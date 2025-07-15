@@ -16,21 +16,32 @@ export default defineConfig({
     }),
   ],
   build: {
-    outDir: "../dist",
+    outDir: "../../sphinx/editor",
     emptyOutDir: true,
     sourcemap: true,
+    cssCodeSplit: true, 
     lib: {
-      entry: [resolve(__dirname, "src/MystEditor.jsx"), resolve(__dirname, "src/index.html"), resolve(__dirname, "src/myst-git/git.html")],
+      entry: [
+        resolve(__dirname, "src/MystEditor.jsx"),
+        resolve(__dirname, "src/index.html"),
+        resolve(__dirname, "src/myst-git/git.html"), 
+        resolve(__dirname, "src/pfx_override/js/MainOverride.js")
+      ],
       formats: ["es"],
     },
     rollupOptions: {
       output: {
-        assetFileNames: "MystEditor.css",
         manualChunks: (module) => {
           if (module.includes("index.html")) {
             return "index";
           } else if (module.includes("git.html")) {
             return "git";
+          } else if (module.includes("MainOverride.js")) {
+            return "MainOverride";
+          } else if (module.includes("MainOverrideStyle.css")) {
+            return "MainOverrideStyle";
+          } else if (module.includes("FuroStyleOverride.css")) {
+            return "FuroStyleOverride";
           } else {
             return "MystEditor";
           }
