@@ -16,7 +16,7 @@ export default defineConfig({
     }),
   ],
   build: {
-    outDir: "../../sphinx/editor",
+    outDir: "./dist",
     emptyOutDir: true,
     sourcemap: true,
     cssCodeSplit: true, 
