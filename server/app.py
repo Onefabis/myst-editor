@@ -6,7 +6,7 @@ from waitress import serve
 
 app = Flask(__name__, static_folder='../dist', static_url_path='/')
 CORS(app)
-BASE_DIR = os.path.abspath('../../docs/source')  # editable content folder
+BASE_DIR = os.path.abspath('../../docs')  # editable content folder
 
 @app.route('/')
 def index():
