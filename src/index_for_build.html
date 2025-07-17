@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MyST Editor Integration</title>
+    <link rel="icon" href="data:," />  
+    <script type="module" src="pfx_override/js/MainOverride.js"></script>
+  </head>
+  <body>
+    <div id="container">
+    <div id="sidebar">
+      <div class="controls">
+        <div class="controls_row" >
+          <button id="new-file">➕ File</button>
+          <button id="new-folder">➕ Folder</button>
+          <button id="delete">🗑️ Delete</button>
+        </div>
+        <div class="controls_row" >
+          <button id="rename">✏️ Rename</button>
+          <button id="move">📁 Move To</button>
+        </div>
+      </div>
+      <div id="tree"></div>
+    </div>
+    <div id="resizer"></div>
+    <div id="editor-panel" class="printable">
+      <div id="myst"></div>
+    </div>
+  </div>
+  </body>
+</html>

@@ -4,7 +4,25 @@
     <meta charset="UTF-8" />
     <title>MyST Editor Integration</title>
     <link rel="icon" href="data:," />  
-    <script type="module" src="pfx_override/js/MainOverride.js"></script>
+    <script type="module" src="/pfx_override/js/MainOverride.js"></script>
+
+    <script type="module" crossorigin src="./MystEditor.jsx"></script>
+    <link rel="stylesheet" crossorigin href="/styles/MystEditor.css">
+    <link rel="stylesheet" crossorigin href="/pfx_override/css/MainOverrideStyle.css">
+    <link rel="stylesheet" crossorigin href="/pfx_override/css/FuroStyleOverride.css">
+    <link rel="stylesheet" href="/styles/MystEditor.css" />
+
+    <link rel="icon" href="data:," />
+    <style>
+      body {
+        margin: 0;
+      }
+
+      #myst {
+        height: 100vh;
+      }
+    </style>
+
   </head>
   <body>
     <div id="container">
@@ -27,5 +45,132 @@
       <div id="myst"></div>
     </div>
   </div>
+  
+  <script type="module">
+  let exampleText = `# This is MyST Editor
+
+A Markdown editor using the [markdown-it parser](https://github.com/markdown-it/markdown-it), based on the [CommonMark specification](https://spec.commonmark.org/0.31.2/).
+We added some extensions so that users can make use of various features of the [MyST Markdown flavor](https://mystmd.org/).
+
+## Admonitions
+
+You can bring more attention to sections of your documents by putting them inside an admonition block. There are many types to choose from.
+
+~~~{note}
+You can find more information on https://mystmd.org/guide/admonitions.
+~~~
+
+~~~{important}
+Notice that the link in the previous admonition is rendered, even without the standard Markdown link syntax.
+~~~
+
+`;
+
+      import MystEditor, { defaultButtons } from "./MystEditor.jsx";
+
+      const usercolors = ["#30bced", "#60c771", "#e6aa3a", "#cbb63e", "#ee6352", "#9ac2c9", "#8acb88", "#14b2c4"];
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const room = urlParams.get("room") || "0";
+      const username = urlParams.get("username") || Math.floor(Math.random() * 1000).toString();
+      const color = usercolors[Math.floor(Math.random() * usercolors.length)];
+      let exampleCustomRoles = [
+        {
+          target: "say",
+          transform: async (content) => username + " says: '" + content + "'",
+        },
+      ];
+      let exampleCustomDirectives = [
+        {
+          target: "bold",
+          transform: (_, data) => `<b style="white-space: pre-wrap;">${data.body}</b>`,
+        },
+      ];
+
+      let exampleTransforms = [
+        {
+          // Other repo issue links
+          target: /[0-9a-z\-]+\/[0-9a-z\-]+#\d{1,10}/g,
+          transform: (match) => {
+            const [repo, issueId] = match.split("#");
+            return `<a href="https://github.com/${repo}/issues/${issueId}">${match}</a>`;
+          },
+        },
+        {
+          // Other repo PR links
+          target: /[0-9a-z\-]+\/[0-9a-z\-]+\!\d+/g,
+          transform: (match) => {
+            const [repo, prid] = match.split("!");
+            return `<a href="https://github.com/${repo}/pull/${prid}">${match}</a>`;
+          },
+        },
+        {
+          // Same repo issue links
+          target: /(^|(?<=\s))#\d+/g,
+          transform: (match) => {
+            const issueId = match.slice(1);
+            return `<a href="https://github.com/antmicro/myst-editor/issues/${issueId}">${match}</a>`;
+          },
+        },
+        {
+          // Same repo PR links
+          target: /(^|(?<=\s))!\d+/g,
+          transform: (match) => {
+            const prid = match.slice(1);
+            return `<a href="https://github.com/antmicro/myst-editor/pull/${prid}">${match}</a>`;
+          },
+        },
+        {
+          // User links
+          target: /@[0-9a-z\-]+/g,
+          transform: (match) => {
+            const user = match.slice(1);
+            return `
+          <a href='https://github.com/${user}'>
+            ${user}
+          </a>`;
+          },
+        },
+        {
+          target: /\|date\|/g,
+          transform: (match) => new Promise((r) => r(new Date().toLocaleString("en-GB", { timeZone: "UTC" }))),
+        },
+      ];
+
+      const collabEnabled = !(import.meta.env.VITE_COLLAB == "OFF") && urlParams.get("collab") != "false";
+      const collabUrl = import.meta.env.VITE_WS_URL ?? urlParams.get("collab_server");
+
+      MystEditor(
+        {
+          id: "demo",
+          templatelist: "linkedtemplatelist.json",
+          initialText: exampleText,
+          title: "[MyST Editor](https://github.com/antmicro/myst-editor/) demo",
+          transforms: exampleTransforms,
+          collaboration: {
+            enabled: collabEnabled,
+            commentsEnabled: collabEnabled,
+            resolvingCommentsEnabled: collabEnabled,
+            wsUrl: collabUrl ?? "#",
+            username,
+            room,
+            color,
+            mode: collabUrl ? "websocket" : "local",
+          },
+          customRoles: exampleCustomRoles,
+          customDirectives: exampleCustomDirectives,
+          includeButtons: defaultButtons.concat([
+            {
+              text: "Custom button",
+              action: () => alert("Custom button action"),
+            },
+          ]),
+          spellcheckOpts: { dict: "en_US", dictionaryPath: `${window.location.pathname}dictionaries` },
+          syncScroll: true,
+        },
+        document.getElementById("myst"),
+      );
+    </script>
+  
   </body>
 </html>

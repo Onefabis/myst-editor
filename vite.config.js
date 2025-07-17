@@ -32,7 +32,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (module) => {
-          if (module.includes("index.html")) {
+          if (module.includes("index_for_build.html")) {
             return "index";
           } else if (module.includes("git.html")) {
             return "git";

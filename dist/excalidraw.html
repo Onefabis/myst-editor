@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Excalidraw in browser</title>
+    <meta charset="UTF-8" />
+
+    <!-- Excalidraw styles -->
+    <link
+      rel="stylesheet"
+      href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css"
+    />
+
+    <script>
+      window.EXCALIDRAW_ASSET_PATH =
+        "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/";
+    </script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@19.0.0",
+          "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
+          "react-dom": "https://esm.sh/react-dom@19.0.0"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import React, { useRef, useEffect, useState } from "https://esm.sh/react@19.0.0";
+      import {createRoot} from "https://esm.sh/react-dom@19.0.0/client";
+      import {
+        Excalidraw,
+        loadFromBlob,
+        Footer,
+        exportToBlob
+      } from "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.js?external=react,react-dom";
+
+      const resolvablePromise = () => {
+        let resolve, reject;
+        const promise = new Promise((res, rej) => {
+          resolve = res;
+          reject = rej;
+        });
+        promise.resolve = resolve;
+        promise.reject = reject;
+        return promise;
+      };
+
+      const App = () => {
+        const [excalidrawAPI, setExcalidrawAPI] = useState(null);
+        const initialStatePromiseRef = useRef({ promise: null });
+
+        if (!initialStatePromiseRef.current.promise) {
+          initialStatePromiseRef.current.promise = resolvablePromise();
+        }
+
+        let currentFileName = "excalidraw.png"; // default
+
+        useEffect(() => {
+          const loadScene = async () => {
+
+            const filePath = "../../_static/main_section/" + currentFileName;
+            
+            try {
+              const response = await fetch(filePath);
+              currentFileName = filePath.split("/").pop(); // Extract file name only
+
+              const blob = await response.blob();
+              const sceneData = await loadFromBlob(blob);
+              console.log("Scene loaded via loadFromBlob", sceneData);
+              initialStatePromiseRef.current.promise.resolve(sceneData);
+            } catch (err) {
+              console.error("Failed to load scene:", err);
+              initialStatePromiseRef.current.promise.resolve({});
+            }
+          };
+
+          loadScene();
+        }, []);
+
+        const handleExportToServer = async () => {
+          if (!excalidrawAPI) return;
+
+          const elements = excalidrawAPI.getSceneElements();
+          const appState = excalidrawAPI.getAppState();
+
+          try {
+            const blob = await exportToBlob({
+              elements,
+              appState: {
+                exportEmbedScene: true, 
+              },
+              mimeType: "image/png",
+              files: excalidrawAPI.getFiles(),
+              exportPadding: 10
+            });
+
+            const formData = new FormData();
+            formData.append("file", blob, currentFileName);
+
+            const response = await fetch(`/save?filename=${encodeURIComponent(currentFileName)}`, {
+              method: "POST",
+              body: formData
+            });
+
+            if (response.ok) {
+              alert("Saved to server as " + currentFileName);
+            } else {
+              throw new Error("Server error");
+            }
+          } catch (err) {
+            console.error("Failed to save:", err);
+            alert("Failed to save file to server.");
+          }
+        };
+
+        return React.createElement(
+          "div",
+          { style: { height: "100vh" } },
+          React.createElement(
+            Excalidraw,
+            {
+              excalidrawAPI: setExcalidrawAPI,
+              initialData: initialStatePromiseRef.current.promise
+            },
+            React.createElement(
+              Footer,
+              null,
+              React.createElement(
+                "button",
+                { onClick: handleExportToServer },
+                "📤 Save to Server"
+              )
+            )
+          )
+        );
+      };
+
+      const root = createRoot(document.getElementById("app"));
+      root.render(React.createElement(App));
+    </script>
+  </body>
+</html>

@@ -8,6 +8,7 @@ app = Flask(__name__, static_folder='../dist', static_url_path='/')
 CORS(app)
 BASE_DIR = os.path.abspath('../../docs')  # editable content folder
 
+
 @app.route('/')
 def index():
     return send_from_directory(app.static_folder, 'index.html')
@@ -207,7 +208,20 @@ def serve_linked_template_list():
     return send_from_directory(app.static_folder, 'linkedtemplatelist.json')
 
 
+EXCALIDRAW_DIR = os.path.abspath('../../docs/_static/main_section')
+
+
+@app.route("/save", methods=["POST"])
+def save_file():
+    file = request.files["file"]
+    # Get filename from query parameter
+    filename = request.args.get("filename", "excalidraw_saved.png")
+    filename = os.path.basename(filename)
+    save_path = os.path.join(EXCALIDRAW_DIR, filename)
+    file.save(save_path)
+    return jsonify({"success": True, "path": save_path})
+
+
 if __name__ == '__main__':
     # app.run(ssl_context=('cert.pem', 'key.pem'), host='0.0.0.0', port=443)
     serve(app, host='0.0.0.0', port=5000)
-    # app.run(host='0.0.0.0', port=5000)
