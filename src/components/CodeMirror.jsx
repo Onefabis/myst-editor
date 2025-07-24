@@ -363,6 +363,7 @@ const CodeMirror = () => {
         .useTrackHeadings(headings)
         .useExceptionSink(error)
         .useLogger(logger)
+        .useTemporaryDivButton()
         .if(options.cmDarkTheme.value, (b) => b.useCmDarkTheme())
         .useCriticMarkup()
         .if(suggestMode.value, (b) => b.useSuggestMode())

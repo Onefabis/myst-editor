@@ -53,8 +53,9 @@ def file_ops():
 
 @app.route('/api/images_in_folder')
 def images_in_folder():
-    folder = request.args.get('folder', '')  # relative to BASE_DIR
-    folder_path = os.path.join(BASE_DIR, folder)
+    folder = request.args.get('folder', '')  # relative to _static
+    static_dir = os.path.join(BASE_DIR, '_static')
+    folder_path = os.path.join(static_dir, folder)
     if not os.path.isdir(folder_path):
         return jsonify([])
 
@@ -63,7 +64,7 @@ def images_in_folder():
 
     for entry in os.listdir(folder_path):
         full_path = os.path.join(folder_path, entry)
-        rel_path = os.path.relpath(full_path, BASE_DIR).replace('\\', '/')
+        rel_path = os.path.relpath(full_path, static_dir).replace('\\', '/')
         if os.path.isdir(full_path):
             entries.append({"type": "folder", "name": entry, "path": rel_path})
         elif os.path.splitext(entry)[1].lower() in allowed_exts:
@@ -72,27 +73,7 @@ def images_in_folder():
     return jsonify(entries)
 
 
-@app.route('/api/images')
-def list_images():
-    allowed_exts = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg'}
-    images = []
-
-    def scan_images(path):
-        result = []
-        for entry in os.listdir(path):
-            full_path = os.path.join(path, entry)
-            rel_path = os.path.relpath(full_path, BASE_DIR).replace('\\', '/')
-            if os.path.isdir(full_path):
-                result.extend(scan_images(full_path))
-            else:
-                if os.path.splitext(entry)[1].lower() in allowed_exts:
-                    result.append(rel_path)
-        return result
-
-    images = scan_images(BASE_DIR)
-    return jsonify(images)
-
-
+# Function for the folder or file creation in the file tree on the left side panel
 @app.route('/api/create', methods=['POST'])
 def create_file_or_folder():
     path = request.json.get('path')
@@ -107,20 +88,17 @@ def create_file_or_folder():
     return jsonify({"status": "created", "path": path})
 
 
+# Function for the file or folder deletion in the file tree on the left side panel
 @app.route('/api/delete', methods=['POST'])
 def delete_path():
     path = request.json.get('path')
     if not path:
         return jsonify({'error': 'Missing path'}), 400
-
     full_path = os.path.join(BASE_DIR, path)
-
     if not os.path.commonpath([BASE_DIR, os.path.abspath(full_path)]) == BASE_DIR:
         return jsonify({'error': 'Invalid path'}), 403  # Prevent directory traversal
-
     if not os.path.exists(full_path):
         return jsonify({'error': 'File or folder does not exist'}), 404
-
     try:
         if os.path.isfile(full_path):
             os.remove(full_path)
@@ -132,25 +110,21 @@ def delete_path():
         return jsonify({'error': str(e)}), 500
 
 
+# Rename function for the files or folders in the file tree on the left side panel
 @app.route('/api/rename', methods=['POST'])
 def rename_path():
     data = request.json
     old_path = data.get('oldPath')
     new_path = data.get('newPath')
-
     if not old_path or not new_path:
         return jsonify({'error': 'Missing oldPath or newPath'}), 400
-
     old_full_path = os.path.abspath(os.path.join(BASE_DIR, old_path))
     new_full_path = os.path.abspath(os.path.join(BASE_DIR, new_path))
-
     # Prevent directory traversal
     if not old_full_path.startswith(BASE_DIR) or not new_full_path.startswith(BASE_DIR):
         return jsonify({'error': 'Invalid path'}), 403
-
     if not os.path.exists(old_full_path):
         return jsonify({'error': 'Source path does not exist'}), 404
-
     try:
         os.makedirs(os.path.dirname(new_full_path), exist_ok=True)
         os.rename(old_full_path, new_full_path)
@@ -159,30 +133,27 @@ def rename_path():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/_static/<path:filename>')
-def serve_static_images(filename):
-    static_dir = os.path.join(BASE_DIR, '_static')
-    full_path = os.path.join(static_dir, filename)
+# This helper to display the correct path of the preview image on the right side panel
+# @app.route('/_static/<path:filename>')
+# def serve_static_images(filename):
+#     static_dir = os.path.join(BASE_DIR, '_static')
+#     full_path = os.path.join(static_dir, filename)
+#     # Prevent directory traversal
+#     if not os.path.commonpath([static_dir, os.path.abspath(full_path)]) == static_dir:
+#         return 'Forbidden', 403
+#     return send_from_directory(static_dir, filename)
+    
 
-    # Prevent directory traversal
+# It collects the source path for thumbnails in the picker image window
+@app.route('/_static/<path:subpath>')
+def serve_source_files(subpath):
+    static_dir = os.path.join(BASE_DIR, '_static')
+    full_path = os.path.join(static_dir, subpath)
+
     if not os.path.commonpath([static_dir, os.path.abspath(full_path)]) == static_dir:
         return 'Forbidden', 403
 
-    return send_from_directory(static_dir, filename)
-    
-
-@app.route('/source/<path:subpath>')
-def serve_source_files(subpath):
-    # Compute the absolute path of the requested file
-    full_path = os.path.abspath(os.path.join(BASE_DIR, subpath))
-
-    # Security check: ensure the requested path is inside BASE_DIR to prevent directory traversal
-    if not full_path.startswith(BASE_DIR):
-        return 'Forbidden', 403
-
-    # Serve the file if it exists and is a file
     if os.path.isfile(full_path):
-        # send_from_directory needs the directory and filename separately
         directory = os.path.dirname(full_path)
         filename = os.path.basename(full_path)
         return send_from_directory(directory, filename)
@@ -190,6 +161,7 @@ def serve_source_files(subpath):
     return 'File not found', 404
     
 
+# Add dictionaries path for the spell-check support
 @app.route('/dictionaries/<path:path>')
 def send_dictionaries(path):
     response = send_from_directory(os.path.join(app.static_folder, 'dictionaries'), path)
@@ -198,30 +170,84 @@ def send_dictionaries(path):
     # return send_from_directory(os.path.join(app.static_folder, 'dictionaries'), path)
 
 
+# Add templates path for the correct templates integration
 @app.route('/templates/<path:path>')
 def get_templates(path):
     return send_from_directory(os.path.join(app.static_folder, 'templates'), path)
 
 
+# Add the main template list json file that contains template_name:template_path values
 @app.route('/linkedtemplatelist.json')
 def serve_linked_template_list():
     return send_from_directory(app.static_folder, 'linkedtemplatelist.json')
 
 
-EXCALIDRAW_DIR = os.path.abspath('../../docs/_static/main_section')
+@app.route('/api/image_tree', methods=['GET'])
+def get_image_tree():
+    static_root = os.path.join(BASE_DIR, '_static')
+
+    def scan_dir(path):
+        entries = []
+        for entry in os.listdir(path):
+            full_path = os.path.join(path, entry)
+            rel_path = os.path.relpath(full_path, static_root).replace('\\', '/')
+            if os.path.isdir(full_path):
+                entries.append({
+                    "type": "folder",
+                    "name": entry,
+                    "path": rel_path,
+                    "children": scan_dir(full_path)
+                })
+        return entries
+
+    return jsonify(scan_dir(static_root))
 
 
-@app.route("/save", methods=["POST"])
-def save_file():
-    file = request.files["file"]
-    # Get filename from query parameter
-    filename = request.args.get("filename", "excalidraw_saved.png")
-    filename = os.path.basename(filename)
-    save_path = os.path.join(EXCALIDRAW_DIR, filename)
-    file.save(save_path)
-    return jsonify({"success": True, "path": save_path})
+@app.route('/api/upload_image', methods=['POST'])
+def upload_image():
+    if 'file' not in request.files:
+        return 'Missing file', 400
+
+    uploaded_file = request.files['file']
+    current_path = request.form.get('currentPath', '')
+    if uploaded_file.filename == '':
+        return 'No selected file', 400
+
+    filename = uploaded_file.filename
+    import os
+
+    # Normalize paths
+    current_path = current_path.replace('\\', '/').strip('/')
+    parts = current_path.split('/')[:-1] if current_path else []
+
+    # Construct target folder in _source
+    source_root = os.path.join(BASE_DIR, '_static')
+    target_folder = os.path.join(source_root, *parts)
+    os.makedirs(target_folder, exist_ok=True)
+
+    # Save file
+    save_path = os.path.join(target_folder, filename)
+    uploaded_file.save(save_path)
+
+    rel_path = os.path.relpath(save_path, os.path.join(BASE_DIR, '_static')).replace('\\', '/')
+    return jsonify({"savedPath": rel_path})
+
+
+# EXCALIDRAW_DIR = os.path.abspath('../../docs/_static/main_section')
+
+
+# @app.route("/save", methods=["POST"])
+# def save_file():
+#     file = request.files["file"]
+#     # Get filename from query parameter
+#     filename = request.args.get("filename", "excalidraw_saved.png")
+#     filename = os.path.basename(filename)
+#     save_path = os.path.join(EXCALIDRAW_DIR, filename)
+#     file.save(save_path)
+#     return jsonify({"success": True, "path": save_path})
 
 
 if __name__ == '__main__':
     # app.run(ssl_context=('cert.pem', 'key.pem'), host='0.0.0.0', port=443)
-    serve(app, host='0.0.0.0', port=5000)
+    # serve(app, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -35,6 +35,7 @@ import { highlightFocusedActiveLine } from "./activeLineHighlight";
 import { classHighlighter, tags } from "@lezer/highlight";
 import { loggerFacet } from "../logger";
 import { criticHistory, criticMarkup, suggestMode } from "./criticMarkup";
+import { temporaryDivExtension } from "./temporaryDivExtension";
 
 const getRelativeCursorLocation = (view) => {
   const { from } = view.state.selection.main;
@@ -121,6 +122,11 @@ export class ExtensionBuilder {
       keymap.of(defaultKeymap),
       keymap.of([indentWithTab, { key: "Mod-Z", run: redo }]),
     ];
+  }
+
+  useTemporaryDivButton() {
+    this.extensions.push(...temporaryDivExtension);
+    return this;
   }
 
   useMarkdown(transforms) {

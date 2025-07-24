@@ -4,27 +4,42 @@
     <meta charset="UTF-8" />
     <title>MyST Editor Integration</title>
     <link rel="icon" href="data:," />  
-    <script type="module" src="/pfx_override/js/MainOverride.js"></script>
 
+     <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@19.0.0",
+          "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
+          "react-dom": "https://esm.sh/react-dom@19.0.0"
+        }
+      }
+    </script>
+
+    <script type="module" src="/pfx_override/js/MainOverride.js"></script>
     <script type="module" crossorigin src="./MystEditor.jsx"></script>
+    
     <link rel="stylesheet" crossorigin href="/styles/MystEditor.css">
-    <link rel="stylesheet" crossorigin href="/pfx_override/css/MainOverrideStyle.css">
-    <link rel="stylesheet" crossorigin href="/pfx_override/css/FuroStyleOverride.css">
+    <!-- <link rel="stylesheet" crossorigin href="/pfx_override/css/MainOverrideStyle.css"> -->
+    <!-- <link rel="stylesheet" crossorigin href="/pfx_override/css/FuroStyleOverride.css"> -->
     <link rel="stylesheet" href="/styles/MystEditor.css" />
 
     <link rel="icon" href="data:," />
-    <style>
-      body {
-        margin: 0;
-      }
 
-      #myst {
-        height: 100vh;
-      }
-    </style>
+    <link
+      rel="stylesheet"
+      href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css"
+    />
+
+    <script>
+      window.EXCALIDRAW_ASSET_PATH =
+        "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/";
+    </script>
+
 
   </head>
   <body>
+    <!-- <div id="app"></div> -->
+    
     <div id="container">
     <div id="sidebar">
       <div class="controls">
@@ -36,6 +51,7 @@
         <div class="controls_row" >
           <button id="rename">✏️ Rename</button>
           <button id="move">📁 Move To</button>
+          <button id="upload-image">📤 Upload Image</button>
         </div>
       </div>
       <div id="tree"></div>
@@ -45,6 +61,8 @@
       <div id="myst"></div>
     </div>
   </div>
+
+  
   
   <script type="module">
   let exampleText = `# This is MyST Editor

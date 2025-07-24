@@ -279,7 +279,7 @@ const Sidebar = ({
         <label>Commit:</label>
         <Select
           name="commits"
-          options={commits.value.map(commitToSelectOpt)}
+          options={(Array.isArray(commits.value) ? commits.value : []).map(commitToSelectOpt)}
           inputPlaceholder="Search commits"
           onChange={(o, isNew) => switchCommit({ hash: o.value, message: o.label }, isNew)}
           loadMore={loadCommits}

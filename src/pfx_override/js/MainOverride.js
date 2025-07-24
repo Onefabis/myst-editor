@@ -2,6 +2,7 @@ import '../css/MainOverrideStyle.css';
 import '../css/FuroStyleOverride.css';
 
 import MystEditor, { defaultButtons } from '../../MystEditor.jsx';
+import { showTemporaryDiv } from "../../extensions/temporaryDivExtension.js";
 const openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
 const bulletproof = ["_static", "_templates"];
 let currentPath = '';
@@ -156,6 +157,14 @@ function renderTree(nodes, parent) {
 }
 
 async function loadFile(filename) {
+  // ⏳ Save current content if dirty
+  if (mystEditorInstance) {
+    const currentContent = mystEditorInstance.editorView.v.contentDOM.editContext.text;
+    if (currentContent !== lastSavedContent) {
+      await saveCurrentEditorContent();
+    }
+  }
+
   const res = await fetch(`/api/file?path=${encodeURIComponent(normalizePath(filename))}`);
   if (res.status === 404) {
     console.warn('Last opened file not found.');
@@ -180,14 +189,11 @@ async function loadFile(filename) {
   currentPath = filename;
   localStorage.setItem('currentPath', currentPath);
 
-  // Create a CSS stylesheet and add style to remove padding
   const sheet = new CSSStyleSheet();
   const css = await (await fetch('../FuroStyleOverride.css')).text();
   await sheet.replace(css);
   document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 
-
-  // Only show the file name in title
   const title = filename.split('\\').pop().split('/').pop();
   const urlParams = new URLSearchParams(window.location.search);
   const usercolors = ["#30bced", "#60c771", "#e6aa3a", "#cbb63e", "#ee6352", "#9ac2c9", "#8acb88", "#14b2c4"];
@@ -198,7 +204,6 @@ async function loadFile(filename) {
   const username = urlParams.get("username") || Math.floor(Math.random() * 1000).toString();
   const color = usercolors[Math.floor(Math.random() * usercolors.length)];
 
-
   requestAnimationFrame(() => {
     mystEditorInstance = MystEditor({
       templatelist: "linkedtemplatelist.json",
@@ -206,8 +211,8 @@ async function loadFile(filename) {
       title: title,
       additionalStyles: sheet,
       collaboration: {
-        enabled: true,
-        commentsEnabled: true,
+        enabled: false,
+        commentsEnabled: false,
         resolvingCommentsEnabled: true,
         wsUrl: collabUrl ?? "#",
         username,
@@ -218,48 +223,37 @@ async function loadFile(filename) {
 
       includeButtons: defaultButtons.concat([
         {
-          text: "Excalidraw",
-          action: () => {
-            copyExcalidrawSceneToClipboardFromMystSelection();
-          }
-        }, 
-        {
           text: "💾 Save",
           action: () => {
-            const content = mystEditorInstance.editorView.v.contentDOM.editContext.text;
-            fetch(`/api/file?path=${encodeURIComponent(currentPath)}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ content }),
-            }).then(() => alert('Saved'));
-          },
+            saveCurrentEditorContent(true);
+          }
         },
         {
           text: "🗃️ Image",
           action: () => {
             openImagePicker();
           }
-        }, 
+        },
         {
-          text: "Clear", 
+          text: "Clear",
           action: () => {
             clearLineSymbols();
           }
-        }, 
+        },
         {
-          text: "H1", 
+          text: "H1",
           action: () => {
             convertToH1();
           }
-        }, 
+        },
         {
-          text: "H2", 
+          text: "H2",
           action: () => {
             convertToH2();
           }
-        }, 
+        },
         {
-          text: "B", 
+          text: "B",
           action: () => {
             convertToBold();
           }
@@ -270,14 +264,87 @@ async function loadFile(filename) {
     }, newContainer);
 
     window._mystEditor = mystEditorInstance;
+    lastSavedContent = data.content;
+
+    // 💾 Start/restart autosave interval
+    if (autosaveInterval) clearInterval(autosaveInterval);
+    autosaveInterval = setInterval(() => {
+      saveCurrentEditorContent();
+    }, 60 * 1000); // 1 min
   });
 
   localStorage.setItem('lastOpened', filename);
 }
 
-// ------------------------- Typography buttons functions START -------------------------- //
 
-const trimSymbols = ['*', '#', '_'];
+let lastSavedContent = '';
+// let currentPath = '';
+let autosaveInterval = null;
+
+async function saveCurrentEditorContent(manual = false) {
+  const view = mystEditorInstance?.editorView;
+  if (!view) {
+    if (manual) alert("Editor is not ready.");
+    return;
+  }
+
+  const content = view.v.contentDOM.editContext.text;
+
+  try {
+    await fetch(`/api/file?path=${encodeURIComponent(currentPath)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+
+    lastSavedContent = content;
+    if (manual) alert('Saved');
+  } catch (err) {
+    if (manual) alert("Save failed: " + err.message);
+  }
+}
+
+
+document.getElementById("upload-image").onclick = () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const currentPath = localStorage.getItem("currentPath") || "";
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("currentPath", currentPath);
+
+    try {
+      const res = await fetch("/api/upload_image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        alert("Upload failed: " + errText);
+        return;
+      }
+
+      const result = await res.json();
+      const savedPath = result.savedPath;
+      const folderPath = result.savedPath.split('/').slice(0, -1).join('/');
+      openImagePicker(folderPath);
+      setTimeout(() => loadImagePickerFolder(folderPath), 100);
+    } catch (err) {
+      alert("Upload error: " + err.message);
+    }
+  };
+
+  input.click();
+};
+
+// ------------------------- Typography buttons functions START -------------------------- //
 
 function clearLineSymbols() {
   const view = mystEditorInstance?.editorView;
@@ -381,116 +448,80 @@ function convertToBold() {
 // ------------------------- Typography buttons functions END -------------------------- //
 
 
+// -------------------------- Custom Right Mouse Button menu START --------------------------- //
+
+
+// ------------------------- Excalidraw image editing START ---------------------------- //
+
+const menu = document.createElement("div");
+menu.id = "custom-menu";
+menu.innerHTML = `<div class="item" id="edit_image">🖼️ Edit Image</div>`;
+document.body.appendChild(menu);
+
+// Show menu on right-click
+document.addEventListener("contextmenu", (e) => {
+  const path = e.composedPath();
+  const target = path.find(el => el.classList && el.classList.contains("myst-main-editor"));
+
+  if (target) {
+    e.preventDefault();
+    menu.style.top = `${e.clientY}px`;
+    menu.style.left = `${e.clientX}px`;
+    menu.style.display = "block";
+  } else {
+    menu.style.display = "none";
+  }
+});
+
+// Hide menu on click
+document.addEventListener("click", () => {
+  menu.style.display = "none";
+});
+
+
+document.getElementById("edit_image").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  if (!view) return alert("Editor not ready");
+
+  const state = view.v.state;
+  const pos = state.selection.main.head;
+  const fullText = state.doc.toString();
+
+  const lineStart = fullText.lastIndexOf('\n', pos - 1) + 1;
+  const lineEnd = fullText.indexOf('\n', pos);
+  const actualEnd = lineEnd === -1 ? fullText.length : lineEnd;
+  const line = fullText.slice(lineStart, actualEnd);
+
+  const match = line.match(/!\[.*?\]\((.*?)\)/);
+  if (match) {
+    // const filename = match[1].split("/").pop();
+    console.log(match[1]);
+    showTemporaryDiv(match[1]);
+    // showTemporaryDiv(match[1]);
+  } else {
+    alert("No image found under cursor.");
+  }
+});
+// ------------------------- Excalidraw image editing END ---------------------------- //
+
+
+// -------------------------- Custom Right Mouse Button menu END --------------------------- //
+
+
+
+
+
 // New Image Picker modal code
 let imagePickerModal = null;
 let folderList = null;
 let imageList = null;
 let currentFolder = '';
 
-async function copyExcalidrawSceneToClipboardFromMystSelection() {
-  const view = mystEditorInstance?.editorView;
-  if (!view) {
-    alert("Editor is not ready yet.");
-    return;
-  }
-
-  const state = view.v.state;
-  const { from: start, to: end } = state.selection.main;
-  const selectedText = state.doc.sliceString(start, end);
-
-  const imgMatch = selectedText.match(/<img[^>]*src="([^"]+)"[^>]*>|!\[[^\]]*\]\(([^)]+)\)/);
-  const imgSrc = imgMatch?.[1] || imgMatch?.[2];
-
-  if (!imgSrc) {
-    alert("No image selected.");
-    return;
-  }
-
-  const response = await fetch(imgSrc);
-  const imageBlob = await response.blob();
-
-  const base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(imageBlob);
-  });
-
-  const fileId = crypto.randomUUID();
-  const now = Date.now();
-
-  // Prepare Excalidraw elements
-  const elements = [
-    {
-      id: crypto.randomUUID(),
-      type: "image",
-      x: 100,
-      y: 100,
-      width: 400,
-      height: 300,
-      angle: 0,
-      fileId,
-      status: "saved",
-      seed: Math.floor(Math.random() * 100000),
-      version: 1,
-      versionNonce: Math.floor(Math.random() * 100000000),
-      isDeleted: false,
-      updated: now,
-      scale: [1, 1],
-    },
-  ];
-
-  // Prepare appState
-  const appState = {
-    backgroundColor: "#ffffff",
-  };
-
-  // Prepare files
-  const files = {
-    [fileId]: {
-      mimeType: imageBlob.type,
-      id: fileId,
-      dataURL: `data:${imageBlob.type};base64,${base64}`,
-      created: now,
-    },
-  };
-
-  // Create the full scene data
-  const sceneData = {
-    type: "excalidraw",
-    version: 2,
-    source: "myst",
-    elements,
-    appState,
-    files
-  };
-
-  // Serialize using Excalidraw's recommended method
-  const serialized = serializeAsJSON(elements, appState);
-
-  // Create the final clipboard data
-  const clipboardData = {
-    ...JSON.parse(serialized),
-    files  // Include files separately
-  };
-
-  await navigator.clipboard.writeText(JSON.stringify(clipboardData));
-  alert("Copied image to clipboard as Excalidraw scene!");
-}
-
-// Implement the required serialization function
-function serializeAsJSON(elements, appState) {
-  return JSON.stringify({
-    type: "excalidraw",
-    version: 2,
-    source: "myst",
-    elements,
-    appState
-  });
-}
-
-function openImagePicker() {
+function openImagePicker(startFolder = '') {
   // Create modal if it doesn't exist
+
+
+
   if (!imagePickerModal) {
     imagePickerModal = document.createElement('div');
     imagePickerModal.id = 'image-picker-modal';
@@ -528,16 +559,24 @@ function openImagePicker() {
   imagePickerModal.style.display = 'flex';
 
   // Reset to root folder and load images
-  currentFolder = '';
-  loadImagePickerFolder('');
+  // currentFolder = '';
+  // loadImagePickerFolder('');
+
+  currentFolder = startFolder;
+  loadImagePickerFolder(currentFolder);
+
+  const selectedParts = startFolder ? startFolder.split('/') : [];
+  fetch('/api/image_tree')
+    .then(res => res.json())
+    .then(data => {
+      folderList.innerHTML = '';
+      renderFolderTree(data, folderList, selectedParts);
+    });
 }
 
 // Insert image markdown into editor
 function insertImageMarkdown(path) {
-  // const imgSyntax = `![image](/source/${path})`;
-  const imgSyntax = path.startsWith('_static') 
-? `![image](/_static/${path.split('/').slice(1).join('/')})`
-: `![image](${path.split('/').pop()})`;  // For local images next to .md file
+  const imgSyntax = `![image](/_static/${path})`;
   const view = mystEditorInstance?.editorView;
   if (!view) {
     alert("Editor is not ready yet.");
@@ -556,29 +595,90 @@ function insertImageMarkdown(path) {
 
 
 // Render folders and images in the modal
-function renderFoldersAndImages(items) {
-  if (!folderList || !imageList) return;
-  folderList.innerHTML = '';
-  imageList.innerHTML = '';
-  // Render folders
-  items.filter(i => i.type === 'folder').forEach(folderItem => {
-    const el = document.createElement('div');
-    el.textContent = '📁 ' + folderItem.name;
-    el.style.cursor = 'pointer';
-    el.style.padding = '4px';
-    el.style.userSelect = 'none';
-    el.onclick = () => {
-      currentFolder = folderItem.path;
-      loadImagePickerFolder(folderItem.path);
+function renderFolderTree(nodes, parent, selectedPathParts = []) {
+  const ul = document.createElement("ul");
+
+  for (const node of nodes) {
+    if (node.type !== "folder") continue;
+
+    const li = document.createElement("li");
+    const container = document.createElement("div");
+    container.style.display = "flex";
+    container.style.alignItems = "center";
+
+    const toggle = document.createElement("span");
+    toggle.textContent = "➕";
+    toggle.style.cursor = "pointer";
+    toggle.style.width = "20px";
+
+    const label = document.createElement("span");
+    label.textContent = node.name;
+    label.style.cursor = "pointer";
+    label.style.userSelect = "none";
+    label.style.padding = "2px 4px";
+
+    if (node.path === selectedPathParts.join('/')) {
+      label.style.fontWeight = "bold";
+    }
+
+    const subtree = document.createElement("div");
+    subtree.style.marginLeft = "16px";
+    subtree.style.display = "none";
+
+    // Expand only matching selectedPathParts
+    const nodeParts = node.path.split('/');
+    const shouldAutoExpand = selectedPathParts.length >= nodeParts.length &&
+                             selectedPathParts.slice(0, nodeParts.length).join('/') === node.path;
+
+    if (shouldAutoExpand) {
+      subtree.style.display = "block";
+      toggle.textContent = "➖";
+    }
+
+    toggle.onclick = () => {
+      if (subtree.style.display === "none") {
+        subtree.style.display = "block";
+        toggle.textContent = "➖";
+      } else {
+        subtree.style.display = "none";
+        toggle.textContent = "➕";
+      }
     };
-    folderList.appendChild(el);
-  });
+
+    label.onclick = () => {
+      currentFolder = node.path;
+      loadImagePickerFolder(currentFolder);
+      fetch('/api/image_tree')
+        .then(res => res.json())
+        .then(data => {
+          folderList.innerHTML = '';
+          renderFolderTree(data, folderList, node.path.split('/'));
+        });
+    };
+
+    container.appendChild(toggle);
+    container.appendChild(label);
+    li.appendChild(container);
+
+    if (node.children && node.children.length > 0) {
+      renderFolderTree(node.children, subtree, selectedPathParts);
+    }
+
+    li.appendChild(subtree);
+    ul.appendChild(li);
+  }
+
+  parent.appendChild(ul);
+}
 
 
-  // Render images as thumbnails
+function renderImageList(items) {
+  if (!imageList) return;
+  imageList.innerHTML = '';
+
   items.filter(i => i.type === 'file').forEach(fileItem => {
     const img = document.createElement('img');
-    img.src = `/source/${fileItem.path}`;
+    img.src = `/_static/${fileItem.path}`;
     img.style.width = '100px';
     img.style.height = 'fit-content';
     img.style.cursor = 'pointer';
@@ -590,23 +690,10 @@ function renderFoldersAndImages(items) {
     };
     imageList.appendChild(img);
   });
+}
 
-
-  // Add "up one folder" button if not root
-  if (currentFolder) {
-    const upFolder = currentFolder.split('/').slice(0, -1).join('/');
-    const upEl = document.createElement('div');
-    upEl.textContent = '⬆️ .. (up one folder)';
-    upEl.style.cursor = 'pointer';
-    upEl.style.padding = '4px';
-    upEl.style.userSelect = 'none';
-    upEl.style.fontWeight = 'bold';
-    upEl.onclick = () => {
-      currentFolder = upFolder;
-      loadImagePickerFolder(upFolder);
-    };
-    folderList.prepend(upEl);
-  }
+function renderFoldersAndImages(items) {
+  renderImageList(items);
 }
 
 
