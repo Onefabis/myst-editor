@@ -36,6 +36,7 @@ import { classHighlighter, tags } from "@lezer/highlight";
 import { loggerFacet } from "../logger";
 import { criticHistory, criticMarkup, suggestMode } from "./criticMarkup";
 import { temporaryDivExtension } from "./temporaryDivExtension";
+import { ollamaExtension } from "./ollamaAIQuery";
 
 const getRelativeCursorLocation = (view) => {
   const { from } = view.state.selection.main;
@@ -128,6 +129,12 @@ export class ExtensionBuilder {
     this.extensions.push(...temporaryDivExtension);
     return this;
   }
+
+  useOllamaAIQuery() {
+    this.extensions.push(...ollamaExtension);
+    return this;
+  }
+
 
   useMarkdown(transforms) {
     const md = markdown({

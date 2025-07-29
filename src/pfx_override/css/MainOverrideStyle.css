@@ -11,7 +11,7 @@ body {
   padding: 11px;
   overflow-y: auto;
   border-right: 1px solid #ccc;
-  min-width: 250px;
+  min-width: 260px;
   max-width: 600px;
   width: 300px;
   box-sizing: border-box;
@@ -61,7 +61,7 @@ ul {
 .controls_row {
   width: 100%;
   display: flex;
-  margin-bottom: 0.5rem;
+  margin-bottom: 3px;
 }
 
 .subtree{
@@ -92,8 +92,10 @@ ul {
 button {
   width: 100%;
   white-space: nowrap;
-  margin-right: 5px;
+  margin-right: 2px;
   cursor: pointer;
+  border: 1px solid rgb(181 181 181);
+  border-radius: 6px;
 }
 
 #container {

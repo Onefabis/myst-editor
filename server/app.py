@@ -1,8 +1,8 @@
-from flask import Flask, send_from_directory, jsonify, request
 import os
+import re
+from flask import Flask, send_from_directory, jsonify, request
 from flask_cors import CORS
-from functools import lru_cache
-from waitress import serve
+
 
 app = Flask(__name__, static_folder='../dist', static_url_path='/')
 CORS(app)
@@ -131,17 +131,6 @@ def rename_path():
         return jsonify({'status': 'renamed', 'oldPath': old_path, 'newPath': new_path})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
-# This helper to display the correct path of the preview image on the right side panel
-# @app.route('/_static/<path:filename>')
-# def serve_static_images(filename):
-#     static_dir = os.path.join(BASE_DIR, '_static')
-#     full_path = os.path.join(static_dir, filename)
-#     # Prevent directory traversal
-#     if not os.path.commonpath([static_dir, os.path.abspath(full_path)]) == static_dir:
-#         return 'Forbidden', 403
-#     return send_from_directory(static_dir, filename)
     
 
 # It collects the source path for thumbnails in the picker image window
@@ -203,6 +192,33 @@ def get_image_tree():
     return jsonify(scan_dir(static_root))
 
 
+def sanitize_filename(filename):
+    name, ext = os.path.splitext(filename)
+    name = name.replace(' ', '_')
+    return f"{name}{ext}"
+
+
+def increment_filename(path, filename):
+    name, ext = os.path.splitext(filename)
+    match = re.search(r'(.*?)(\d+)$', name)
+
+    if match:
+        prefix = match.group(1)
+        number = match.group(2)
+        i = int(number) + 1
+        width = len(number)
+    else:
+        prefix = name + '_'
+        i = 1
+        width = 4  # default padding
+
+    while True:
+        new_name = f"{prefix}{i:0{width}d}{ext}"
+        if not os.path.exists(os.path.join(path, new_name)):
+            return new_name
+        i += 1
+
+
 @app.route('/api/upload_image', methods=['POST'])
 def upload_image():
     if 'file' not in request.files:
@@ -213,38 +229,49 @@ def upload_image():
     if uploaded_file.filename == '':
         return 'No selected file', 400
 
-    filename = uploaded_file.filename
-    import os
-
-    # Normalize paths
+    filename = sanitize_filename(uploaded_file.filename)
     current_path = current_path.replace('\\', '/').strip('/')
     parts = current_path.split('/')[:-1] if current_path else []
 
-    # Construct target folder in _source
     source_root = os.path.join(BASE_DIR, '_static')
     target_folder = os.path.join(source_root, *parts)
     os.makedirs(target_folder, exist_ok=True)
 
-    # Save file
-    save_path = os.path.join(target_folder, filename)
-    uploaded_file.save(save_path)
+    full_path = os.path.join(target_folder, filename)
 
-    rel_path = os.path.relpath(save_path, os.path.join(BASE_DIR, '_static')).replace('\\', '/')
+    if os.path.exists(full_path):
+        filename = increment_filename(target_folder, filename)
+        full_path = os.path.join(target_folder, filename)
+
+    uploaded_file.save(full_path)
+    rel_path = os.path.relpath(full_path, source_root).replace('\\', '/')
     return jsonify({"savedPath": rel_path})
 
 
-# EXCALIDRAW_DIR = os.path.abspath('../../docs/_static/main_section')
+@app.route("/save", methods=["POST"])
+def save_file():
+    file = request.files["file"]
+    raw_path = request.args.get("filename")
 
+    if not raw_path:
+        return jsonify({"error": "Missing filename"}), 400
 
-# @app.route("/save", methods=["POST"])
-# def save_file():
-#     file = request.files["file"]
-#     # Get filename from query parameter
-#     filename = request.args.get("filename", "excalidraw_saved.png")
-#     filename = os.path.basename(filename)
-#     save_path = os.path.join(EXCALIDRAW_DIR, filename)
-#     file.save(save_path)
-#     return jsonify({"success": True, "path": save_path})
+    # Strip leading slash and normalize path
+    safe_relative_path = os.path.normpath(raw_path.lstrip("/"))
+
+    # Resolve full absolute path within BASE_DIR
+    save_path = os.path.abspath(os.path.join(BASE_DIR, safe_relative_path))
+
+    # SECURITY CHECK: ensure path is within BASE_DIR
+    if not save_path.startswith(BASE_DIR):
+        return jsonify({"error": "Invalid save path"}), 400
+
+    # Ensure target directory exists
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    # Save file
+    file.save(save_path)
+    return jsonify({"success": True, "path": save_path})
 
 
 if __name__ == '__main__':

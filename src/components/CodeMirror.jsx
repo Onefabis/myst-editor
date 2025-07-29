@@ -364,6 +364,7 @@ const CodeMirror = () => {
         .useExceptionSink(error)
         .useLogger(logger)
         .useTemporaryDivButton()
+        .useOllamaAIQuery()
         .if(options.cmDarkTheme.value, (b) => b.useCmDarkTheme())
         .useCriticMarkup()
         .if(suggestMode.value, (b) => b.useSuggestMode())

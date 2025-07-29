@@ -3,6 +3,8 @@ import '../css/FuroStyleOverride.css';
 
 import MystEditor, { defaultButtons } from '../../MystEditor.jsx';
 import { showTemporaryDiv } from "../../extensions/temporaryDivExtension.js";
+import { showOllamaPopup } from "../../extensions/ollamaAIQuery.js";
+
 const openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
 const bulletproof = ["_static", "_templates"];
 let currentPath = '';
@@ -278,7 +280,6 @@ async function loadFile(filename) {
 
 
 let lastSavedContent = '';
-// let currentPath = '';
 let autosaveInterval = null;
 
 async function saveCurrentEditorContent(manual = false) {
@@ -287,16 +288,13 @@ async function saveCurrentEditorContent(manual = false) {
     if (manual) alert("Editor is not ready.");
     return;
   }
-
   const content = view.v.contentDOM.editContext.text;
-
   try {
     await fetch(`/api/file?path=${encodeURIComponent(currentPath)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
     });
-
     lastSavedContent = content;
     if (manual) alert('Saved');
   } catch (err) {
@@ -304,43 +302,37 @@ async function saveCurrentEditorContent(manual = false) {
   }
 }
 
-
 document.getElementById("upload-image").onclick = () => {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/*";
-
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
-
     const currentPath = localStorage.getItem("currentPath") || "";
     const formData = new FormData();
     formData.append("file", file);
     formData.append("currentPath", currentPath);
-
     try {
       const res = await fetch("/api/upload_image", {
         method: "POST",
         body: formData,
       });
-
       if (!res.ok) {
         const errText = await res.text();
         alert("Upload failed: " + errText);
         return;
       }
-
       const result = await res.json();
       const savedPath = result.savedPath;
       const folderPath = result.savedPath.split('/').slice(0, -1).join('/');
-      openImagePicker(folderPath);
-      setTimeout(() => loadImagePickerFolder(folderPath), 100);
+      insertImageMarkdown(savedPath);
+      // openImagePicker(folderPath);
+      // setTimeout(() => loadImagePickerFolder(folderPath), 100);
     } catch (err) {
       alert("Upload error: " + err.message);
     }
   };
-
   input.click();
 };
 
@@ -352,29 +344,23 @@ function clearLineSymbols() {
     alert("Editor is not ready yet.");
     return;
   }
-
   const state = view.v.state;
   const { from: start, to: end } = state.selection.main;
   const fullText = state.doc.toString();
-
   // Get the full line
   const lineStart = fullText.lastIndexOf('\n', start - 1) + 1;
   const lineEnd = fullText.indexOf('\n', end);
   const actualEnd = lineEnd === -1 ? fullText.length : lineEnd;
-
   const line = fullText.slice(lineStart, actualEnd);
-
   // Remove all leading/trailing symbols and spaces
   const symbolPattern = `[#*_\\s]*`; // greedy match of symbols and whitespace
   const regex = new RegExp(`^${symbolPattern}(.*?)${symbolPattern}$`);
   const match = line.match(regex);
   const cleaned = match ? match[1] : line;
-
   view.v.dispatch({
     changes: { from: lineStart, to: actualEnd, insert: cleaned },
     selection: { anchor: lineStart + cleaned.length }
   });
-
   view.v.focus();
 }
 
@@ -385,25 +371,20 @@ function _convertLinePrefix(prefix) {
     alert("Editor is not ready yet.");
     return;
   }
-
   const state = view.v.state;
   const { from: start, to: end } = state.selection.main;
   const fullText = state.doc.toString();
-
   // Get the full line
   const lineStart = fullText.lastIndexOf('\n', start - 1) + 1;
   const lineEnd = fullText.indexOf('\n', end);
   const actualEnd = lineEnd === -1 ? fullText.length : lineEnd;
-
   const line = fullText.slice(lineStart, actualEnd);
   const cleaned = line.replace(/^[#*_ \t]+|[#*_ \t]+$/g, '');
   const newLine = prefix + cleaned;
-
   view.v.dispatch({
     changes: { from: lineStart, to: actualEnd, insert: newLine },
     selection: { anchor: lineStart + newLine.length }
   });
-
   view.v.focus();
 }
 
@@ -423,7 +404,6 @@ function convertToBold() {
     alert("Editor is not ready yet.");
     return;
   }
-
   const state = view.v.state;
   const { from: start, to: end } = state.selection.main;
   // Skip if no selection
@@ -450,20 +430,29 @@ function convertToBold() {
 
 // -------------------------- Custom Right Mouse Button menu START --------------------------- //
 
-
-// ------------------------- Excalidraw image editing START ---------------------------- //
-
 const menu = document.createElement("div");
 menu.id = "custom-menu";
-menu.innerHTML = `<div class="item" id="edit_image">🖼️ Edit Image</div>`;
+menu.innerHTML = `
+  <div class="item" id="excalidraw_image">🖼️ Excalidraw Image</div>
+  <div class="item" id="ai_popup">🤖 AI Assistant</div>
+`;
 document.body.appendChild(menu);
 
-// Show menu on right-click
 document.addEventListener("contextmenu", (e) => {
   const path = e.composedPath();
-  const target = path.find(el => el.classList && el.classList.contains("myst-main-editor"));
 
-  if (target) {
+  const isInMystMainEditor = path.some(el => el.classList?.contains("cm-content"));
+
+  const isInExcalidraw = path.some(el =>
+    typeof el.id === "string" && el.id.startsWith("excalidraw")
+  );
+
+  const isInOllamaAI = path.some(el =>
+    el.classList?.contains("ollama-ai") ||
+    typeof el.id === "string" && el.id === "ollama-ai"
+  );
+
+  if (isInMystMainEditor && !isInExcalidraw && !isInOllamaAI) {
     e.preventDefault();
     menu.style.top = `${e.clientY}px`;
     menu.style.left = `${e.clientX}px`;
@@ -478,38 +467,82 @@ document.addEventListener("click", () => {
   menu.style.display = "none";
 });
 
+// ------------------------- Excalidraw image editing START ---------------------------- //
 
-document.getElementById("edit_image").addEventListener("click", () => {
+// Edit Image handler
+document.getElementById("excalidraw_image").addEventListener("click", async () => {
   const view = mystEditorInstance?.editorView;
   if (!view) return alert("Editor not ready");
-
   const state = view.v.state;
   const pos = state.selection.main.head;
   const fullText = state.doc.toString();
-
   const lineStart = fullText.lastIndexOf('\n', pos - 1) + 1;
   const lineEnd = fullText.indexOf('\n', pos);
   const actualEnd = lineEnd === -1 ? fullText.length : lineEnd;
   const line = fullText.slice(lineStart, actualEnd);
-
   const match = line.match(/!\[.*?\]\((.*?)\)/);
+
   if (match) {
-    // const filename = match[1].split("/").pop();
-    console.log(match[1]);
-    showTemporaryDiv(match[1]);
-    // showTemporaryDiv(match[1]);
-  } else {
-    alert("No image found under cursor.");
+    showTemporaryDiv(match[1], view);
+    return;
+  }
+
+  // No image found - ask for name and create image
+  const rawName = prompt("No image found.\nEnter name for new Excalidraw image (without extension):");
+  if (!rawName) return;
+
+  const nameBase = rawName.trim().replace(/\s+/g, '_');
+  if (!nameBase) return;
+
+  const mdPath = localStorage.getItem("currentPath") || "";
+  const mdParts = mdPath.replace(/\\/g, "/").split("/").slice(0, -1);
+  const targetFolder = `_static/${mdParts.join("/")}`;
+  const filename = `${nameBase}.png`;
+
+  // Request empty file creation and backend handles incrementing
+  const formData = new FormData();
+
+  const emptyFile = new Blob([], { type: "image/png" });
+  formData.append("file", emptyFile, filename);
+  formData.append("currentPath", mdPath);
+
+  try {
+    const res = await fetch("/api/upload_image", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      alert("Failed to create image: " + errText);
+      return;
+    }
+
+    const result = await res.json();
+    const savedPath = result.savedPath;
+
+    insertImageMarkdown(savedPath);
+    showTemporaryDiv(`${targetFolder}/${filename}`, view);
+
+  } catch (err) {
+    alert("Image creation failed: " + err.message);
   }
 });
+
 // ------------------------- Excalidraw image editing END ---------------------------- //
+
+// ------------------------- Ollama AI window START ---------------------------- //
+
+// AI Assistant popup handler
+document.getElementById("ai_popup").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  if (!view) return alert("Editor not ready");
+  showOllamaPopup(view);
+});
+
+// ------------------------- Ollama AI window END ---------------------------- //
 
 
 // -------------------------- Custom Right Mouse Button menu END --------------------------- //
-
-
-
-
 
 // New Image Picker modal code
 let imagePickerModal = null;
@@ -519,9 +552,6 @@ let currentFolder = '';
 
 function openImagePicker(startFolder = '') {
   // Create modal if it doesn't exist
-
-
-
   if (!imagePickerModal) {
     imagePickerModal = document.createElement('div');
     imagePickerModal.id = 'image-picker-modal';
@@ -549,7 +579,6 @@ function openImagePicker(startFolder = '') {
     folderList = document.getElementById('image-picker-folder-list');
     imageList = document.getElementById('image-picker-image-list');
     const closeBtn = document.getElementById('image-picker-close');
-
     closeBtn.onclick = () => {
       imagePickerModal.style.display = 'none';
     };
@@ -557,14 +586,8 @@ function openImagePicker(startFolder = '') {
 
   // Show the modal
   imagePickerModal.style.display = 'flex';
-
-  // Reset to root folder and load images
-  // currentFolder = '';
-  // loadImagePickerFolder('');
-
   currentFolder = startFolder;
   loadImagePickerFolder(currentFolder);
-
   const selectedParts = startFolder ? startFolder.split('/') : [];
   fetch('/api/image_tree')
     .then(res => res.json())
@@ -667,7 +690,6 @@ function renderFolderTree(nodes, parent, selectedPathParts = []) {
     li.appendChild(subtree);
     ul.appendChild(li);
   }
-
   parent.appendChild(ul);
 }
 
@@ -675,7 +697,6 @@ function renderFolderTree(nodes, parent, selectedPathParts = []) {
 function renderImageList(items) {
   if (!imageList) return;
   imageList.innerHTML = '';
-
   items.filter(i => i.type === 'file').forEach(fileItem => {
     const img = document.createElement('img');
     img.src = `/_static/${fileItem.path}`;
@@ -692,11 +713,6 @@ function renderImageList(items) {
   });
 }
 
-function renderFoldersAndImages(items) {
-  renderImageList(items);
-}
-
-
 // Load folder content from server and render
 async function loadImagePickerFolder(folder) {
   try {
@@ -706,12 +722,11 @@ async function loadImagePickerFolder(folder) {
       return;
     }
     const items = await res.json();
-    renderFoldersAndImages(items);
+    renderImageList(items);
   } catch (err) {
     alert('Error: ' + err.message);
   }
 }
-
 
 // ----------------- 'MOVE TO' SECTION START ---------------- // 
 // Functions for 'Move to' feature, we can move folders and files in the tree structure. 
