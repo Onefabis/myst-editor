@@ -329,7 +329,7 @@ Enter name for new Excalidraw image (without extension):`);
       return;
     }
     const q = (await w.json()).savedPath;
-    W(q), A(T + "/" + b, e);
+    W(q), A(`${T}/${b}`, e);
   } catch (w) {
     alert("Image creation failed: " + w.message);
   }
