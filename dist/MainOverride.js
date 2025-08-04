@@ -1,6 +1,6 @@
 /* empty css                           */
 /* empty css                           */
-import { M as z, d as X, s as A, a as G } from "./MystEditor-Brf8ekcZ.js";
+import { M as z, d as X, s as A, a as G } from "./MystEditor-CNleIgAH.js";
 const S = new Set(JSON.parse(localStorage.getItem("openFolders") || "[]")), j = ["_static", "_templates"];
 let g = "", v = "", d = null;
 const $ = document.getElementById("sidebar"), K = document.getElementById("resizer");
@@ -24,7 +24,7 @@ function x() {
   fetch("/api/tree").then((e) => e.json()).then((e) => {
     B(e, document.getElementById("tree"));
     let t = localStorage.getItem("currentPath");
-    t && (U(t, e) ? fetch(`/api/file?path=${encodeURIComponent(t)}`).then((n) => {
+    t && (R(t, e) ? fetch(`/api/file?path=${encodeURIComponent(t)}`).then((n) => {
       if (!n.ok) throw new Error("File missing");
       return n.json();
     }).then(() => N(k(t))).catch(() => {
@@ -32,9 +32,9 @@ function x() {
     }) : (localStorage.removeItem("currentPath"), localStorage.removeItem("lastOpened")));
   });
 }
-function U(e, t) {
+function R(e, t) {
   for (const n of t)
-    if (n.path === e && n.type === "file" || n.type === "folder" && n.children && U(e, n.children))
+    if (n.path === e && n.type === "file" || n.type === "folder" && n.children && R(e, n.children))
       return !0;
   return !1;
 }
@@ -51,14 +51,14 @@ function B(e, t) {
     if (a.textContent = o.name.endsWith(".md") ? o.name.replace(/\.md$/, "") : o.name, a.title = o.path, a.className = o.type, o.type === "folder") {
       if (o.name.startsWith(".") || o.name.startsWith("_"))
         continue;
-      const r = document.createElement("span");
-      r.textContent = "📁", r.style.marginRight = "6px", a.prepend(r);
+      const l = document.createElement("span");
+      l.textContent = "📁", l.style.marginRight = "6px", a.prepend(l);
     } else if (o.type === "file") {
-      const r = document.createElement("span");
-      r.textContent = "📄", r.style.marginRight = "6px", a.prepend(r);
+      const l = document.createElement("span");
+      l.textContent = "📄", l.style.marginRight = "6px", a.prepend(l);
     }
-    a.onclick = (r) => {
-      r.stopPropagation(), L(), a.classList.add("active");
+    a.onclick = (l) => {
+      l.stopPropagation(), L(), a.classList.add("active");
       const c = a.querySelector("span");
       if (o.type === "file")
         N(k(o.path));
@@ -68,11 +68,11 @@ function B(e, t) {
         s.hasChildNodes() ? (s.innerHTML = "", c && (c.textContent = "📁"), S.delete(o.path), localStorage.setItem("openFolders", JSON.stringify([...S]))) : o.children && (B(o.children, s), c && (c.textContent = "📂"), S.add(o.path), localStorage.setItem("openFolders", JSON.stringify([...S])));
       }
     };
-    const l = document.createElement("div");
-    if (l.className = "subtree", i.appendChild(a), i.appendChild(l), n.appendChild(i), o.type === "folder" && S.has(o.path)) {
-      B(o.children || [], l);
-      const r = a.querySelector("span");
-      r && (r.textContent = "📂");
+    const r = document.createElement("div");
+    if (r.className = "subtree", i.appendChild(a), i.appendChild(r), n.appendChild(i), o.type === "folder" && S.has(o.path)) {
+      B(o.children || [], r);
+      const l = a.querySelector("span");
+      l && (l.textContent = "📂");
     }
   }
   t.appendChild(n), t.addEventListener("click", (o) => {
@@ -93,16 +93,16 @@ async function N(e) {
   }
   const n = await t.json(), o = document.getElementById("myst"), i = document.createElement("div");
   i.id = "myst", i.style.flexGrow = "1", i.style.border = "1px solid #ccc", i.style.marginBottom = "0.5rem", i.style.height = "80vh", o.replaceWith(i), g = e, localStorage.setItem("currentPath", g);
-  const a = new CSSStyleSheet(), l = await (await fetch("../FuroStyleOverride.css")).text();
-  await a.replace(l), document.adoptedStyleSheets = [...document.adoptedStyleSheets, a];
-  const r = e.split("\\").pop().split("/").pop(), c = new URLSearchParams(window.location.search), s = ["#30bced", "#60c771", "#e6aa3a", "#cbb63e", "#ee6352", "#9ac2c9", "#8acb88", "#14b2c4"], m = ((y = import.meta) == null ? void 0 : y.env) ?? {};
+  const a = new CSSStyleSheet(), r = await (await fetch("../FuroStyleOverride.css")).text();
+  await a.replace(r), document.adoptedStyleSheets = [...document.adoptedStyleSheets, a];
+  const l = e.split("\\").pop().split("/").pop(), c = new URLSearchParams(window.location.search), s = ["#30bced", "#60c771", "#e6aa3a", "#cbb63e", "#ee6352", "#9ac2c9", "#8acb88", "#14b2c4"], m = ((y = import.meta) == null ? void 0 : y.env) ?? {};
   m.VITE_COLLAB !== "OFF" && c.get("collab");
   const p = m.VITE_WS_URL ?? c.get("collab_server"), f = c.get("room") || "0", T = c.get("username") || Math.floor(Math.random() * 1e3).toString(), b = s[Math.floor(Math.random() * s.length)];
   requestAnimationFrame(() => {
     d = z({
       templatelist: "linkedtemplatelist.json",
       initialText: n.content,
-      title: r,
+      title: l,
       additionalStyles: a,
       collaboration: {
         enabled: !1,
@@ -145,10 +145,8 @@ async function N(e) {
           Z();
         }
       }]),
-      spellcheckOpts: {
-        dict: "en_US",
-        dictionaryPath: `${window.location.pathname}dictionaries`
-      },
+      // spellcheckOpts: { dict: "en_US", dictionaryPath: `${window.location.pathname}dictionaries` },
+      spellcheckOpts: !1,
       syncScroll: !0
     }, i), window._mystEditor = d, M = n.content, P && clearInterval(P), P = setInterval(() => {
       O();
@@ -194,8 +192,8 @@ document.getElementById("upload-image").onclick = () => {
         alert("Upload failed: " + c);
         return;
       }
-      const a = await i.json(), l = a.savedPath, r = a.savedPath.split("/").slice(0, -1).join("/");
-      W(l);
+      const a = await i.json(), r = a.savedPath, l = a.savedPath.split("/").slice(0, -1).join("/");
+      W(r);
     } catch (i) {
       alert("Upload error: " + i.message);
     }
@@ -211,12 +209,12 @@ function F() {
     from: n,
     to: o
   } = t.selection.main, i = t.doc.toString(), a = i.lastIndexOf(`
-`, n - 1) + 1, l = i.indexOf(`
-`, o), r = l === -1 ? i.length : l, c = i.slice(a, r), s = "[#*_\\s]*", m = new RegExp(`^${s}(.*?)${s}$`), p = c.match(m), f = p ? p[1] : c;
+`, n - 1) + 1, r = i.indexOf(`
+`, o), l = r === -1 ? i.length : r, c = i.slice(a, l), s = "[#*_\\s]*", m = new RegExp(`^${s}(.*?)${s}$`), p = c.match(m), f = p ? p[1] : c;
   e.v.dispatch({
     changes: {
       from: a,
-      to: r,
+      to: l,
       insert: f
     },
     selection: {
@@ -224,7 +222,7 @@ function F() {
     }
   }), e.v.focus();
 }
-function R(e) {
+function U(e) {
   const t = d == null ? void 0 : d.editorView;
   if (!t) {
     alert("Editor is not ready yet.");
@@ -233,25 +231,25 @@ function R(e) {
   const n = t.v.state, {
     from: o,
     to: i
-  } = n.selection.main, a = n.doc.toString(), l = a.lastIndexOf(`
-`, o - 1) + 1, r = a.indexOf(`
-`, i), c = r === -1 ? a.length : r, m = a.slice(l, c).replace(/^[#*_ \t]+|[#*_ \t]+$/g, ""), p = e + m;
+  } = n.selection.main, a = n.doc.toString(), r = a.lastIndexOf(`
+`, o - 1) + 1, l = a.indexOf(`
+`, i), c = l === -1 ? a.length : l, m = a.slice(r, c).replace(/^[#*_ \t]+|[#*_ \t]+$/g, ""), p = e + m;
   t.v.dispatch({
     changes: {
-      from: l,
+      from: r,
       to: c,
       insert: p
     },
     selection: {
-      anchor: l + p.length
+      anchor: r + p.length
     }
   }), t.v.focus();
 }
 function Y() {
-  F(), R("# ");
+  F(), U("# ");
 }
 function Q() {
-  F(), R("## ");
+  F(), U("## ");
 }
 function Z() {
   const e = d == null ? void 0 : d.editorView;
@@ -267,15 +265,15 @@ function Z() {
     alert("Please select text to bold.");
     return;
   }
-  const l = `**${t.doc.toString().slice(n, o)}**`;
+  const r = `**${t.doc.toString().slice(n, o)}**`;
   e.v.dispatch({
     changes: {
       from: n,
       to: o,
-      insert: l
+      insert: r
     },
     selection: {
-      anchor: n + l.length
+      anchor: n + r.length
     }
   }), e.v.focus();
 }
@@ -288,11 +286,11 @@ h.innerHTML = `
 document.body.appendChild(h);
 document.addEventListener("contextmenu", (e) => {
   const t = e.composedPath(), n = t.some((a) => {
-    var l;
-    return (l = a.classList) == null ? void 0 : l.contains("cm-content");
+    var r;
+    return (r = a.classList) == null ? void 0 : r.contains("cm-content");
   }), o = t.some((a) => typeof a.id == "string" && a.id.startsWith("excalidraw")), i = t.some((a) => {
-    var l;
-    return ((l = a.classList) == null ? void 0 : l.contains("ollama-ai")) || typeof a.id == "string" && a.id === "ollama-ai";
+    var r;
+    return ((r = a.classList) == null ? void 0 : r.contains("ollama-ai")) || typeof a.id == "string" && a.id === "ollama-ai";
   });
   n && !o && !i ? (e.preventDefault(), h.style.top = `${e.clientY}px`, h.style.left = `${e.clientX}px`, h.style.display = "block") : h.style.display = "none";
 });
@@ -304,7 +302,7 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
   if (!e) return alert("Editor not ready");
   const t = e.v.state, n = t.selection.main.head, o = t.doc.toString(), i = o.lastIndexOf(`
 `, n - 1) + 1, a = o.indexOf(`
-`, n), l = a === -1 ? o.length : a, c = o.slice(i, l).match(/!\[.*?\]\((.*?)\)/);
+`, n), r = a === -1 ? o.length : a, c = o.slice(i, r).match(/!\[.*?\]\((.*?)\)/);
   if (c) {
     A(c[1], e);
     return;
@@ -392,22 +390,22 @@ function _(e, t, n = []) {
   const o = document.createElement("ul");
   for (const i of e) {
     if (i.type !== "folder") continue;
-    const a = document.createElement("li"), l = document.createElement("div");
-    l.style.display = "flex", l.style.alignItems = "center";
-    const r = document.createElement("span");
-    r.textContent = "➕", r.style.cursor = "pointer", r.style.width = "20px";
+    const a = document.createElement("li"), r = document.createElement("div");
+    r.style.display = "flex", r.style.alignItems = "center";
+    const l = document.createElement("span");
+    l.textContent = "➕", l.style.cursor = "pointer", l.style.width = "20px";
     const c = document.createElement("span");
     c.textContent = i.name, c.style.cursor = "pointer", c.style.userSelect = "none", c.style.padding = "2px 4px", i.path === n.join("/") && (c.style.fontWeight = "bold");
     const s = document.createElement("div");
     s.style.marginLeft = "16px", s.style.display = "none";
     const m = i.path.split("/");
-    n.length >= m.length && n.slice(0, m.length).join("/") === i.path && (s.style.display = "block", r.textContent = "➖"), r.onclick = () => {
-      s.style.display === "none" ? (s.style.display = "block", r.textContent = "➖") : (s.style.display = "none", r.textContent = "➕");
+    n.length >= m.length && n.slice(0, m.length).join("/") === i.path && (s.style.display = "block", l.textContent = "➖"), l.onclick = () => {
+      s.style.display === "none" ? (s.style.display = "block", l.textContent = "➖") : (s.style.display = "none", l.textContent = "➕");
     }, c.onclick = () => {
       I = i.path, V(I), fetch("/api/image_tree").then((f) => f.json()).then((f) => {
         E.innerHTML = "", _(f, E, i.path.split("/"));
       });
-    }, l.appendChild(r), l.appendChild(c), a.appendChild(l), i.children && i.children.length > 0 && _(i.children, s, n), a.appendChild(s), o.appendChild(a);
+    }, r.appendChild(l), r.appendChild(c), a.appendChild(r), i.children && i.children.length > 0 && _(i.children, s, n), a.appendChild(s), o.appendChild(a);
   }
   t.appendChild(o);
 }
@@ -461,15 +459,15 @@ function ne(e) {
     }], a);
   });
   function o(i, a) {
-    const l = document.createElement("ul");
-    for (const r of i) {
-      if (r.type !== "folder") continue;
+    const r = document.createElement("ul");
+    for (const l of i) {
+      if (l.type !== "folder") continue;
       const c = document.createElement("li"), s = document.createElement("div");
-      s.textContent = "📁 " + r.name, s.style.cursor = "pointer", s.onclick = () => {
-        n = r.path.replace(/\\/g, "/"), document.querySelectorAll("#move-tree div").forEach((m) => m.style.fontWeight = "normal"), s.style.fontWeight = "bold";
-      }, c.appendChild(s), r.children && o(r.children, c), l.appendChild(c);
+      s.textContent = "📁 " + l.name, s.style.cursor = "pointer", s.onclick = () => {
+        n = l.path.replace(/\\/g, "/"), document.querySelectorAll("#move-tree div").forEach((m) => m.style.fontWeight = "normal"), s.style.fontWeight = "bold";
+      }, c.appendChild(s), l.children && o(l.children, c), r.appendChild(c);
     }
-    a.appendChild(l);
+    a.appendChild(r);
   }
   document.getElementById("move-ok").onclick = async () => {
     if (n === null) {
@@ -560,21 +558,21 @@ document.getElementById("delete").onclick = async () => {
         })
       });
       if (!a.ok) {
-        const r = await a.text();
-        alert(`Error while deleting: ${r}`);
+        const l = await a.text();
+        alert(`Error while deleting: ${l}`);
         return;
       }
       L();
-      let l = localStorage.getItem("currentPath");
-      if (l) {
-        if (o && l.startsWith(t + "/")) {
-          localStorage.removeItem("currentPath"), localStorage.removeItem("lastOpened"), l = "";
-          const r = document.getElementById("myst");
-          r && (r.innerHTML = "");
-        } else if (!o && l === t) {
-          localStorage.removeItem("currentPath"), localStorage.removeItem("lastOpened"), l = "";
-          const r = document.getElementById("myst");
-          r && (r.innerHTML = "");
+      let r = localStorage.getItem("currentPath");
+      if (r) {
+        if (o && r.startsWith(t + "/")) {
+          localStorage.removeItem("currentPath"), localStorage.removeItem("lastOpened"), r = "";
+          const l = document.getElementById("myst");
+          l && (l.innerHTML = "");
+        } else if (!o && r === t) {
+          localStorage.removeItem("currentPath"), localStorage.removeItem("lastOpened"), r = "";
+          const l = document.getElementById("myst");
+          l && (l.innerHTML = "");
         }
       }
       x();
@@ -593,9 +591,9 @@ document.getElementById("rename").onclick = async () => {
     alert(`Cannot rename protected folder: ${n}`);
     return;
   }
-  const o = t.replace(/\\/g, "/"), i = o.split("/"), a = i.pop(), l = i.join("/"), r = a.endsWith(".md") ? a.replace(/\.md$/, "") : a, c = prompt("Enter new name:", r);
-  if (!c || c.trim() === "" || c === r) return;
-  const s = a.endsWith(".md") && !c.endsWith(".md") ? `${c}.md` : c, m = l ? `${l}/${s}` : s;
+  const o = t.replace(/\\/g, "/"), i = o.split("/"), a = i.pop(), r = i.join("/"), l = a.endsWith(".md") ? a.replace(/\.md$/, "") : a, c = prompt("Enter new name:", l);
+  if (!c || c.trim() === "" || c === l) return;
+  const s = a.endsWith(".md") && !c.endsWith(".md") ? `${c}.md` : c, m = r ? `${r}/${s}` : s;
   if (!(await fetch("/api/rename", {
     method: "POST",
     headers: {
