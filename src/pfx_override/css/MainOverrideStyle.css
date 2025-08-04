@@ -125,6 +125,11 @@ button {
   background: #f0f0f0;
 }
 
+.harper-underline {
+        text-decoration: underline wavy red;
+        text-decoration-thickness: 1.5px;
+      }
+
 @media print {
   #sidebar, #editor-wrapper, #resizer, .myst-main-editor {
     display: none !important;

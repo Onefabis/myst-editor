@@ -1,5 +1,13 @@
 import { lineNumbers, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, keymap } from "@codemirror/view";
-import { Compartment, EditorSelection, EditorState, Facet, Prec } from "@codemirror/state";
+
+
+// import { 
+//   lineNumbers, highlightSpecialChars, drawSelection, dropCursor,
+//   rectangularSelection, crosshairCursor, keymap, Decoration
+// } from "@codemirror/view";
+
+
+import { Compartment, EditorSelection, EditorState, Facet, Prec  } from "@codemirror/state";
 import { EditorView } from "codemirror";
 import { yCollab } from "y-codemirror.next";
 import { markdown } from "@codemirror/lang-markdown";
@@ -35,8 +43,18 @@ import { highlightFocusedActiveLine } from "./activeLineHighlight";
 import { classHighlighter, tags } from "@lezer/highlight";
 import { loggerFacet } from "../logger";
 import { criticHistory, criticMarkup, suggestMode } from "./criticMarkup";
-import { temporaryDivExtension } from "./temporaryDivExtension";
+import { excalidrawExtension } from "./excalidrawExtension";
 import { ollamaExtension } from "./ollamaAIQuery";
+import { harperExtension } from "./harperExtension";
+
+// import { createHarperExtension } from "./harperExtension.js";
+
+// const harperExtension = createHarperExtension({
+//   EditorView,
+//   Decoration,
+//   StateEffect,
+//   StateField
+// });
 
 const getRelativeCursorLocation = (view) => {
   const { from } = view.state.selection.main;
@@ -125,8 +143,8 @@ export class ExtensionBuilder {
     ];
   }
 
-  useTemporaryDivButton() {
-    this.extensions.push(...temporaryDivExtension);
+  useExcalidraw() {
+    this.extensions.push(...excalidrawExtension);
     return this;
   }
 
@@ -135,6 +153,10 @@ export class ExtensionBuilder {
     return this;
   }
 
+  useHarperGrammarChecker() {
+    this.extensions.push(harperExtension); // no spread
+    return this;
+  }
 
   useMarkdown(transforms) {
     const md = markdown({

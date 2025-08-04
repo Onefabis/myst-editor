@@ -2,7 +2,7 @@ import '../css/MainOverrideStyle.css';
 import '../css/FuroStyleOverride.css';
 
 import MystEditor, { defaultButtons } from '../../MystEditor.jsx';
-import { showTemporaryDiv } from "../../extensions/temporaryDivExtension.js";
+import { showTemporaryDiv } from "../../extensions/excalidrawExtension.js";
 import { showOllamaPopup } from "../../extensions/ollamaAIQuery.js";
 
 const openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
@@ -261,7 +261,8 @@ async function loadFile(filename) {
           }
         }
       ]),
-      spellcheckOpts: { dict: "en_US", dictionaryPath: `${window.location.pathname}dictionaries` },
+      // spellcheckOpts: { dict: "en_US", dictionaryPath: `${window.location.pathname}dictionaries` },
+      spellcheckOpts: false, 
       syncScroll: true,
     }, newContainer);
 

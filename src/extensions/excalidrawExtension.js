@@ -256,7 +256,7 @@ class ExcalidrawWidget extends WidgetType {
 }
 
 // ViewPlugin for decoradion control
-export const temporaryDivPlugin = ViewPlugin.fromClass(class {
+export const excalidrawPlugin = ViewPlugin.fromClass(class {
   constructor(view) {
     this.view = view;
     this.decorationsMap = new Map(); // key: line.from, val: Decoration
@@ -370,12 +370,12 @@ export const temporaryDivPlugin = ViewPlugin.fromClass(class {
   decorations: v => v.decorations
 });
 
-export const temporaryDivExtension = [temporaryDivPlugin];
+export const excalidrawExtension = [excalidrawPlugin];
 
 export function showTemporaryDiv(path, editorView) {
   if (pluginInstance) {
     pluginInstance.show(path, editorView);
   } else {
-    console.warn("⚠️ temporaryDivPlugin not active");
+    console.warn("⚠️ excalidrawPlugin not active");
   }
 }
