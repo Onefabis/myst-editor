@@ -365,6 +365,8 @@ const CodeMirror = () => {
         .useLogger(logger)
         .useExcalidraw()
         .useOllamaAIQuery()
+        .useImageRename()
+        .useAiRephrase()
         .useHarperGrammarChecker()
         .if(options.cmDarkTheme.value, (b) => b.useCmDarkTheme())
         .useCriticMarkup()

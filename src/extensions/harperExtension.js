@@ -83,8 +83,8 @@ export const harperExtension = (() => {
     } else {
       addHarperStyle(document.head); // fallback
     }
-    const text = view.state.doc.toString().trim();
-    if (!text) return [];
+    const text = view.state.doc.toString();
+    if (!text.trim()) return [];
 
     try {
       await harperLinter.setLintConfig({
@@ -93,7 +93,7 @@ export const harperExtension = (() => {
         ExplanationMarks: true,
       });
 
-      const results = await harperLinter.lint(text);
+      const results = await harperLinter.lint(text, "plaintext");
 
       const diagnostics = results.map(d => {
         let span = null;

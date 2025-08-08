@@ -15,12 +15,15 @@ import {
 let pluginInstance = null;
 export const customUpdatedEffect = StateEffect.define();
 
+/** @type {StateEffect<number>} */
+const customUpdatedEffect2 = StateEffect.define();
+
 // Widget with Excalidraw
 class ExcalidrawWidget extends WidgetType {
   constructor(filePath, editorView, widgetId, onClose) {
     super();
-    this.filePath = filePath;
-    this.fileName = this.filePath.split("/").pop();
+    this.filePath = filePath || "";
+    this.fileName = (typeof this.filePath === "string" && this.filePath.includes("/")) ? this.filePath.split("/").pop() : "untitled.png";
     this.editorView = editorView;
     this.widgetId = widgetId;
     this.onClose = onClose;
@@ -136,8 +139,6 @@ class ExcalidrawWidget extends WidgetType {
           loadScene();
         }, []);
 
-
-
         const handleExport = async () => {
           if (!excalidrawAPI) return;
 
@@ -153,31 +154,25 @@ class ExcalidrawWidget extends WidgetType {
 
             const formData = new FormData();
             console.log("📦 Saving blob of size:", blob.size);
+
             formData.append("file", blob, this.fileName);
 
+            // Send filename in the query string — not in the body
             const res = await fetch(`/save?filename=${encodeURIComponent(this.filePath)}`, {
               method: "POST",
               body: formData
             });
 
             if (res.ok) {
-
-              const randomChar = String.fromCharCode(0xe000 + Math.floor(Math.random() * 100)); // U+E000 to U+E064
               const widgetOffset = pluginInstance?.widgetIdToOffsetMap.get(this.widgetId);
               const state = this.editorView.v.state;
-              const originalSelection = state.selection.main;
+              const docLength = state.doc.length;
+              const currentSelection = state.selection.main;
 
-              if (widgetOffset != null) {
-                // Insert the random character
+              if (widgetOffset != null && widgetOffset >= 0 && widgetOffset <= docLength) {
                 this.editorView.v.dispatch({
-                  changes: { from: widgetOffset, to: widgetOffset, insert: randomChar },
+                  changes: { from: widgetOffset, to: widgetOffset, insert: " " }
                 });
-
-                this.editorView.v.dispatch({
-                  selection: { anchor: widgetOffset + 1 } // move cursor right after inserted char
-                });
-
-                this.editorView.v.focus();
 
                 setTimeout(() => {
                   this.editorView.v.dispatch({
@@ -190,14 +185,20 @@ class ExcalidrawWidget extends WidgetType {
 
                   this.editorView.v.dispatch({
                     selection: {
-                      anchor: originalSelection.anchor,
-                      head: originalSelection.head
+                      anchor: state.selection.main.anchor,
+                      head: state.selection.main.head
                     }
                   });
 
-                this.editorView.v.focus();
+                  this.editorView.v.focus();
+
+                  if (this.onClose) {
+                    this.onClose();
+                  }
                 }, 100);
- 
+
+              } else {
+                console.warn("⚠️ Invalid widgetOffset:", widgetOffset, "Document length:", docLength);
               }
             }
 
@@ -290,6 +291,8 @@ export const excalidrawPlugin = ViewPlugin.fromClass(class {
       changed = true;
     }
 
+    // if (update.docChanged || update.viewportChanged || update.selectionSet || update.focusChanged) this.view.requestMeasure();
+
     if (update.effects && update.effects.some(e => e.is(customUpdatedEffect))) {
       // Trigger re-render without doc change
       this.view.dispatch({ effects: [] });
@@ -372,7 +375,7 @@ export const excalidrawPlugin = ViewPlugin.fromClass(class {
 
 export const excalidrawExtension = [excalidrawPlugin];
 
-export function showTemporaryDiv(path, editorView) {
+export function showExcalidraw(path, editorView) {
   if (pluginInstance) {
     pluginInstance.show(path, editorView);
   } else {

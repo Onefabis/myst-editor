@@ -2,8 +2,10 @@ import '../css/MainOverrideStyle.css';
 import '../css/FuroStyleOverride.css';
 
 import MystEditor, { defaultButtons } from '../../MystEditor.jsx';
-import { showTemporaryDiv } from "../../extensions/excalidrawExtension.js";
+import { showExcalidraw } from "../../extensions/excalidrawExtension.js";
 import { showOllamaPopup } from "../../extensions/ollamaAIQuery.js";
+import { showAIRephrasePopup } from "../../extensions/aiRephrase.js";
+import { showRenamePopup } from "../../extensions/renameImage.js";
 
 const openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
 const bulletproof = ["_static", "_templates"];
@@ -117,6 +119,8 @@ function renderTree(nodes, parent) {
       title.classList.add('active');
       const icon = title.querySelector('span');
       if (node.type === 'file') {
+        updateGitPanel(normalizePath(node.path)); 
+        setupGitDiffListeners();
         loadFile(normalizePath(node.path));
       } else {
         activeFolderPath = node.path;
@@ -156,6 +160,148 @@ function renderTree(nodes, parent) {
       activeFolderPath = '';
     }
   });
+}
+
+function setupGitDiffListeners() {
+  const branchDropdown = document.getElementById("branchDropdown");
+  const commitDropdown = document.getElementById("commitDropdown");
+
+  if (branchDropdown) {
+    branchDropdown.addEventListener("change", () => {
+      if (window.reloadGitDiff) window.reloadGitDiff();
+    });
+  }
+
+  if (commitDropdown) {
+    commitDropdown.addEventListener("change", () => {
+      if (window.reloadGitDiff) window.reloadGitDiff();
+    });
+  }
+}
+
+const fileTree = document.getElementById("tree-panel");
+const hor_resizer = document.querySelector(".resizer-vertical");
+const gitPanel = document.getElementById("gitPanel");
+
+hor_resizer.onmousedown = function (e) {
+  e.preventDefault();
+  const startY = e.clientY;
+  const startHeight = fileTree.offsetHeight;
+
+  document.onmousemove = function (e) {
+    const newHeight = startHeight + (e.clientY - startY);
+    if (newHeight >= 100) {
+      fileTree.style.height = newHeight + 'px';
+      localStorage.setItem('fileTreeHeight', newHeight);
+    }
+  };
+
+  document.onmouseup = function () {
+    document.onmousemove = null;
+    document.onmouseup = null;
+  };
+};
+
+function setHiddenFilename(filename) {
+  const hiddenInput = document.getElementById('hidden-filename');
+  if (hiddenInput) {
+    hiddenInput.value = filename;
+  }
+}
+
+// Restore saved height
+const savedHeight = localStorage.getItem('fileTreeHeight');
+if (savedHeight) {
+  fileTree.style.height = savedHeight + 'px';
+}
+
+const branchSelect = document.getElementById('branch-select');
+const commitSelect = document.getElementById('commit-select');
+const commitDetails = document.getElementById('commit-details');
+
+async function updateGitPanel(filename) {
+  const branchDropdown = document.getElementById("branchDropdown");
+  const commitDropdown = document.getElementById("commitDropdown");
+  const commitDetails = document.getElementById("commitDetails");
+  branchDropdown.innerHTML = "";
+  commitDropdown.innerHTML = "";
+  commitDetails.innerText = "";
+  const response = await fetch("/search-file", {
+    method: "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename })
+  });
+  const data = await response.json();
+  setHiddenFilename(filename);
+  data.branches.forEach(branch => {
+    const opt = document.createElement("option");
+    opt.value = branch;
+    opt.innerText = branch;
+    branchDropdown.appendChild(opt);
+  });
+  data.commits.forEach(commit => {
+    const opt = document.createElement("option");
+    opt.value = commit.hash;
+    opt.innerText = commit.summary || commit.hash;
+    opt.dataset.message = commit.message;
+    commitDropdown.appendChild(opt);
+  });
+  commitDropdown.onchange = function () {
+    const selected = commitDropdown.options[commitDropdown.selectedIndex];
+    commitDetails.innerText = selected.dataset.message || '';
+  };
+  // Auto-select first
+  if (commitDropdown.options.length) {
+    commitDropdown.selectedIndex = 0;
+    commitDropdown.onchange();
+  }
+}
+
+let commitsMeta = [];
+
+async function loadCommitTitles(branch, filepath) {
+  try {
+    const res = await fetch('/search-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: filepath })
+    });
+
+    const data = await res.json();
+    const { commits = [] } = data;
+
+    // Fetch full info per commit hash (you may optimize this backend-side)
+    commitsMeta = await Promise.all(commits.map(async hash => {
+      try {
+        const res = await fetch(`/api/git-commit-info?branch=${branch}&commit=${hash}&filename=${filepath}`);
+        const data = await res.json();
+        return {
+          hash,
+          summary: data.summary || hash.slice(0, 7),
+          full: data.message || "No message"
+        };
+      } catch {
+        return { hash, summary: hash.slice(0, 7), full: "" };
+      }
+    }));
+
+    // Update commit dropdown
+    commitSelect.innerHTML = '';
+    commitsMeta.forEach(commit => {
+      const opt = document.createElement('option');
+      opt.value = commit.hash;
+      opt.textContent = commit.summary;
+      commitSelect.appendChild(opt);
+    });
+
+    if (commitsMeta.length > 0) {
+      commitSelect.value = commitsMeta[0].hash;
+      commitDetails.textContent = commitsMeta[0].full;
+    }
+
+  } catch (err) {
+    console.error("Failed to load commit details:", err);
+  }
 }
 
 async function loadFile(filename) {
@@ -212,17 +358,6 @@ async function loadFile(filename) {
       initialText: data.content,
       title: title,
       additionalStyles: sheet,
-      collaboration: {
-        enabled: false,
-        commentsEnabled: false,
-        resolvingCommentsEnabled: true,
-        wsUrl: collabUrl ?? "#",
-        username,
-        room,
-        color,
-        mode: collabUrl ? "websocket" : "local",
-      },
-
       includeButtons: defaultButtons.concat([
         {
           text: "💾 Save",
@@ -303,39 +438,195 @@ async function saveCurrentEditorContent(manual = false) {
   }
 }
 
-document.getElementById("upload-image").onclick = () => {
+
+// ============================
+// Create Upload Modal (styled like Rename modal)
+// ============================
+function createUploadModal() {
+  const modal = document.createElement("div");
+  modal.id = "upload-image-modal";
+  modal.style.position = "fixed";
+  modal.style.inset = "0";
+  modal.style.background = "rgba(0,0,0,0.4)";
+  modal.style.display = "flex";
+  modal.style.alignItems = "center";
+  modal.style.justifyContent = "center";
+  modal.style.zIndex = "2000";
+  modal.style.display = "none";
+
+  const content = document.createElement("div");
+  content.style.position = "relative";
+  content.style.background = "white";
+  content.style.padding = "14px";
+  content.style.borderRadius = "7px";
+  content.style.minWidth = "320px";
+  content.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+
+  // Close button (circle "x")
+  const closeBtn = document.createElement("div");
+  closeBtn.innerHTML = "&times;";
+  closeBtn.style.position = "absolute";
+  closeBtn.style.top = "-11px";
+  closeBtn.style.right = "-11px";
+  closeBtn.style.width = "25px";
+  closeBtn.style.height = "25px";
+  closeBtn.style.background = "rgb(209 29 24)";
+  closeBtn.style.color = "white";
+  closeBtn.style.borderRadius = "50%";
+  closeBtn.style.display = "flex";
+  closeBtn.style.alignItems = "center";
+  closeBtn.style.justifyContent = "center";
+  closeBtn.style.cursor = "pointer";
+  closeBtn.style.fontWeight = "bold";
+  closeBtn.style.fontSize = "18px";
+
+  const title = document.createElement("h3");
+  title.textContent = "Name Image";
+  title.style.margin = "0 0 10px 0";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.style.width = "98%";
+  input.style.lineHeight = "22px";
+  input.style.margin = "0 0 12px";
+  input.style.border = "1px solid rgb(219 209 209)";
+  input.style.borderRadius = "3px";
+  input.style.outline = "none";
+
+  const actions = document.createElement("div");
+  actions.style.display = "grid";
+  actions.style.gridTemplateColumns = "1fr 1fr";
+  actions.style.gap = "8px";
+
+  const nameBtn = document.createElement("button");
+  nameBtn.textContent = "Name";
+  nameBtn.style.padding = "6px 8px";
+  nameBtn.style.border = "1px dashed rgb(92, 184, 92)";
+  nameBtn.style.borderLeft = "3px solid rgb(92, 184, 92)";
+  nameBtn.style.borderRadius = "6px";
+  nameBtn.style.cursor = "pointer";
+
+  const incrementBtn = document.createElement("button");
+  incrementBtn.textContent = "Increment";
+  incrementBtn.style.padding = "6px 8px";
+  incrementBtn.style.border = "1px dashed rgb(2, 117, 216)";
+  incrementBtn.style.borderLeft = "3px solid rgb(2, 117, 216)";
+  incrementBtn.style.borderRadius = "6px";
+  incrementBtn.style.cursor = "pointer";
+  incrementBtn.style.display = "none"; // hidden until collision
+
+  const overwriteBtn = document.createElement("button");
+  overwriteBtn.textContent = "Overwrite";
+  overwriteBtn.style.padding = "6px 8px";
+  overwriteBtn.style.border = "1px dashed rgb(240, 173, 78)";
+  overwriteBtn.style.borderLeft = "3px solid rgb(240, 173, 78)";
+  overwriteBtn.style.borderRadius = "6px";
+  overwriteBtn.style.cursor = "pointer";
+  overwriteBtn.style.display = "none"; // hidden until collision
+
+  actions.appendChild(nameBtn);
+  actions.appendChild(overwriteBtn);
+  actions.appendChild(incrementBtn);
+
+  content.appendChild(closeBtn);
+  content.appendChild(title);
+  content.appendChild(input);
+  content.appendChild(actions);
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+
+  return { modal, input, nameBtn, incrementBtn, overwriteBtn, closeBtn, title };
+}
+
+const uploadModal = createUploadModal();
+
+// ============================
+// Show Upload Modal & Handle Logic
+// ============================
+function showUploadModal(file, currentPath) {
+  return new Promise((resolve) => {
+    const dotIndex = file.name.lastIndexOf(".");
+    const baseName = dotIndex > -1 ? file.name.substring(0, dotIndex) : file.name;
+    const extension = dotIndex > -1 ? file.name.substring(dotIndex) : "";
+
+    uploadModal.input.value = baseName;
+    uploadModal.title.textContent = "Name Image";
+    uploadModal.nameBtn.style.display = "inline-block";
+    uploadModal.overwriteBtn.style.display = "none";
+    uploadModal.incrementBtn.style.display = "none";
+    uploadModal.modal.style.display = "flex";
+    uploadModal.input.focus();
+
+    async function checkCollision(actionType) {
+      const newName = uploadModal.input.value.trim() + extension;
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("path", currentPath);
+      formData.append("action", actionType);
+
+      const res = await fetch("/api/upload_image", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (res.status === 409 && data.collision) {
+        // Show Overwrite + Increment buttons
+        uploadModal.title.textContent = `Image "${uploadModal.input.value.trim()}" already exists`;
+        uploadModal.nameBtn.style.display = "none";
+        uploadModal.overwriteBtn.style.display = "inline-block";
+        uploadModal.incrementBtn.style.display = "inline-block";
+      } else if (res.ok) {
+        uploadModal.modal.style.display = "none";
+        resolve({ action: actionType, savedPath: data.newPath });
+      } else {
+        alert(data.error || "Upload failed");
+      }
+    }
+
+    uploadModal.nameBtn.onclick = () => checkCollision("check");
+    uploadModal.incrementBtn.onclick = () => checkCollision("increment");
+    uploadModal.overwriteBtn.onclick = () => checkCollision("overwrite");
+    uploadModal.closeBtn.onclick = () => {
+      uploadModal.modal.style.display = "none";
+      resolve(null);
+    };
+
+    document.onkeydown = (e) => {
+      if (e.key === "Enter") uploadModal.nameBtn.click();
+      else if (e.key === "Escape") uploadModal.closeBtn.click();
+    };
+  });
+}
+
+// ============================
+// Hook into Upload Button
+// ============================
+document.getElementById("upload-image").onclick = () => { 
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/*";
   input.onchange = async () => {
     const file = input.files[0];
     if (!file) return;
-    const currentPath = localStorage.getItem("currentPath") || "";
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("currentPath", currentPath);
-    try {
-      const res = await fetch("/api/upload_image", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        alert("Upload failed: " + errText);
-        return;
-      }
-      const result = await res.json();
-      const savedPath = result.savedPath;
-      const folderPath = result.savedPath.split('/').slice(0, -1).join('/');
-      insertImageMarkdown(savedPath);
-      // openImagePicker(folderPath);
-      // setTimeout(() => loadImagePickerFolder(folderPath), 100);
-    } catch (err) {
-      alert("Upload error: " + err.message);
+
+    const mdPath = localStorage.getItem("currentPath") || "";
+    const segments = mdPath.split("/");
+    segments.pop(); // remove .md filename
+
+    let imagePath = segments.join("/");
+    if (imagePath.startsWith("/")) imagePath = imagePath.slice(1);
+
+    // Don't add _static here — backend already handles it
+    const currentPath = imagePath;
+
+    const result = await showUploadModal(file, currentPath);
+    if (result && result.savedPath) {
+      insertImageMarkdown(result.savedPath); // already has _static/ once
     }
   };
   input.click();
 };
+
+
 
 // ------------------------- Typography buttons functions START -------------------------- //
 
@@ -433,9 +724,16 @@ function convertToBold() {
 
 const menu = document.createElement("div");
 menu.id = "custom-menu";
+menu.style.position = "fixed"; // Ensures positioning is relative to the viewport
+menu.style.display = "none";   // Hidden by default
 menu.innerHTML = `
+  <div class="item" id="rename_image">✍️ Rename Image</div>
   <div class="item" id="excalidraw_image">🖼️ Excalidraw Image</div>
-  <div class="item" id="ai_popup">🤖 AI Assistant</div>
+  <div class="item" style="display: flex; align-items: center; gap: 4px;">
+    <button id="ai_rephrase_btn" style="flex: 9; height: 100%;border: 0px;border-right: 1px solid gray; border-radius: 0px; background: none; padding: 0px; text-align: left; font-size: 16px;">🪄 AI Rephrase</button>
+    <button id="ai_rephrase_settings" title="Settings" style="flex: 1;background: none;border: none;">⚙️</button>
+  </div>
+  <div class="item" id="ask_ollama">🤖 Ask Ollama</div>
 `;
 document.body.appendChild(menu);
 
@@ -453,11 +751,38 @@ document.addEventListener("contextmenu", (e) => {
     typeof el.id === "string" && el.id === "ollama-ai"
   );
 
-  if (isInMystMainEditor && !isInExcalidraw && !isInOllamaAI) {
+  const isInAIRephrase = path.some(el =>
+    el.classList?.contains("ollama-ai-rephrase-settings") ||
+    typeof el.id === "string" && el.id === "ollama-ai-reprhase-settings"
+  );
+
+  if (isInMystMainEditor && !isInExcalidraw && !isInOllamaAI && !isInAIRephrase) {
     e.preventDefault();
-    menu.style.top = `${e.clientY}px`;
-    menu.style.left = `${e.clientX}px`;
+
+    // Show temporarily to measure size
     menu.style.display = "block";
+    menu.style.visibility = "hidden"; // Hide visually while measuring
+    menu.style.top = "0px";
+    menu.style.left = "0px";
+
+    const menuRect = menu.getBoundingClientRect();
+    let x = e.clientX;
+    let y = e.clientY;
+
+    // Check right edge
+    if (x + menuRect.width > window.innerWidth) {
+      x = window.innerWidth - menuRect.width;
+    }
+
+    // Check bottom edge
+    if (y + menuRect.height > window.innerHeight) {
+      y = window.innerHeight - menuRect.height;
+    }
+
+    // Apply corrected position
+    menu.style.top = `${y}px`;
+    menu.style.left = `${x}px`;
+    menu.style.visibility = "visible";
   } else {
     menu.style.display = "none";
   }
@@ -467,6 +792,7 @@ document.addEventListener("contextmenu", (e) => {
 document.addEventListener("click", () => {
   menu.style.display = "none";
 });
+
 
 // ------------------------- Excalidraw image editing START ---------------------------- //
 
@@ -484,7 +810,7 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
   const match = line.match(/!\[.*?\]\((.*?)\)/);
 
   if (match) {
-    showTemporaryDiv(match[1], view);
+    showExcalidraw(match[1], view);
     return;
   }
 
@@ -495,8 +821,9 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
   const nameBase = rawName.trim().replace(/\s+/g, '_');
   if (!nameBase) return;
 
-  const mdPath = localStorage.getItem("currentPath") || "";
+  const mdPath = (localStorage.getItem("currentPath") || "").toString();
   const mdParts = mdPath.replace(/\\/g, "/").split("/").slice(0, -1);
+
   const targetFolder = `_static/${mdParts.join("/")}`;
   const filename = `${nameBase}.png`;
 
@@ -505,7 +832,7 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
 
   const emptyFile = new Blob([], { type: "image/png" });
   formData.append("file", emptyFile, filename);
-  formData.append("currentPath", mdPath);
+  formData.append("path", mdPath);
 
   try {
     const res = await fetch("/api/upload_image", {
@@ -519,22 +846,39 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
     }
 
     const result = await res.json();
-    const savedPath = result.savedPath;
+    console.log("📦 Backend response:", result);
+
+    let savedPath = result.savedPath || result.newPath;
+
+    // Strip `.md/` from the path if present
+    if (savedPath) {
+      const pathParts = savedPath.split("/");
+      const mdIndex = pathParts.findIndex(p => p.endsWith(".md"));
+      if (mdIndex !== -1) {
+        pathParts.splice(mdIndex, 1);
+        savedPath = pathParts.join("/");
+        console.log("🧼 Cleaned path:", savedPath);
+      }
+    }
+
+    if (!savedPath || typeof savedPath !== "string") {
+      alert("Image creation failed: Invalid path returned by server.");
+      return;
+    }
 
     insertImageMarkdown(savedPath);
-    showTemporaryDiv(`${targetFolder}/${filename}`, view);
+    showExcalidraw(savedPath, view);
 
   } catch (err) {
     alert("Image creation failed: " + err.message);
   }
 });
 
-// ------------------------- Excalidraw image editing END ---------------------------- //
+// ------------------------- Excalidraw image editing END --------------------- //
 
-// ------------------------- Ollama AI window START ---------------------------- //
+// ------------------------- Ollama AI window START --------------------------- //
 
-// AI Assistant popup handler
-document.getElementById("ai_popup").addEventListener("click", () => {
+document.getElementById("ask_ollama").addEventListener("click", () => {
   const view = mystEditorInstance?.editorView;
   if (!view) return alert("Editor not ready");
   showOllamaPopup(view);
@@ -542,8 +886,44 @@ document.getElementById("ai_popup").addEventListener("click", () => {
 
 // ------------------------- Ollama AI window END ---------------------------- //
 
+// ------------------------- Rename Image START ------------------------------ //
 
-// -------------------------- Custom Right Mouse Button menu END --------------------------- //
+document.getElementById("rename_image").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  if (!view) return alert("Editor not ready");
+  showRenamePopup(view);
+});
+
+// ------------------------- Rename Image END -------------------------------- //
+
+// ------------------------- AI Rephrase START ------------------------------- //
+
+// AI Rephrase main action
+document.getElementById("ai_rephrase_btn").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  if (!view) return alert("Editor not ready");
+
+  const sel = view.v.state.selection.main;
+  if (sel.empty) {
+    alert("Please select some text first.");
+    return;
+  }
+
+  showAIRephrasePopup(view, { type: "rephrase", from: sel.from, to: sel.to });
+});
+
+// AI Rephrase settings action
+document.getElementById("ai_rephrase_settings").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  if (!view) return alert("Editor not ready");
+
+  showAIRephrasePopup(view, { type: "settings" });
+});
+
+
+// ------------------------- AI Rephrase END --------------------------------- //
+
+// ------------------- Custom Right Mouse Button menu END -------------------- //
 
 // New Image Picker modal code
 let imagePickerModal = null;
@@ -600,7 +980,12 @@ function openImagePicker(startFolder = '') {
 
 // Insert image markdown into editor
 function insertImageMarkdown(path) {
-  const imgSyntax = `![image](/_static/${path})`;
+  // Extract filename from path (after last slash)
+  const filename = path.split("/").pop() || "";
+  // Remove file extension from filename
+  const dotIndex = filename.lastIndexOf(".");
+  const altText = dotIndex > -1 ? filename.substring(0, dotIndex) : filename;
+  const imgSyntax = `![${altText}](/${path})`;
   const view = mystEditorInstance?.editorView;
   if (!view) {
     alert("Editor is not ready yet.");
@@ -694,7 +1079,6 @@ function renderFolderTree(nodes, parent, selectedPathParts = []) {
   parent.appendChild(ul);
 }
 
-
 function renderImageList(items) {
   if (!imageList) return;
   imageList.innerHTML = '';
@@ -707,7 +1091,7 @@ function renderImageList(items) {
     img.title = fileItem.name;
     img.alt = fileItem.name;
     img.onclick = () => {
-      insertImageMarkdown(fileItem.path);
+      insertImageMarkdown(`_static/${fileItem.path}`);
       imagePickerModal.style.display = 'none';
     };
     imageList.appendChild(img);
@@ -949,6 +1333,8 @@ document.getElementById("rename").onclick = async () => {
   const newName = oldName.endsWith(".md") && !inputName.endsWith(".md")
     ? `${inputName}.md` : inputName;
   const newPath = dirPath ? `${dirPath}/${newName}` : newName;
+  console.log(oldPath);
+  console.log(newPath);
   const res = await fetch("/api/rename", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

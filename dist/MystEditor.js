@@ -1,4 +1,4 @@
-import { C as s, b as e, e as o, r as d, w as r, f, M as i, d as l, E as n, p as c, c as u } from "./MystEditor-CNleIgAH.js";
+import { C as s, e, g as o, r as d, w as r, h as f, M as i, d as l, E as n, p as u, f as c } from "./MystEditor-6TrRYQ_f.js";
 export {
   s as CollaborationClient,
   e as MystEditorGit,
@@ -9,7 +9,7 @@ export {
   i as default,
   l as defaultButtons,
   n as effect,
-  c as predefinedButtons,
-  u as signal
+  u as predefinedButtons,
+  c as signal
 };
 //# sourceMappingURL=MystEditor.js.map

@@ -4,6 +4,7 @@ import { StyleSheetManager, styled } from "styled-components";
 import CodeMirror from "./components/CodeMirror";
 import Preview, { PreviewFocusHighlight } from "./components/Preview";
 import Diff from "./components/Diff";
+import GitDiff from "./components/GitDiff";
 import { EditorTopbar } from "./components/Topbar";
 import ResolvedComments from "./components/Resolved";
 import { handlePreviewClickToScroll } from "./extensions/syncDualPane";
@@ -25,6 +26,8 @@ const EditorParent = styled.div`
   ${(props) => props.fullscreen && "position: fixed; left: 0; top: 0; z-index: 10;"}
   ${(props) => {
     switch (props.mode) {
+      case "GitDiff":
+        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
       case "Preview":
         return "#editor-wrapper { display: none }";
       case "Source":
@@ -159,6 +162,11 @@ const MystEditor = () => {
               {options.mode.value === "Diff" && (
                 <FlexWrapper className="flex-wrapper">
                   <Diff />
+                </FlexWrapper>
+              )}
+              {options.mode.value === "GitDiff" && (
+                <FlexWrapper className="flex-wrapper">
+                  <GitDiff />
                 </FlexWrapper>
               )}
               {options.mode.value == "Resolved" &&

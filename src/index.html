@@ -42,19 +42,33 @@
     
     <div id="container">
     <div id="sidebar">
-      <div class="controls">
-        <div class="controls_row" >
-          <button id="new-file">➕ File</button>
-          <button id="new-folder">➕ Folder</button>
-          <button id="delete">🗑️ Delete</button>
+      <div id="tree-panel">
+        <div class="controls">
+          <div class="controls_row" >
+            <button id="new-file">➕ File</button>
+            <button id="new-folder">➕ Folder</button>
+            <button id="delete">🗑️ Delete</button>
+          </div>
+          <div class="controls_row" >
+            <button id="rename">✏️ Rename</button>
+            <button id="move">📁 Move</button>
+            <button id="upload-image">📤 Upload</button>
+          </div>
         </div>
-        <div class="controls_row" >
-          <button id="rename">✏️ Rename</button>
-          <button id="move">📁 Move</button>
-          <button id="upload-image">📤 Upload</button>
-        </div>
+        <div id="tree"></div>
       </div>
-      <div id="tree"></div>
+      <div class="resizer-vertical"></div>
+      <div id="gitPanel">
+        <input type="hidden" id="hidden-filename" value="">
+        <label>Branch:</label>
+        <select id="branchDropdown"></select>
+        <label>Commit:</label>
+        <select id="commitDropdown"></select>
+        <label>Commit Details:</label>
+        <pre id="commitDetails">Select a commit...</pre>
+      </div>
+
+      
     </div>
     <div id="resizer"></div>
     <div id="editor-panel" class="printable">

@@ -17,6 +17,65 @@ body {
   box-sizing: border-box;
 }
 
+#tree-panel {
+  flex-grow: 1;
+  overflow: auto;
+}
+
+#resizer-horizontal {
+  height: 6px;
+  background: #ccc;
+  cursor: row-resize;
+}
+
+#gitPanel {
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  padding: 12px;
+  border-top: 1px solid #ccc;
+  background-color: #f9f9f9;
+}
+
+#gitPanel label {
+  display: block;
+  margin-top: 10px;
+  font-weight: bold;
+  color: #333;
+}
+
+#gitPanel select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px;
+  font-family: inherit;
+  font-size: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+#gitPanel pre#commitDetails {
+  display: block;
+  margin-top: 6px;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: inherit;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+
+
+.resizer-vertical {
+  height: 6px;
+  background: #ccc;
+  cursor: row-resize;
+}
+
 #resizer {
   width: 5px;
   cursor: ew-resize;

@@ -305,7 +305,7 @@ function PopupContent({ editorView, from, to, context }) {
 
 
 function closePopup(view) {
-  view.dispatch({ effects: closePopupEffect.of(null) }); // ✅ FIXED: don't use view.v
+  view.dispatch({ effects: closePopupEffect.of(null) }); //
 }
 
 const addPopupEffect = StateEffect.define();
@@ -370,5 +370,5 @@ const ollamaPopupPlugin = ViewPlugin.fromClass(class {
 export const ollamaExtension = [ollamaPopupPlugin];
 
 export function showOllamaPopup(view) {
-  view.v.dispatch({ effects: addPopupEffect.of(null) }); // ✅ FIXED
+  view.v.dispatch({ effects: addPopupEffect.of(null) }); 
 }

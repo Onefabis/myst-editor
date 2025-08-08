@@ -45,7 +45,9 @@ import { loggerFacet } from "../logger";
 import { criticHistory, criticMarkup, suggestMode } from "./criticMarkup";
 import { excalidrawExtension } from "./excalidrawExtension";
 import { ollamaExtension } from "./ollamaAIQuery";
+import { aiRephraseExtension } from "./aiRephrase";
 import { harperExtension } from "./harperExtension";
+import { renameExtension } from "./renameImage";
 
 // import { createHarperExtension } from "./harperExtension.js";
 
@@ -143,6 +145,8 @@ export class ExtensionBuilder {
     ];
   }
 
+  // ------------- Custom PFX extension declaration START -------------- //
+
   useExcalidraw() {
     this.extensions.push(...excalidrawExtension);
     return this;
@@ -153,10 +157,22 @@ export class ExtensionBuilder {
     return this;
   }
 
+  useAiRephrase() {
+    this.extensions.push(...aiRephraseExtension);
+    return this;
+  }
+
   useHarperGrammarChecker() {
     this.extensions.push(harperExtension); // no spread
     return this;
   }
+
+  useImageRename() {
+    this.extensions.push(...renameExtension);
+    return this;
+  }
+
+  // ------------- Custom PFX extension declaration END -------------- //
 
   useMarkdown(transforms) {
     const md = markdown({

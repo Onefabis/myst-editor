@@ -197,7 +197,7 @@ const defaultUserSettings = [
 const defaults = {
   id: "",
   title: "",
-  /** @type {"Both" | "Preview" | "Source" | "Diff" | "Resolved" | "Outline" | "Inline"} */
+  /** @type { "Both" | "Preview" | "Source" | "Diff" | "Resolved" | "GitDiff" | "Outline" | "Inline"} */
   mode: "Both",
   initialText: "",
   includeButtons: defaultButtons,

@@ -1,280 +1,417 @@
 import os
 import re
-from flask import Flask, send_from_directory, jsonify, request
-from flask_cors import CORS
+import shutil
+from fastapi import FastAPI, File, Form, UploadFile, Request, Query
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from typing import Optional, List
 
+from git import Repo
+import difflib
 
-app = Flask(__name__, static_folder='../dist', static_url_path='/')
-CORS(app)
-BASE_DIR = os.path.abspath('../../docs')  # editable content folder
+# ---------------------- CONFIG ----------------------
+BASE_DIR = os.path.abspath("../../docs")
+STATIC_FOLDER = "../dist"
 
+app = FastAPI()
 
-@app.route('/')
-def index():
-    return send_from_directory(app.static_folder, 'index.html')
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # adjust for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# ---------------------- MODELS ----------------------
+class PathModel(BaseModel):
+    path: str
+    type: Optional[str] = None
 
-@app.route('/api/tree', methods=['GET'])
-def get_file_tree():
-    def scan_dir(path):
-        entries = []
-        for entry in os.listdir(path):
-            full_path = os.path.join(path, entry)
-            rel_path = os.path.relpath(full_path, BASE_DIR)
-            if os.path.isdir(full_path):
-                entries.append({"type": "folder", "name": entry, "path": rel_path, "children": scan_dir(full_path)})
-            elif entry.endswith(".md"):
-                entries.append({"type": "file", "name": entry, "path": rel_path})
-        return entries
+class RenameModel(BaseModel):
+    oldPath: str
+    newPath: str
+    action: str = "check"  # "check" | "overwrite" | "increment"
 
-    return jsonify(scan_dir(BASE_DIR))
+# ---------------------- HELPERS ----------------------
+def normalize_relative_path(path: str) -> str:
+    """Normalize and sanitize a relative path."""
+    # Convert backslashes → forward slashes
+    path = path.replace("\\", "/").strip()
+    # Remove any dangerous prefixes
+    while path.startswith("../") or path.startswith("./") or path.startswith("/"):
+        path = path.lstrip("./").lstrip("/")
+    # Collapse redundant separators
+    path = os.path.normpath(path).replace("\\", "/")
+    # Prevent navigating above root
+    if ".." in path.split("/"):
+        raise ValueError("Invalid path: directory traversal detected")
+    return path
 
+def safe_join(base: str, *paths) -> str:
+    """Join paths safely to prevent directory traversal."""
+    paths = [normalize_relative_path(p) for p in paths]
+    final_path = os.path.abspath(os.path.join(base, *paths))
+    if not final_path.startswith(base):
+        raise ValueError("Unsafe path")
+    return final_path
 
-@app.route('/api/file', methods=['GET', 'POST'])
-def file_ops():
-    path = request.args.get('path')
-    safe_path = path.replace('\\', '/')
-    full_path = os.path.join(BASE_DIR, safe_path)
-
-    if request.method == 'GET':
-        try:
-            with open(full_path, 'r', encoding='utf-8') as f:
-                return jsonify({"content": f.read()})
-        except FileNotFoundError:
-            return 'File not found', 404
-
-    elif request.method == 'POST':
-        content = request.json.get('content', '')
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        return jsonify({"status": "saved"})
-
-
-@app.route('/api/images_in_folder')
-def images_in_folder():
-    folder = request.args.get('folder', '')  # relative to _static
-    static_dir = os.path.join(BASE_DIR, '_static')
-    folder_path = os.path.join(static_dir, folder)
-    if not os.path.isdir(folder_path):
-        return jsonify([])
-
-    allowed_exts = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg'}
+def scan_dir(path: str, base: str, ext_filter: Optional[List[str]] = None):
     entries = []
-
-    for entry in os.listdir(folder_path):
-        full_path = os.path.join(folder_path, entry)
-        rel_path = os.path.relpath(full_path, static_dir).replace('\\', '/')
+    for entry in os.listdir(path):
+        full_path = os.path.join(path, entry)
+        rel_path = os.path.relpath(full_path, base).replace("\\", "/")
         if os.path.isdir(full_path):
-            entries.append({"type": "folder", "name": entry, "path": rel_path})
-        elif os.path.splitext(entry)[1].lower() in allowed_exts:
+            entries.append({
+                "type": "folder",
+                "name": entry,
+                "path": rel_path,
+                "children": scan_dir(full_path, base, ext_filter)
+            })
+        elif not ext_filter or os.path.splitext(entry)[1].lower() in ext_filter:
             entries.append({"type": "file", "name": entry, "path": rel_path})
-
-    return jsonify(entries)
-
-
-# Function for the folder or file creation in the file tree on the left side panel
-@app.route('/api/create', methods=['POST'])
-def create_file_or_folder():
-    path = request.json.get('path')
-    type_ = request.json.get('type')
-    full_path = os.path.join(BASE_DIR, path)
-    if type_ == 'folder':
-        os.makedirs(full_path, exist_ok=True)
-    elif type_ == 'file':
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, 'w', encoding='utf-8') as f:
-            f.write('')
-    return jsonify({"status": "created", "path": path})
-
-
-# Function for the file or folder deletion in the file tree on the left side panel
-@app.route('/api/delete', methods=['POST'])
-def delete_path():
-    path = request.json.get('path')
-    if not path:
-        return jsonify({'error': 'Missing path'}), 400
-    full_path = os.path.join(BASE_DIR, path)
-    if not os.path.commonpath([BASE_DIR, os.path.abspath(full_path)]) == BASE_DIR:
-        return jsonify({'error': 'Invalid path'}), 403  # Prevent directory traversal
-    if not os.path.exists(full_path):
-        return jsonify({'error': 'File or folder does not exist'}), 404
-    try:
-        if os.path.isfile(full_path):
-            os.remove(full_path)
-        elif os.path.isdir(full_path):
-            import shutil
-            shutil.rmtree(full_path)
-        return jsonify({'status': 'deleted', 'path': path})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# Rename function for the files or folders in the file tree on the left side panel
-@app.route('/api/rename', methods=['POST'])
-def rename_path():
-    data = request.json
-    old_path = data.get('oldPath')
-    new_path = data.get('newPath')
-    if not old_path or not new_path:
-        return jsonify({'error': 'Missing oldPath or newPath'}), 400
-    old_full_path = os.path.abspath(os.path.join(BASE_DIR, old_path))
-    new_full_path = os.path.abspath(os.path.join(BASE_DIR, new_path))
-    # Prevent directory traversal
-    if not old_full_path.startswith(BASE_DIR) or not new_full_path.startswith(BASE_DIR):
-        return jsonify({'error': 'Invalid path'}), 403
-    if not os.path.exists(old_full_path):
-        return jsonify({'error': 'Source path does not exist'}), 404
-    try:
-        os.makedirs(os.path.dirname(new_full_path), exist_ok=True)
-        os.rename(old_full_path, new_full_path)
-        return jsonify({'status': 'renamed', 'oldPath': old_path, 'newPath': new_path})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    
-
-# It collects the source path for thumbnails in the picker image window
-@app.route('/_static/<path:subpath>')
-def serve_source_files(subpath):
-    static_dir = os.path.join(BASE_DIR, '_static')
-    full_path = os.path.join(static_dir, subpath)
-
-    if not os.path.commonpath([static_dir, os.path.abspath(full_path)]) == static_dir:
-        return 'Forbidden', 403
-
-    if os.path.isfile(full_path):
-        directory = os.path.dirname(full_path)
-        filename = os.path.basename(full_path)
-        return send_from_directory(directory, filename)
-
-    return 'File not found', 404
-    
-
-# Add dictionaries path for the spell-check support
-@app.route('/dictionaries/<path:path>')
-def send_dictionaries(path):
-    response = send_from_directory(os.path.join(app.static_folder, 'dictionaries'), path)
-    response.headers["Cache-Control"] = "public, max-age=31536000"
-    return response
-    # return send_from_directory(os.path.join(app.static_folder, 'dictionaries'), path)
-
-
-# Add templates path for the correct templates integration
-@app.route('/templates/<path:path>')
-def get_templates(path):
-    return send_from_directory(os.path.join(app.static_folder, 'templates'), path)
-
-
-# Add the main template list json file that contains template_name:template_path values
-@app.route('/linkedtemplatelist.json')
-def serve_linked_template_list():
-    return send_from_directory(app.static_folder, 'linkedtemplatelist.json')
-
-
-@app.route('/api/image_tree', methods=['GET'])
-def get_image_tree():
-    static_root = os.path.join(BASE_DIR, '_static')
-
-    def scan_dir(path):
-        entries = []
-        for entry in os.listdir(path):
-            full_path = os.path.join(path, entry)
-            rel_path = os.path.relpath(full_path, static_root).replace('\\', '/')
-            if os.path.isdir(full_path):
-                entries.append({
-                    "type": "folder",
-                    "name": entry,
-                    "path": rel_path,
-                    "children": scan_dir(full_path)
-                })
-        return entries
-
-    return jsonify(scan_dir(static_root))
-
+    return entries
 
 def sanitize_filename(filename):
     name, ext = os.path.splitext(filename)
-    name = name.replace(' ', '_')
+    name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name)  # Replace unsafe chars
     return f"{name}{ext}"
-
 
 def increment_filename(path, filename):
     name, ext = os.path.splitext(filename)
-    match = re.search(r'(.*?)(\d+)$', name)
-
+    match = re.search(r"(.*?)(\d+)$", name)
     if match:
-        prefix = match.group(1)
-        number = match.group(2)
+        prefix, number = match.groups()
         i = int(number) + 1
         width = len(number)
     else:
-        prefix = name + '_'
-        i = 1
-        width = 4  # default padding
-
+        prefix, i, width = name + "_", 1, 4
     while True:
         new_name = f"{prefix}{i:0{width}d}{ext}"
         if not os.path.exists(os.path.join(path, new_name)):
             return new_name
         i += 1
 
+# ---------------------- ROUTES ----------------------
+@app.get("/")
+async def index():
+    index_file = os.path.join(STATIC_FOLDER, "index.html")
+    return FileResponse(index_file)
 
-@app.route('/api/upload_image', methods=['POST'])
-def upload_image():
-    if 'file' not in request.files:
-        return 'Missing file', 400
+@app.get("/api/tree")
+async def get_file_tree():
+    return scan_dir(BASE_DIR, BASE_DIR, [".md"])
 
-    uploaded_file = request.files['file']
-    current_path = request.form.get('currentPath', '')
-    if uploaded_file.filename == '':
-        return 'No selected file', 400
+@app.get("/api/file")
+async def get_file(path: str):
+    try:
+        full_path = safe_join(BASE_DIR, path)
+        with open(full_path, "r", encoding="utf-8") as f:
+            return {"content": f.read()}
+    except FileNotFoundError:
+        return JSONResponse({"error": "File not found"}, status_code=404)
+    except ValueError:
+        return JSONResponse({"error": "Invalid path"}, status_code=400)
 
-    filename = sanitize_filename(uploaded_file.filename)
-    current_path = current_path.replace('\\', '/').strip('/')
-    parts = current_path.split('/')[:-1] if current_path else []
+@app.post("/api/file")
+async def save_file(path: str, request: Request):
+    try:
+        full_path = safe_join(BASE_DIR, path)
+    except ValueError:
+        return JSONResponse({"error": "Invalid path"}, status_code=400)
+    data = await request.json()
+    content = data.get("content", "")
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    with open(full_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return {"status": "saved"}
 
-    source_root = os.path.join(BASE_DIR, '_static')
-    target_folder = os.path.join(source_root, *parts)
-    os.makedirs(target_folder, exist_ok=True)
+@app.get("/api/images_in_folder")
+async def images_in_folder(folder: str = ""):
+    try:
+        folder = normalize_relative_path(folder)
+    except ValueError:
+        return []
+    static_dir = os.path.join(BASE_DIR, "_static")
+    folder_path = os.path.join(static_dir, folder)
+    if not os.path.isdir(folder_path):
+        return []
+    allowed_exts = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg"}
+    return scan_dir(folder_path, static_dir, allowed_exts)
 
-    full_path = os.path.join(target_folder, filename)
+@app.post("/api/create")
+async def create_file_or_folder(data: PathModel):
+    try:
+        full_path = safe_join(BASE_DIR, data.path)
+    except ValueError:
+        return JSONResponse({"error": "Invalid path"}, status_code=400)
+    if data.type == "folder":
+        os.makedirs(full_path, exist_ok=True)
+    elif data.type == "file":
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        open(full_path, "w", encoding="utf-8").close()
+    return {"status": "created", "path": data.path}
 
-    if os.path.exists(full_path):
-        filename = increment_filename(target_folder, filename)
-        full_path = os.path.join(target_folder, filename)
+@app.post("/api/delete")
+async def delete_path(data: PathModel):
+    try:
+        full_path = safe_join(BASE_DIR, data.path)
+    except ValueError:
+        return JSONResponse({"error": "Invalid path"}, status_code=400)
+    if not os.path.exists(full_path):
+        return JSONResponse({"error": "File or folder does not exist"}, status_code=404)
+    if os.path.isfile(full_path):
+        os.remove(full_path)
+    else:
+        shutil.rmtree(full_path)
+    return {"status": "deleted", "path": data.path}
 
-    uploaded_file.save(full_path)
-    rel_path = os.path.relpath(full_path, source_root).replace('\\', '/')
-    return jsonify({"savedPath": rel_path})
+# ------------------------------ COLLISION HANDLER ------------------------------
+def handle_collision(base_dir, old_path=None, file: UploadFile = None,
+                     new_path=None, action="check", move_file=False):
+    try:
+        new_full_path = safe_join(base_dir, new_path)
+        os.makedirs(os.path.dirname(new_full_path), exist_ok=True)
+
+        if action == "check":
+            if os.path.exists(new_full_path):
+                return JSONResponse({"collision": True}, status_code=409)
+            if move_file:
+                old_full_path = safe_join(base_dir, old_path)
+                if not os.path.exists(old_full_path):
+                    return JSONResponse({"error": "Source does not exist"}, status_code=404)
+                os.rename(old_full_path, new_full_path)
+            else:
+                with open(new_full_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
+            return {"status": "saved", "newPath": new_path}
+
+        elif action == "overwrite":
+            old_full_path = safe_join(base_dir, old_path)
+
+            # If source and destination are the same file → do nothing
+            if os.path.abspath(old_full_path) == os.path.abspath(new_full_path):
+                return {"status": "no_change", "newPath": new_path}
+
+            # If destination exists → delete it first
+            if os.path.exists(new_full_path):
+                os.remove(new_full_path)
+
+            # Move or copy
+            if move_file:
+                os.rename(old_full_path, new_full_path)
+            else:
+                with open(new_full_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
+
+            return {"status": "saved", "newPath": new_path}
+
+        elif action == "increment":
+            dir_path = os.path.dirname(new_full_path)
+            filename = os.path.basename(new_full_path)
+            new_name = increment_filename(dir_path, filename)
+            final_path = os.path.join(dir_path, new_name)
+            if move_file:
+                old_full_path = safe_join(base_dir, old_path)
+                os.rename(old_full_path, final_path)
+            else:
+                with open(final_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
+            rel_path = os.path.relpath(final_path, base_dir).replace("\\", "/")
+            return {"status": "saved", "newPath": rel_path}
+
+        return JSONResponse({"error": "Invalid action"}, status_code=400)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": f"Internal Server Error: {str(e)}"}, status_code=500)
+
+@app.post("/api/rename")
+async def rename_path(data: RenameModel):
+    try:
+        # Normalize input paths
+        old_path_clean = data.oldPath.lstrip("/").replace("\\", "/")
+        new_path_clean = data.newPath.lstrip("/").replace("\\", "/")
+
+        return handle_collision(
+            base_dir=BASE_DIR,
+            old_path=old_path_clean,
+            new_path=new_path_clean,
+            action=data.action,
+            move_file=True
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/api/upload_image")
+async def upload_image(
+    file: UploadFile = File(...),
+    path: str = Form(...),
+    action: str = Form("check")
+):
+    filename = sanitize_filename(file.filename)
+    try:
+        # Ensure path always starts inside _static
+        normalized_path = normalize_relative_path(path)
+        if not normalized_path.startswith("_static/"):
+            normalized_path = f"_static/{normalized_path}"
+
+        rel_path = os.path.join(normalized_path, filename).replace("\\", "/")
+    except ValueError:
+        return JSONResponse({"error": "Invalid path"}, status_code=400)
+
+    return handle_collision(
+        base_dir=BASE_DIR,
+        file=file,
+        new_path=rel_path,
+        action=action,
+        move_file=False
+    )
 
 
-@app.route("/save", methods=["POST"])
-def save_file():
-    file = request.files["file"]
-    raw_path = request.args.get("filename")
+@app.get("/api/image_tree")
+async def get_image_tree():
+    static_root = os.path.join(BASE_DIR, "_static")
+    return scan_dir(static_root, static_root)
 
-    if not raw_path:
-        return jsonify({"error": "Missing filename"}), 400
-
-    # Strip leading slash and normalize path
-    safe_relative_path = os.path.normpath(raw_path.lstrip("/"))
-
-    # Resolve full absolute path within BASE_DIR
-    save_path = os.path.abspath(os.path.join(BASE_DIR, safe_relative_path))
-
-    # SECURITY CHECK: ensure path is within BASE_DIR
-    if not save_path.startswith(BASE_DIR):
-        return jsonify({"error": "Invalid save path"}), 400
-
-    # Ensure target directory exists
+@app.post("/save")
+async def save_uploaded_file(file: UploadFile = File(...), filename: str = ""):
+    if not filename:
+        return JSONResponse({"error": "Missing filename"}, status_code=400)
+    try:
+        safe_relative_path = normalize_relative_path(filename)
+        save_path = safe_join(BASE_DIR, safe_relative_path)
+    except ValueError:
+        return JSONResponse({"error": "Invalid save path"}, status_code=400)
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    with open(save_path, "wb") as f:
+        f.write(await file.read())
+    return {"success": True, "path": save_path}
 
-    # Save file
-    file.save(save_path)
-    return jsonify({"success": True, "path": save_path})
+# ---------------------- STATIC FILE ROUTES ----------------------
+@app.get("/_static/{subpath:path}")
+async def serve_static_files(subpath: str):
+    try:
+        full_path = safe_join(os.path.join(BASE_DIR, "_static"), subpath)
+    except ValueError:
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+    if os.path.isfile(full_path):
+        headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+        return FileResponse(full_path, headers=headers)
+    return JSONResponse({"error": "File not found"}, status_code=404)
+
+@app.get("/dictionaries/{path:path}")
+async def send_dictionaries(path: str):
+    return FileResponse(os.path.join(STATIC_FOLDER, "dictionaries", path))
+
+@app.get("/templates/{path:path}")
+async def get_templates(path: str):
+    return FileResponse(os.path.join(STATIC_FOLDER, "templates", path))
+
+@app.get("/linkedtemplatelist.json")
+async def serve_linked_template_list():
+    return FileResponse(os.path.join(STATIC_FOLDER, "linkedtemplatelist.json"))
+
+REMOTE_GIT_URL = "https://github.com/Onefabis/PFX_docs_project"
 
 
-if __name__ == '__main__':
-    # app.run(ssl_context=('cert.pem', 'key.pem'), host='0.0.0.0', port=443)
-    # serve(app, host='0.0.0.0', port=5000)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+repo_dir = "F:/!Work/PFX_Studio/PFX_docs_project"
+if not os.path.exists(os.path.join(repo_dir, ".git")):
+    Repo.clone_from(REMOTE_GIT_URL, repo_dir)
+
+repo = Repo(repo_dir)
+
+
+class FileRequest(BaseModel):
+    filename: str
+
+
+class CompareRequest(BaseModel):
+    branch: str
+    commit: str
+    filename: str
+    current_text: str
+
+@app.post("/search-file")
+async def search_file(req: FileRequest):
+    branches = []
+    commits = []
+    # target_file = req.filename.replace("\\", "/")  # normalize path
+    target_file = f"docs/{req.filename.replace('\\', '/')}"
+    for branch in repo.branches:
+        branch_name = branch.name
+        try:
+            repo.git.checkout(branch_name)
+            # try:
+            _ = repo.head.commit.tree / target_file
+            print(f"✅ Found in: {branch_name}")
+            branches.append(branch_name)
+            for commit in repo.iter_commits(branch_name, paths=target_file):
+                commits.append({
+                    "hash": commit.hexsha,
+                    "summary": commit.summary,
+                    "message": commit.message
+                })
+            # except KeyError:
+                # continue  # file not found in this branch
+        except Exception as e:
+            print(f"❌ Error in branch {branch_name}: {e}")
+            continue
+    return {
+        "branches": sorted(set(branches)),
+        "commits": commits
+    }
+
+@app.post("/compare")
+async def compare_file(req: CompareRequest):
+    repo.git.checkout(req.branch)
+    file_content = ""
+
+    try:
+        blob = repo.commit(req.commit).tree / req.filename
+        file_content = blob.data_stream.read().decode("utf-8")
+    except Exception as e:
+        return JSONResponse(status_code=404, content={"error": str(e)})
+
+    diff = difflib.unified_diff(
+        file_content.splitlines(),
+        req.current_text.splitlines(),
+        fromfile='remote',
+        tofile='current',
+        lineterm=''
+    )
+    return {"diff": "\n".join(diff)}
+
+@app.post("/get-file-from-git")
+async def get_file_from_git(req: CompareRequest):
+    repo.git.checkout(req.branch)
+    target_file = f"docs/{req.filename.replace('\\', '/')}"
+    try:
+        blob = repo.commit(req.commit).tree / target_file
+        content = blob.data_stream.read().decode("utf-8").replace('\r', '')
+        return {"content": content}
+    except Exception as e:
+        return JSONResponse(status_code=404, content={"error": str(e)})
+
+@app.get("/api/git-commit-info")
+async def get_commit_info(branch: str = Query(...), commit: str = Query(...), filename: str = Query(...)):
+    try:
+        repo.git.checkout(branch)
+        c = repo.commit(commit)
+        return {
+            "summary": c.summary,
+            "message": c.message
+        }
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+# Mount frontend
+app.mount("/", StaticFiles(directory=STATIC_FOLDER, html=True), name="frontend")
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=True)
