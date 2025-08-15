@@ -1,46 +1,19 @@
 import { StateEffect } from "@codemirror/state";
 import { ViewPlugin } from "@codemirror/view";
 
-// ============================
-// Modal Creation
-// ============================
+/* Create a popup window, called by RMB menu to rename image file name and update markdown
+inside the editor with that updated name. 
+It operates with images inside the "_static" structure */
 function createRenameModal() {
   const modal = document.createElement("div");
   modal.id = "rename-image-modal";
-  modal.style.position = "fixed";
-  modal.style.inset = "0";
-  modal.style.background = "rgba(0,0,0,0.4)";
-  modal.style.display = "flex";
-  modal.style.alignItems = "center";
-  modal.style.justifyContent = "center";
-  modal.style.zIndex = "2000";
-  modal.style.display = "none";
 
   const content = document.createElement("div");
-  content.style.position = "relative";
-  content.style.background = "white";
-  content.style.padding = "14px";
-  content.style.borderRadius = "7px";
-  content.style.minWidth = "320px";
-  content.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
+  content.className = "rename-modal-content";
 
-  // Close button
   const closeBtn = document.createElement("div");
   closeBtn.innerHTML = "&times;";
-  closeBtn.style.position = "absolute";
-  closeBtn.style.top = "-11px";
-  closeBtn.style.right = "-11px";
-  closeBtn.style.width = "25px";
-  closeBtn.style.height = "25px";
-  closeBtn.style.background = "rgb(209 29 24)";
-  closeBtn.style.color = "white";
-  closeBtn.style.borderRadius = "50%";
-  closeBtn.style.display = "flex";
-  closeBtn.style.alignItems = "center";
-  closeBtn.style.justifyContent = "center";
-  closeBtn.style.cursor = "pointer";
-  closeBtn.style.fontWeight = "bold";
-  closeBtn.style.fontSize = "18px";
+  closeBtn.className = "rename-close-btn";
 
   const title = document.createElement("h3");
   title.textContent = "Rename Image";
@@ -48,48 +21,22 @@ function createRenameModal() {
 
   const input = document.createElement("input");
   input.type = "text";
-  input.style.width = "98%";
-  input.style.lineHeight = "22px";
-  input.style.margin = "0 0 12px";
-  input.style.border = "1px solid rgb(219 209 209)";
-  input.style.borderRadius = "3px";
-  input.style.outline = "none"; // prevent blue outline
-  input.onfocus = () => {
-    input.style.border = "1px solid rgb(219 209 209)"; // keep same as unfocused
-  };
-  input.onblur = () => {
-    input.style.border = "1px solid rgb(219 209 209)";
-  };
+  input.className = "rename-input";
 
-  // Action buttons
   const actions = document.createElement("div");
-  actions.style.display = "grid";
-  actions.style.gridTemplateColumns = "1fr 1fr";
-  actions.style.gap = "8px";
+  actions.className = "rename-actions";
 
   const renameBtn = document.createElement("button");
   renameBtn.textContent = "Rename";
-  renameBtn.style.padding = "6px 8px";
-  renameBtn.style.border = "1px dashed rgb(92, 184, 92)";
-  renameBtn.style.borderLeft = "3px solid rgb(92, 184, 92)";
-  renameBtn.style.borderRadius = "6px";
-  renameBtn.style.cursor = "pointer";
+  renameBtn.className = "rename-btn rename-btn-green";
 
   const incrementBtn = document.createElement("button");
   incrementBtn.textContent = "Increment";
-  incrementBtn.style.padding = "6px 8px";
-  incrementBtn.style.border = "1px dashed rgb(2, 117, 216)";
-  incrementBtn.style.borderLeft = "3px solid rgb(2, 117, 216)";
-  incrementBtn.style.borderRadius = "6px";
-  incrementBtn.style.cursor = "pointer";
+  incrementBtn.className = "rename-btn rename-btn-blue";
 
   const overwriteBtn = document.createElement("button");
   overwriteBtn.textContent = "Overwrite";
-  overwriteBtn.style.padding = "6px 8px";
-  overwriteBtn.style.border = "1px dashed rgb(240, 173, 78)";
-  overwriteBtn.style.borderLeft = "3px solid rgb(240, 173, 78)";
-  overwriteBtn.style.borderRadius = "6px";
-  overwriteBtn.style.cursor = "pointer";
+  overwriteBtn.className = "rename-btn rename-btn-orange";
 
   actions.appendChild(renameBtn);
   actions.appendChild(overwriteBtn);
@@ -107,42 +54,42 @@ function createRenameModal() {
 
 const renameModal = createRenameModal();
 
-// ============================
-// Helper for truncating names
-// ============================
+/* Shortens a filename if it exceeds the max length. 
+Checks string length and appends "..." if too long, simply make the rename title readable. */
 function truncateName(name, maxLength = 20) {
   return name.length > maxLength ? name.substring(0, maxLength) + "..." : name;
 }
 
-
-// ============================
-// Modal Logic
-// ============================
+/* Displays and configures the rename modal for a specific file path.
+It orchestrates the rename operation lifecycle (UI state → server request → UI update).
+Internally:
+- Prepares modal with initial filename.
+- Sends rename requests to the backend.
+- Handles name collisions by showing alternate action buttons. */
 function showRenameModal(oldPath, onSuccess) {
-  oldPath = oldPath.replace(/\\/g, "/");
-  const segments = oldPath.split("/");
-  const oldName = segments.pop();
-  const dirPath = segments.join("/");
+  const segments = oldPath.split("/"); // Split whole path into a folder + filename segments
+  const oldName = segments.pop(); // Get filename of the image
+  const dirPath = segments.join("/"); // Get project-relative path to the current image
 
+  // Split image name into the name itself and extension, only nice name displayed in the rename field
   const dotIndex = oldName.lastIndexOf(".");
   const baseName = dotIndex > -1 ? oldName.substring(0, dotIndex) : oldName;
   const extension = dotIndex > -1 ? oldName.substring(dotIndex) : "";
 
   renameModal.input.value = baseName;
-  renameModal.modal.style.display = "flex";
-  renameModal.renameBtn.style.display = "inline-block";
-  renameModal.incrementBtn.style.display = "none";
-  renameModal.overwriteBtn.style.display = "none";
-  renameModal.title.textContent = "Rename Image"; // reset title
+
+  renameModal.modal.classList.add("active");
+  renameModal.renameBtn.classList.remove("hidden");
+  renameModal.incrementBtn.classList.add("hidden");
+  renameModal.overwriteBtn.classList.add("hidden");
+  renameModal.title.textContent = "Rename Image";
   renameModal.input.focus();
 
+  // Backend called by increment, overwrite or rename button
   async function checkCollision(actionType) {
     const newName = renameModal.input.value.trim() + extension;
-    const newPath = (dirPath ? `${dirPath}/${newName}` : newName)
-      .replace(/^\/+/, "")
-      .replace(/\\/g, "/");
-
-    const oldPathClean = oldPath.replace(/^\/+/, "").replace(/\\/g, "/");
+    const newPath = (dirPath ? `${dirPath}/${newName}` : newName).replace(/^\/+/, "").replace(/\\/g, "/"); // remove leading slashes and then convert backslashes -> forward slashes
+    const oldPathClean = oldPath.replace(/^\/+/, "").replace(/\\/g, "/"); // remove leading slashes and then convert backslashes -> forward slashes
 
     const res = await fetch("/api/rename", {
       method: "POST",
@@ -156,42 +103,44 @@ function showRenameModal(oldPath, onSuccess) {
 
     const data = await res.json();
 
-    if (res.status === 409 && data.collision) {
-      // Change title to collision message
+    if (res.status === 409 && data.collision) { // image with new name is already here, hide rename and unhide overwrite and increment buttons
       const truncated = truncateName(renameModal.input.value.trim());
       renameModal.title.textContent = `Image "${truncated}" already exist`;
-
-      renameModal.renameBtn.style.display = "none";
-      renameModal.incrementBtn.style.display = "inline-block";
-      renameModal.overwriteBtn.style.display = "inline-block";
-    } else if (res.ok) {
-      renameModal.modal.style.display = "none";
+      renameModal.renameBtn.classList.add("hidden");
+      renameModal.incrementBtn.classList.remove("hidden");
+      renameModal.overwriteBtn.classList.remove("hidden");
+    } else if (res.ok) { // no image with the same name, proceed with rename pipeline
+      renameModal.modal.classList.remove("active");
       if (onSuccess) onSuccess(data.newPath || newPath);
-    } else {
+    } else { // something is wrong on the backend, check the folder structure and system write access
       alert(data.error || "Rename failed");
     }
   }
 
+  // Send to backend "rename" function different action arguments:
   renameModal.renameBtn.onclick = () => checkCollision("check");
   renameModal.incrementBtn.onclick = () => checkCollision("increment");
   renameModal.overwriteBtn.onclick = () => checkCollision("overwrite");
-  renameModal.closeBtn.onclick = () => (renameModal.modal.style.display = "none");
+  // Close modalbutton
+  renameModal.closeBtn.onclick = () => renameModal.modal.classList.remove("active");
 
+  // Catch common hotkeys here and approve or close rename window states
   document.onkeydown = (e) => {
     if (e.key === "Enter") renameModal.renameBtn.click();
     else if (e.key === "Escape") renameModal.closeBtn.click();
   };
 }
 
-// ============================
-// Get image path range under cursor
-// ============================
+/* Finds the image path markdown link under the editor's cursor.
+Internally:
+- Parses current line for Markdown image syntax.
+- Returns the path and its text range. */
 function getImagePathRangeUnderCursor(view) {
   const sel = view.state.selection.main;
   const line = view.state.doc.lineAt(sel.from);
   const text = line.text;
 
-  const regex = /!\[[^\]]*\]\(([^)]+)\)/g;
+  const regex = /!\[[^\]]*\]\(([^)]+)\)/g; // Find pattren for the markdown image link ![...](...)
   let match;
   while ((match = regex.exec(text))) {
     const fullStart = line.from + match.index;
@@ -205,8 +154,14 @@ function getImagePathRangeUnderCursor(view) {
   return null;
 }
 
+// StateEffect to trigger modal from outside
 const showRenameEffect = StateEffect.define();
 
+/* CodeMirror plugin that listens for `showRenameEffect` and opens the modal.
+Integrates the rename modal with CodeMirror editor.
+Internally:
+- Checks cursor position for an image path.
+- Opens rename modal and updates editor text after rename. */
 const renamePopupPlugin = ViewPlugin.fromClass(
   class {
     constructor(view) {
@@ -235,6 +190,8 @@ const renamePopupPlugin = ViewPlugin.fromClass(
 );
 
 export const renameExtension = [renamePopupPlugin];
+
+/* Export extension fuction so it may be called from external fuction. */
 export function showRenamePopup(view) {
   view.v.dispatch({ effects: showRenameEffect.of(null) });
 }

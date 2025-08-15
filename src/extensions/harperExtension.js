@@ -1,15 +1,14 @@
 import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import { WorkerLinter, binary } from "harper.js/dist/harper.js";
+// import '../pfx_override/css/MainOverrideStyle.css';
+// import '../pfx_overridecss/PFXStyleOverride.css';
 
 export const harperExtension = (() => {
+  // This is crutial initialization of the Harper extension 
   const harperLinter = new WorkerLinter({ binary });
 
-  const getValidSpan = d => {
-    const span = d.span();
-    return [span.start, span.end];
-  };
-
+  // Map Harper lint kinds to CodeMirror severity levels
   const severityMap = {
     Grammar: "error",
     Punctuation: "error",
@@ -33,71 +32,31 @@ export const harperExtension = (() => {
     Regionalism: "hint",
   };
 
+  /* Returns the CodeMirror severity string for a given Harper lint kind for underline style and color.
+  In: The lint kind string from Harper. Out: Corresponding severity string. */
   const getSeverityForLintKind = kind => severityMap[kind] || "error";
 
-  const addHarperStyle = (root) => {
-    if (!root || root.querySelector("#harper-underline-style")) return;
-    const style = document.createElement("style");
-    style.id = "harper-underline-style";
-    style.textContent = `
-      .cm-lintRange-error { background-image: none !important; text-decoration: underline solid #e94f4f 1.5px !important; }
-      .cm-lintRange-warning { background-image: none !important; text-decoration: underline solid #f6a631 1.5px !important; }
-      .cm-lintRange-info { background-image: none !important; text-decoration: underline solid #2c7bfc 1.5px !important; }
-      .cm-lintRange-hint { background-image: none !important; text-decoration: underline solid #6c757d 1.5px !important; }
-      .cm-diagnostic-hint, .cm-diagnostic-info, .cm-diagnostic-warning, .cm-diagnostic-error { border-radius: 5px !important; }
-
-      .cm-tooltip {
-  border: 1px solid rgb(187, 187, 187)!important;
-  border-radius: 9px !important;
-  box-shadow: 0px 0px 11px #7f7f7f !important;
-  background-color: rgb(255 255 255) !important;
-  white-space: normal; /* allow wrapping inside */
-}
-
-.cm-harper-suggestions-container {
-  display: block;
-    gap: 4px;
-    margin-top: 4px !important;
-    width: 100%;
-}
-
-.cm-harper-suggestion-btn {
-      flex: 1 1 auto;
-    margin: 2px;
-    padding: 3px;
-    border: 1px dotted;
-    background: white !important;
-    border-radius: 5px;
- 
-}
-
-      .cm-harper-suggestion-btn:hover { background: #ddd; }
-    `;
-    root.appendChild(style);
-  };
-
+  /* The main lint function called by CodeMirror. 
+  Runs Harper lint asynchronously on the editor text and formats diagnostics. */
   const harperLint = async view => {
-    const shadowRoot = view.dom.getRootNode();
-    if (shadowRoot instanceof ShadowRoot) {
-      addHarperStyle(shadowRoot);
-    } else {
-      addHarperStyle(document.head); // fallback
-    }
     const text = view.state.doc.toString();
     if (!text.trim()) return [];
 
-    try {
+    try { // Set Harper linting options
       await harperLinter.setLintConfig({
         SpellCheck: true,
         ForNoun: true,
         ExplanationMarks: true,
       });
 
+      // Run linting on the full editor text
       const results = await harperLinter.lint(text, "plaintext");
 
+      // Convert Harper results into CodeMirror diagnostics
       const diagnostics = results.map(d => {
         let span = null;
 
+        // Prefer span from suggestions replace_span if valid
         for (const sug of d.suggestions()) {
           const rs = sug.replace_span?.();
           if (Array.isArray(rs) && rs.length === 2 && rs[0] >= 0 && rs[1] > rs[0] && rs[1] <= text.length) {
@@ -106,12 +65,14 @@ export const harperExtension = (() => {
           }
         }
 
-        if (!span) span = getValidSpan(d);
+        // Fall back to diagnostic span if no suggestion span found
+        if (!span) span = [d.span().start, d.span().end];
         if (!span) return null;
 
         const message = d.message();
         const severity = getSeverityForLintKind(d.lint_kind());
 
+        // Format suggestions for display and actions
         const suggestions = d.suggestions().map(sug => ({
           kind: sug.kind(),
           text: sug.get_replacement_text(),
@@ -126,6 +87,8 @@ export const harperExtension = (() => {
           to: span[1],
           severity,
           message,
+          
+          /* Renders a diagnostic message DOM popup window with suggestion buttons */
           renderMessage(view) {
             const dom = document.createElement("div");
             dom.textContent = message;
@@ -134,10 +97,12 @@ export const harperExtension = (() => {
               const suggestionContainer = document.createElement("div");
               suggestionContainer.className = "cm-harper-suggestions-container";
 
+              // Create buttons for each suggestion
               suggestions.forEach(({ kind, text, replaceSpan }) => {
                 const btn = document.createElement("button");
                 btn.className = "cm-harper-suggestion-btn";
 
+                // Button text varies by suggestion kind
                 switch (kind) {
                   case 1:
                     btn.textContent = `Remove "${view.state.doc.sliceString(
@@ -152,6 +117,7 @@ export const harperExtension = (() => {
                     btn.textContent = `Replace with "${text}"`;
                 }
 
+                // Click handler to apply the suggestion edit. It will insert the new corrected text instead of the underlined one
                 btn.addEventListener("click", () => {
                   const from = replaceSpan?.[0] ?? span[0];
                   const to = replaceSpan?.[1] ?? span[1];
@@ -179,6 +145,7 @@ export const harperExtension = (() => {
         };
       });
 
+      // Filter out invalid diagnostics
       return diagnostics.filter(d => d && d.from >= 0 && d.to > d.from && d.to <= text.length);
     } catch (err) {
       console.error("[Harper] Lint error:", err);
@@ -186,5 +153,6 @@ export const harperExtension = (() => {
     }
   };
 
+  // Return the configured linter extension with 700ms delay debounce
   return [linter(harperLint, { delay: 700 })];
 })();

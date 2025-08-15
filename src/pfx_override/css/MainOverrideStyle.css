@@ -1,4 +1,4 @@
-body {
+/*body {
   margin: 0;
   font-family: sans-serif;
   display: flex;
@@ -26,6 +26,7 @@ body {
   height: 6px;
   background: #ccc;
   cursor: row-resize;
+  display: none;
 }
 
 #gitPanel {
@@ -58,6 +59,7 @@ body {
 #gitPanel pre#commitDetails {
   display: block;
   margin-top: 6px;
+  min-height: 1em;
   padding: 10px;
   background-color: #f0f0f0;
   border-radius: 4px;
@@ -67,8 +69,6 @@ body {
   color: #333;
   border: 1px solid #ddd;
 }
-
-
 
 .resizer-vertical {
   height: 6px;
@@ -86,7 +86,6 @@ body {
 #editor-panel {
   flex-grow: 1;
   padding: 0;
-  display: flex;
   flex-direction: column;
   overflow: hidden;
 }
@@ -140,7 +139,7 @@ ul {
   flex-grow: 1;
   border: 1px solid #ccc;
   margin-bottom: 0.5rem;
-  height: 80vh;
+  height: 100% !important;
   overflow: hidden;
 }
 
@@ -204,3 +203,6 @@ button {
     height: auto !important;
   }
 }
+
+
+*/

@@ -210,8 +210,8 @@ const InlinePreviewIcon = () => (
   </svg>
 );
 
-const GitDiffIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="16" viewBox="0 0 92 92">
+const GitdiffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="22" viewBox="0 0 92 92">
     <defs>
       <clipPath id="a">
         <path d="M0 .113h91.887V92H0Zm0 0"/>
@@ -296,36 +296,116 @@ const icons = {
   "suggest-mode": SuggestIcon,
 };
 
-export const EditorTopbar = ({ alert, buttons }) => {
+export const EditorTopbar = ({ alert, buttons }) => { 
   const { options, editorView, collab, suggestMode } = useContext(MystState);
   const titleHtml = useComputed(() => purify.sanitize(renderMdLinks(options.title.value)));
   const emptyDiff = useSignal(false);
+
+  // Helper function to show/hide gitPanel
+  const toggleGitPanel = (show) => {
+    const gitPanel = document.getElementById("gitPanel");
+    const treePanel = document.getElementById("tree-panel");
+    const hor_resizer = document.getElementById("resizer-horizontal");
+    const savedHeight = localStorage.getItem('fileTreeHeight');
+    
+    if (gitPanel) {
+      gitPanel.style.display = show ? "block" : "none";
+    }
+
+    if (treePanel) {
+      treePanel.style.height = show ? savedHeight + 'px' : "100%";
+    }
+
+    if (hor_resizer) {
+      hor_resizer.style.display = show ? "block" : "none";
+    }
+
+  };
+
   const editorModeButtons = useComputed(() => {
     const modeButtons = [
-      { id: "source", tooltip: "Source", action: () => (options.mode.value = "Source"), icon: SourceIcon },
-      { id: "preview", tooltip: "Preview", action: () => (options.mode.value = "Preview"), icon: PreviewIcon },
-      { id: "both", tooltip: "Dual Pane", action: () => (options.mode.value = "Both"), icon: BothIcon },
-      { id: "inline", tooltip: "Inline Preview", action: () => (options.mode.value = "Inline"), icon: InlinePreviewIcon },
-      { id: "git-diff", tooltip: "Git Diff", text: "Git Diff", action: () => (options.mode.value = "GitDiff"), icon: GitDiffIcon },
-      // {
-      //   id: "diff",
-      //   tooltip: emptyDiff.value ? "No changes to show" : null,
-      //   text: "Diff View",
-      //   disabled: emptyDiff.value,
-      //   action: () => (options.mode.value = "Diff"),
-      //   hover: () => (emptyDiff.value = options.initialText.value == editorView.value?.state?.doc?.toString?.()),
-      //   icon: DiffIcon,
-      // },
-      { id: "outline", text: "Table of Contents", action: () => (options.mode.value = "Outline"), icon: TocIcon },
+      { 
+        id: "source", 
+        tooltip: "Source", 
+        action: () => { 
+          options.mode.value = "Source"; 
+          toggleGitPanel(false); 
+        }, 
+        icon: SourceIcon 
+      },
+      { 
+        id: "preview", 
+        tooltip: "Preview", 
+        action: () => { 
+          options.mode.value = "Preview"; 
+          toggleGitPanel(false); 
+        }, 
+        icon: PreviewIcon 
+      },
+      { 
+        id: "both", 
+        tooltip: "Dual Pane", 
+        action: () => { 
+          options.mode.value = "Both"; 
+          toggleGitPanel(false); 
+        }, 
+        icon: BothIcon 
+      },
+      { 
+        id: "inline", 
+        tooltip: "Inline Preview", 
+        action: () => { 
+          options.mode.value = "Inline"; 
+          toggleGitPanel(false); 
+        }, 
+        icon: InlinePreviewIcon 
+      },
+      { 
+        id: "gitdiff", 
+        tooltip: "Git Diff", 
+        text: "Git Diff", 
+        action: () => { 
+          options.mode.value = "Gitdiff"; 
+          toggleGitPanel(true); 
+        }, 
+        icon: GitdiffIcon 
+      },
+      { 
+        id: "outline", 
+        text: "Table of Contents", 
+        action: () => { 
+          options.mode.value = "Outline"; 
+          toggleGitPanel(false); 
+        }, 
+        icon: TocIcon 
+      },
     ];
+
     if (options.collaboration.value.resolvingCommentsEnabled) {
-      modeButtons.push({ id: "resolved", text: "Resolved", action: () => (options.mode.value = "Resolved"), icon: ResolvedIcon });
+      modeButtons.push({ 
+        id: "resolved", 
+        text: "Resolved", 
+        action: () => { 
+          options.mode.value = "Resolved"; 
+          toggleGitPanel(false); 
+        }, 
+        icon: ResolvedIcon 
+      });
     }
 
     return modeButtons;
   });
-  const clickedId = useComputed(() => editorModeButtons.value.findIndex((b) => b.id[0].toUpperCase() + b.id.slice(1) === options.mode.value));
-  const buttonsLeft = useMemo(() => buttons.map((b) => ({ ...b, icon: b.icon || icons[b.id] })).filter((b) => b.icon), [buttons]);
+
+  const clickedId = useComputed(() => 
+    editorModeButtons.value.findIndex(
+      (b) => b.id[0].toUpperCase() + b.id.slice(1) === options.mode.value
+    )
+  );
+  const buttonsLeft = useMemo(() => 
+    buttons.map((b) => ({ ...b, icon: b.icon || icons[b.id] }))
+           .filter((b) => b.icon), 
+    [buttons]
+  );
   const textButtons = useMemo(() => buttons.filter((b) => b.text), [buttons]);
 
   return (
@@ -366,7 +446,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
             ))}
           </div>
         )}
-        <ButtonGroup buttons={editorModeButtons} clickedId={clickedId.value} mainButtonsNum={4} />
+        <ButtonGroup buttons={editorModeButtons} clickedId={clickedId.value} mainButtonsNum={5} /> 
       </div>
     </Topbar>
   );

@@ -4,11 +4,11 @@ import { StyleSheetManager, styled } from "styled-components";
 import CodeMirror from "./components/CodeMirror";
 import Preview, { PreviewFocusHighlight } from "./components/Preview";
 import Diff from "./components/Diff";
-import GitDiff from "./components/GitDiff";
+import Gitdiff from "./extensions/Gitdiff";
 import { EditorTopbar } from "./components/Topbar";
 import ResolvedComments from "./components/Resolved";
 import { handlePreviewClickToScroll } from "./extensions/syncDualPane";
-import { createMystState, MystState, predefinedButtons, defaultButtons } from "./mystState";
+import { createMystState, MystState, predefinedButtons, defaultButtons, autosaveEnabled } from "./mystState";
 import { batch, computed, signal, effect, useSignal, useSignalEffect } from "@preact/signals";
 import { MystContainer } from "./styles/MystStyles";
 import { syncCheckboxes } from "./markdown/markdownCheckboxes";
@@ -17,16 +17,17 @@ import ErrorModal from "./components/ErrorModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { createLogger, Logger } from "./logger";
 
+
 const EditorParent = styled.div`
   font-family: "Lato";
   display: flex;
-  flex-flow: row wrap;
+  flex-flow: column wrap;
   width: 100%;
   height: 100%;
   ${(props) => props.fullscreen && "position: fixed; left: 0; top: 0; z-index: 10;"}
   ${(props) => {
     switch (props.mode) {
-      case "GitDiff":
+      case "Gitdiff":
         return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
       case "Preview":
         return "#editor-wrapper { display: none }";
@@ -164,9 +165,9 @@ const MystEditor = () => {
                   <Diff />
                 </FlexWrapper>
               )}
-              {options.mode.value === "GitDiff" && (
+              {options.mode.value === "Gitdiff" && (
                 <FlexWrapper className="flex-wrapper">
-                  <GitDiff />
+                  <Gitdiff />
                 </FlexWrapper>
               )}
               {options.mode.value == "Resolved" &&
@@ -249,7 +250,7 @@ export default ({ additionalStyles, id, ...params }, /** @type {HTMLElement} */ 
   return state;
 };
 
-export { defaultButtons, predefinedButtons, batch, computed, signal, effect, MystEditor as MystEditorPreact };
+export { autosaveEnabled, defaultButtons, predefinedButtons, batch, computed, signal, effect, MystEditor as MystEditorPreact };
 export { default as MystEditorGit } from "./myst-git/MystEditorGit";
 export { CollaborationClient } from "./collaboration";
 export { darkTheme } from "./styles/MystStyles";

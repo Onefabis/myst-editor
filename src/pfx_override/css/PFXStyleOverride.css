@@ -1,0 +1,983 @@
+/* --------------- Index main page Myst editor style START ---------------- */
+
+body {
+  margin: 0;
+  font-family: sans-serif;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#sidebar {
+  background: #f3f3f3;
+  padding: 11px;
+  overflow-y: auto;
+  border-right: 1px solid #ccc;
+  min-width: 260px;
+  max-width: 600px;
+  width: 300px;
+  box-sizing: border-box;
+}
+
+#tree-panel {
+  flex-grow: 1;
+  overflow: auto;
+}
+
+#resizer-horizontal {
+  height: 6px;
+  background: #ccc;
+  cursor: row-resize;
+  display: none;
+}
+
+#gitPanel {
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  padding: 12px;
+  border-top: 1px solid #ccc;
+  background-color: #f9f9f9;
+}
+
+#gitPanel label {
+  display: block;
+  margin-top: 10px;
+  font-weight: bold;
+  color: #333;
+}
+
+#gitPanel select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px;
+  font-family: inherit;
+  font-size: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+#gitPanel pre#commitDetails {
+  display: block;
+  margin-top: 6px;
+  min-height: 1em;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: inherit;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.resizer-vertical {
+  height: 6px;
+  background: #ccc;
+  cursor: row-resize;
+}
+
+#resizer {
+  width: 5px;
+  cursor: ew-resize;
+  background: #ccc;
+  user-select: none;
+}
+
+#editor-panel {
+  flex-grow: 1;
+  padding: 0;
+  /*display: flex;*/
+  flex-direction: column;
+  overflow: hidden;
+}
+
+ul {
+  list-style-type: none;
+  padding-left: 1rem;
+}
+
+.folder, .file {
+  display: list-item;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.folder:hover, .file:hover {
+  background-color: #ddd;
+}
+
+.active {
+  background-color: #cce5ff;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.controls_row {
+  width: 100%;
+  display: flex;
+  margin-bottom: 3px;
+}
+
+.subtree{
+  display: inline-flex;
+  width: 100%;
+}
+
+.subtree ul{
+  width: 100%;
+}
+
+.subtree li, #tree li{
+  display: grid;
+}
+
+#myst {
+  flex-grow: 1;
+  border: 1px solid #ccc;
+  margin-bottom: 0.5rem;
+  height: 100% !important;
+  overflow: hidden;
+}
+
+.myst-editor-wrapper{
+  padding: 0px !important;
+}
+
+button {
+  width: 100%;
+  white-space: nowrap;
+  margin-right: 2px;
+  cursor: pointer;
+  border: 1px solid rgb(181 181 181);
+  border-radius: 6px;
+}
+
+#container {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+#custom-menu {
+  position: absolute;
+  display: none;
+  background: white;
+  border: 1px solid #ccc;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+  z-index: 1000;
+  padding: 5px 0;
+  border-radius: 6px;
+  width: 200px;
+}
+
+#custom-menu .item {
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+#custom-menu .item:hover {
+  background: #f0f0f0;
+}
+
+.harper-underline {
+        text-decoration: underline wavy red;
+        text-decoration-thickness: 1.5px;
+      }
+
+@media print {
+  #sidebar, #editor-wrapper, #resizer, .myst-main-editor {
+    display: none !important;
+  }
+
+  .myst-preview {
+    width: 100%;
+    display: block;
+  }
+  
+  body {
+    overflow: visible !important;
+    height: auto !important;
+  }
+}
+
+/* --------------- Index main page Myst editor style END ---------------- */
+
+
+
+/* --------------- Furo themed Myst editor style START ---------------- */
+
+:root {
+	--color-admonition-background: #f9f9f9;
+	--admonition-font-size: 0.9rem;
+	--admonition-title-font-size: 1rem;
+
+	--color-admonition-title: #3b82f6;
+	--color-admonition-title-background: #eff6ff;
+
+	--color-topic-title: #334155;
+	--color-topic-title-background: #e2e8f0;
+
+	--color-admonition-title--note: #2563eb;
+	--color-admonition-title-background--note: #dbeafe;
+
+	--color-admonition-title--warning: #f59e0b !important;
+	--color-admonition-title-background--warning: #fef3c7 !important;
+
+	--color-admonition-title-background--danger: rgba(255,82,82,.2) !important;
+	--color-admonition-title--danger: #ff5252 !important;
+
+	--color-admonition-title--important: #00bfa5 !important;
+    --color-admonition-title-background--important: rgba(0, 191, 165, .2) !important;
+
+    --color-admonition-title--hint: #00c852 !important;
+    --color-admonition-title-background--hint: rgba(0, 200, 82, .2) !important;
+
+    --color-admonition-title--note: #00b0ff !important;
+    --color-admonition-title-background--note: rgba(0, 176, 255, .2) !important;
+
+    --color-admonition-title--attention: #ff5252 !important;
+    --color-admonition-title-background--attention: rgba(255, 82, 82, .2) !important;
+
+    --color-admonition-title: #7d49eb !important;
+    --color-admonition-title-background: rgba(101, 31, 255, .2) !important;
+    
+
+    --icon-abstract: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 5h16v2H4zm0 4h16v2H4zm0 4h16v2H4zm0 4h10v2H4z"/></svg>');
+    --icon-pencil: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>');
+	--icon-flame: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.55 11.2c-.23-.3-.5-.56-.76-.82-.65-.6-1.4-1.03-2.03-1.66C13.3 7.26 13 4.85 13.91 3c-.91.23-1.75.75-2.45 1.32-2.54 2.08-3.54 5.75-2.34 8.9.04.1.08.2.08.33 0 .22-.15.42-.35.5-.22.1-.46.04-.64-.12a.8.8 0 0 1-.15-.17c-1.1-1.43-1.28-3.48-.53-5.12C5.89 10 5 12.3 5.14 14.47c.04.5.1 1 .27 1.5.14.6.4 1.2.72 1.73 1.04 1.73 2.87 2.97 4.84 3.22 2.1.27 4.35-.12 5.96-1.6 1.8-1.66 2.45-4.32 1.5-6.6l-.13-.26c-.2-.46-.47-.87-.8-1.25zm-3.1 6.3c-.28.24-.73.5-1.08.6-1.1.4-2.2-.16-2.87-.82 1.19-.28 1.89-1.16 2.09-2.05.17-.8-.14-1.46-.27-2.23-.12-.74-.1-1.37.18-2.06.17.38.37.76.6 1.06.76 1 1.95 1.44 2.2 2.8.04.14.06.28.06.43.03.82-.32 1.72-.92 2.27z"/></svg>');
+	--icon-question: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m15.07 11.25-.9.92C13.45 12.89 13 13.5 13 15h-2v-.5c0-1.11.45-2.11 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41a2 2 0 0 0-2-2 2 2 0 0 0-2 2H8a4 4 0 0 1 4-4 4 4 0 0 1 4 4 3.2 3.2 0 0 1-.93 2.25M13 19h-2v-2h2M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10c0-5.53-4.5-10-10-10"/></svg>');
+	--icon-warning: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2v-4h2m0 8h-2v-2h2M1 21h22L12 2z"/></svg>');
+	--icon-failure: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2c5.53 0 10 4.47 10 10s-4.47 10-10 10S2 17.53 2 12 6.47 2 12 2m3.59 5L12 10.59 8.41 7 7 8.41 10.59 12 7 15.59 8.41 17 12 13.41 15.59 17 17 15.59 13.41 12 17 8.41z"/></svg>');
+	--icon-spark: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.5 20 4.86-9.73H13V4l-5 9.73h3.5zM12 2c2.75 0 5.1 1 7.05 2.95S22 9.25 22 12s-1 5.1-2.95 7.05S14.75 22 12 22s-5.1-1-7.05-2.95S2 14.75 2 12s1-5.1 2.95-7.05S9.25 2 12 2"/></svg>');
+}
+
+
+#topbar {
+    /*gap: 6px; */
+    min-width: 0px;
+    height: 45px;
+    display: flex;
+    padding: 8px 12px 0px !important;
+}
+
+.side {
+	display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.myst-editor-wrapper {
+	padding: 0;
+	height: calc(100% - 45px) !important;
+}
+
+
+
+
+.admonition, .topic {
+	margin: 1rem auto;
+	padding: 0 !important;
+	background: var(--color-admonition-background);
+	border-radius: 0.2rem;
+	box-shadow: 0 0.2rem 0.5rem rgba(0, 0, 0, 0.05), 0 0 0.0625rem rgba(0, 0, 0, 0.1);
+	font-size: var(--admonition-font-size);
+	overflow: hidden;
+	page-break-inside: avoid;
+}
+
+.btns {
+	gap: 2px !important;
+	/*float: left;*/
+	display: flex;
+    white-space: nowrap;
+}
+
+
+#document-title {
+	text-align: center;
+	text-transform: uppercase;
+    font-size: 12px;
+    font-weight: bold;
+    font-family: inherit;
+}
+
+#topbar button{
+	padding: 1px 2px !important;
+    margin: 0px !important;
+    display: flex;
+    height: 25px;
+    width: auto;
+    min-width: 25px;
+    line-height: 14px;
+}
+
+.btn-dropdown {
+	z-index: 100 !important;
+	top: 25px !important;
+    padding-top: 0px !important;
+}
+
+.icon svg {
+	scale: 0.65;
+} 
+
+/* Variants */
+.admonition {
+	border-left: 0.2rem solid var(--color-admonition-title);
+}
+
+
+aside.admonition {
+	border-top: none !important;
+	border-bottom: none !important;
+	border-right: none !important;
+}
+
+/*.cm-inline-rendered-md aside.admonition>header*/
+
+
+aside {
+	border-radius: 1 !important;
+}
+
+aside.admonition>header, aside.admonition p {
+	padding: 6px !important;
+}
+
+
+/* Custom */
+
+aside.admonition > header {
+	color: black !important;
+	font-weight: normal !important;
+	background-color: var(--color-admonition-title-background) !important;
+}
+
+aside.admonition{
+	border-left-color: var(--color-admonition-title) !important;
+}
+
+aside.admonition>header::before {
+	content: "" !important;
+	display: inline-block !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	background-color: var(--color-admonition-title) !important;
+	mask-image: var(--icon-abstract) !important;
+	mask-size: contain !important;
+	mask-repeat: no-repeat !important;
+}
+
+
+/* Attention */
+
+aside.admonition.attention>header{
+	background-color: var(--color-admonition-title-background--attention) !important;
+}
+
+aside.attention{
+	border-left-color: var(--color-admonition-title--attention) !important;
+}
+
+aside.attention>header::before {
+	content: "" !important;
+	display: inline-block !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	background-color: var(--color-admonition-title--attention) !important;
+	mask-image: var(--icon-warning) !important;
+	mask-size: contain !important;
+	mask-repeat: no-repeat !important;
+}
+
+/* Note */
+
+aside.admonition.note>header{
+	background-color: var(--color-admonition-title-background--note) !important;
+}
+
+aside.note{
+	border-left-color: var(--color-admonition-title--note) !important;
+}
+
+aside.note>header::before {
+	content: "" !important;
+	display: inline-block !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	background-color: var(--color-admonition-title--note) !important;
+	mask-image: var(--icon-pencil) !important;
+	mask-size: contain !important;
+	mask-repeat: no-repeat !important;
+}
+
+/* Important */
+
+aside.admonition.important>header{
+	background-color: var(--color-admonition-title-background--important) !important;
+}
+
+aside.important{
+	border-left-color: var(--color-admonition-title--important) !important;
+}
+
+aside.important>header::before {
+	content: "" !important;
+	display: inline-block !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	background-color: var(--color-admonition-title--important) !important;
+	mask-image: var(--icon-flame) !important;
+	mask-size: contain !important;
+	mask-repeat: no-repeat !important;
+}
+
+/* Hint */
+
+aside.admonition.hint>header{
+	background-color: var(--color-admonition-title-background--hint) !important;
+}
+
+aside.hint{
+	border-left-color: var(--color-admonition-title--hint) !important;
+}
+
+aside.hint>header::before {
+	content: "" !important;
+	display: inline-block !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	background-color: var(--color-admonition-title--hint) !important;
+	mask-image: var(--icon-question) !important;
+	mask-size: contain !important;
+	mask-repeat: no-repeat !important;
+}
+
+/* Warning */
+
+aside.admonition.warning>header{
+	background-color: var(--color-admonition-title-background--warning) !important;
+}
+
+aside.warning{
+	border-left-color: var(--color-admonition-title--warning) !important;
+}
+
+aside.warning>header::before {
+	content: "" !important;
+	display: inline-block !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	background-color: var(--color-admonition-title--warning) !important;
+	mask-image: var(--icon-warning) !important;
+	mask-size: contain !important;
+	mask-repeat: no-repeat !important;
+}
+
+/* Danger */
+
+aside.admonition.danger>header{
+	background-color: var(--color-admonition-title-background--danger) !important;
+}
+
+aside.danger{
+	border-left-color: var(--color-admonition-title--danger) !important;
+}
+
+aside.danger>header::before {
+	content: "" !important;
+	display: inline-block !important;
+	width: 1rem !important;
+	height: 1rem !important;
+	background-color: var(--color-admonition-title--danger) !important;
+	mask-image: var(--icon-spark) !important;
+	mask-size: contain !important;
+	mask-repeat: no-repeat !important;
+}
+
+/* --------------- Furo themed Myst editor style END ---------------- */
+
+
+/* --------------- AI Rephrase Extension UI elements START ---------------- */
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-overlay--visible {
+  display: flex;
+}
+
+/* Modal Content */
+.modal-content {
+  background: white;
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 320px;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Inputs */
+.modal-textarea {
+  height: 100px;
+  font-size: 14px;
+  resize: vertical;
+  padding: 6px;
+}
+
+.modal-select {
+  flex-grow: 1;
+}
+
+.modal-input {
+  flex-grow: 1;
+  padding: 6px;
+}
+
+/* Close Button */
+.modal-close-btn {
+  cursor: pointer;
+  padding: 6px 12px;
+}
+
+/* Popup Container */
+.popup-container {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  z-index: 10000;
+}
+
+/* Popup Textarea */
+.popup-textarea {
+  min-height: 80px;
+  resize: vertical;
+  border: 1px solid rgb(219, 219, 219);
+  border-radius: 5px;
+  overflow-y: auto;
+  outline: none;
+  box-shadow: none;
+  padding: 6px;
+}
+
+.popup-textarea--focus {
+  border-color: rgb(219, 219, 219);
+  outline: none;
+  box-shadow: none;
+}
+
+/* Controls Container */
+.popup-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.controls-left,
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Button Base */
+.popup-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgb(199, 199, 199);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  user-select: none;
+  background-color: white;
+}
+
+.popup-btn--purple svg {
+  stroke: purple;
+}
+
+.popup-btn--green svg {
+  stroke: green;
+}
+
+.popup-btn--red svg {
+  stroke: red;
+}
+
+.popup-btn--orange svg path {
+  fill: orange;
+  stroke: none;
+}
+
+/* Counter */
+.popup-counter {
+  min-width: 36px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/*  ------------------ AI Rephrase Extension UI elements END  -------------------- */
+
+
+/* ------------------- Rename Image Extension UI elements START ------------------ */
+
+/* Modal Layout & Backdrop */
+#rename-image-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: none; /* hidden by default */
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+#rename-image-modal.active {
+  display: flex;
+}
+
+/* Modal Content */
+.rename-modal-content {
+  position: relative;
+  background: white;
+  padding: 14px;
+  border-radius: 7px;
+  min-width: 320px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Close Button */
+.rename-close-btn {
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  width: 25px;
+  height: 25px;
+  background: rgb(209 29 24);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+/* Input Field */
+.rename-input {
+  width: 98%;
+  line-height: 22px;
+  margin: 0 0 12px;
+  border: 1px solid rgb(219 209 209);
+  border-radius: 3px;
+  outline: none;
+}
+
+.rename-input:focus {
+  border: 1px solid rgb(219 209 209);
+}
+
+/* Action Buttons Layout */
+.rename-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Buttons (Variants) */
+.rename-btn {
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rename-btn-green {
+  border: 1px dashed rgb(92, 184, 92);
+  border-left: 3px solid rgb(92, 184, 92);
+}
+
+.rename-btn-blue {
+  border: 1px dashed rgb(2, 117, 216);
+  border-left: 3px solid rgb(2, 117, 216);
+}
+
+.rename-btn-orange {
+  border: 1px dashed rgb(240, 173, 78);
+  border-left: 3px solid rgb(240, 173, 78);
+}
+
+/* Visibility Control */
+.hidden {
+  display: none !important;
+}
+
+/* ------------------- Rename Image Extension UI elements END ------------------ */
+
+
+
+/* ------------------- Left Panel File Tree Extension UI elements START ------------------ */
+
+.icon-margin {
+  margin-right: 6px;
+}
+
+.move-modal {
+  position: fixed;
+  top: 20%;
+  left: 30%;
+  width: 40%;
+  height: 50%;
+  background: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  z-index: 10000;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.move-tree {
+  display: block;
+  width: 100%;
+  height: 80%;
+}
+
+.move-actions {
+  text-align: right;
+  margin-top: 10px;
+}
+
+.move-folder-btn {
+  cursor: pointer;
+}
+
+.move-folder-btn.selected {
+  font-weight: bold;
+}
+
+.upload-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.upload-modal.hidden {
+  display: none;
+}
+
+.upload-modal-content {
+  position: relative;
+  background: white;
+  padding: 14px;
+  border-radius: 7px;
+  min-width: 320px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.upload-modal-close {
+  position: absolute;
+  top: -11px;
+  right: -11px;
+  width: 25px;
+  height: 25px;
+  background: rgb(209 29 24);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.upload-modal-title {
+  margin: 0 0 10px 0;
+}
+
+.upload-modal-input {
+  width: 98%;
+  line-height: 22px;
+  margin: 0 0 12px;
+  border: 1px solid rgb(219 209 209);
+  border-radius: 3px;
+  outline: none;
+}
+
+.upload-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-green {
+  padding: 6px 8px;
+  border: 1px dashed rgb(92, 184, 92);
+  border-left: 3px solid rgb(92, 184, 92);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-blue {
+  padding: 6px 8px;
+  border: 1px dashed rgb(2, 117, 216);
+  border-left: 3px solid rgb(2, 117, 216);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-orange {
+  padding: 6px 8px;
+  border: 1px dashed rgb(240, 173, 78);
+  border-left: 3px solid rgb(240, 173, 78);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ------------------- Left Panel File Tree Extension UI elements END ------------------ */
+
+/* ------------------- GitDiff Extension UI elements START ------------------ */
+
+/* File tree panel */
+#tree-panel {
+  min-height: 100px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Git panel container */
+#gitPanel {
+  background-color: #fff;
+  border-left: 1px solid #ccc;
+  padding: 0.5rem;
+  display: none;
+}
+
+/* Resizer */
+#resizer-horizontal {
+  height: 5px;
+  cursor: row-resize;
+  background: #ddd;
+  display: none;
+}
+
+/* Commit details text area */
+#commit-details {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.GitDiffContainer {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: max-content;
+  width: 100%;
+  height: 100%;
+  scrollbar-width: thin;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.MergeViewCodeEditor {
+  overflow-y: visible;
+  overscroll-behavior: contain;
+  display: block;
+}
+
+/* ------------------- GitDiff Extension UI elements END ------------------ */
+
+
+
+/* ------------------- Harper Extension UI elements START ------------------ */
+
+.cm-lintRange-error {
+  background-image: none !important;
+  text-decoration: underline solid #e94f4f 1.5px !important;
+}
+
+.cm-lintRange-warning {
+  background-image: none !important;
+  text-decoration: underline solid #f6a631 1.5px !important;
+}
+
+.cm-lintRange-info {
+  background-image: none !important;
+  text-decoration: underline solid #2c7bfc 1.5px !important;
+}
+
+.cm-lintRange-hint {
+  background-image: none !important;
+  text-decoration: underline solid #6c757d 1.5px !important;
+}
+
+.cm-diagnostic-hint,
+.cm-diagnostic-info,
+.cm-diagnostic-warning,
+.cm-diagnostic-error {
+  border-radius: 5px !important;
+}
+
+.cm-tooltip {
+  border: 1px solid rgb(187, 187, 187) !important;
+  border-radius: 9px !important;
+  box-shadow: 0px 0px 11px #7f7f7f !important;
+  background-color: rgb(255 255 255) !important;
+  white-space: normal;
+}
+
+.cm-harper-suggestions-container {
+  display: block;
+  gap: 4px;
+  margin-top: 4px !important;
+  width: 100%;
+}
+
+.cm-harper-suggestion-btn {
+  flex: 1 1 auto;
+  margin: 2px;
+  padding: 3px;
+  border: 1px dotted;
+  background: white !important;
+  border-radius: 5px;
+}
+
+.cm-harper-suggestion-btn:hover {
+  background: #ddd;
+}
+
+/* ------------------- Harper Extension UI elements END ------------------ */

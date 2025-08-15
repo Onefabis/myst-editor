@@ -1,15 +1,16 @@
-import { C as s, e, g as o, r as d, w as r, h as f, M as i, d as l, E as n, p as u, f as c } from "./MystEditor-6TrRYQ_f.js";
+import { C as s, h as e, l as o, i as d, r, j as i, m as l, M as n, d as f, E as u, p as c, k as m } from "./MystEditor-D22XXGGf.js";
 export {
   s as CollaborationClient,
   e as MystEditorGit,
   o as MystEditorPreact,
-  d as batch,
-  r as computed,
-  f as darkTheme,
-  i as default,
-  l as defaultButtons,
-  n as effect,
-  u as predefinedButtons,
-  c as signal
+  d as autosaveEnabled,
+  r as batch,
+  i as computed,
+  l as darkTheme,
+  n as default,
+  f as defaultButtons,
+  u as effect,
+  c as predefinedButtons,
+  m as signal
 };
 //# sourceMappingURL=MystEditor.js.map

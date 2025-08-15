@@ -7,12 +7,7 @@
 
 
 
-    
-    <!-- <link rel="stylesheet" crossorigin href="/pfx_override/css/MainOverrideStyle.css"> -->
-    <!-- <link rel="stylesheet" crossorigin href="/pfx_override/css/FuroStyleOverride.css"> -->
-
     <link rel="icon" href="data:," />
-
     <link
       rel="stylesheet"
       href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css"
@@ -22,7 +17,6 @@
       window.EXCALIDRAW_ASSET_PATH =
         "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/";
     </script>
-
 
      <script type="importmap">
       {
@@ -37,14 +31,11 @@
     <script type="module" crossorigin src="https://esm.sh/react@19.0.0"></script>
     <script type="module" crossorigin src="https://esm.sh/react-dom@19.0.0/client"></script>
     <script type="module" crossorigin src="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.js?external=react,react-dom"></script>
-    <script type="module" crossorigin src="./MystEditor-6TrRYQ_f.js"></script>
-    <link rel="stylesheet" crossorigin href="./MainOverrideStyle.css">
-    <link rel="stylesheet" crossorigin href="./FuroStyleOverride.css">
+    <script type="module" crossorigin src="./MystEditor-D22XXGGf.js"></script>
+    <link rel="stylesheet" crossorigin href="./PFXStyleOverride.css">
     <link rel="stylesheet" crossorigin href="./MystEditor.css">
   </head>
   <body>
-    <!-- <div id="app"></div> -->
-    
     <div id="container">
     <div id="sidebar">
       <div id="tree-panel">
@@ -62,7 +53,7 @@
         </div>
         <div id="tree"></div>
       </div>
-      <div class="resizer-vertical"></div>
+      <div id="resizer-horizontal"></div>
       <div id="gitPanel">
         <input type="hidden" id="hidden-filename" value="">
         <label>Branch:</label>
@@ -72,17 +63,11 @@
         <label>Commit Details:</label>
         <pre id="commitDetails">Select a commit...</pre>
       </div>
-
-      
     </div>
     <div id="resizer"></div>
     <div id="editor-panel" class="printable">
       <div id="myst"></div>
     </div>
   </div>
-
-  
-  
-  
   </body>
 </html>

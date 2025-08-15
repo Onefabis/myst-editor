@@ -14,6 +14,8 @@ import Templates from "./components/Templates";
 import { yRemoteAnnotation } from "./extensions/collab";
 import { syntaxTree } from "@codemirror/language";
 
+export const autosaveEnabled = signal(false);
+
 /** @type {{ id: string; tooltip?: string; text?: string; action?: Function; dropdown?: Function }} */
 export const predefinedButtons = {
   printToPdf: {
@@ -54,6 +56,21 @@ const formatRelativeNumbers = (line, state) => {
 };
 
 const defaultUserSettings = [
+  {
+    id: "autosave",
+    title: "Autosave",
+    enabled: false, // default off
+    extension: ViewPlugin.fromClass(
+      class {
+        constructor() {
+          autosaveEnabled.value = true;
+        }
+        destroy() {
+          autosaveEnabled.value = false;
+        }
+      }
+    ),
+  },
   {
     id: "auto-markdown",
     title: "Autocomplete Markdown",
@@ -152,7 +169,7 @@ const defaultUserSettings = [
   },
   {
     id: "auto-ordered-lists",
-    title: "Automatically number ordered lists",
+    title: "Auto number ordered lists",
     enabled: false,
     extension: EditorView.updateListener.of((update) => {
       if (!update.docChanged || update.transactions.some((tr) => tr.annotation(reorderAnnotation) || tr.annotation(yRemoteAnnotation))) return;
@@ -197,7 +214,7 @@ const defaultUserSettings = [
 const defaults = {
   id: "",
   title: "",
-  /** @type { "Both" | "Preview" | "Source" | "Diff" | "Resolved" | "GitDiff" | "Outline" | "Inline"} */
+  /** @type { "Both" | "Preview" | "Source" | "Diff" | "Resolved" | "Gitdiff" | "Outline" | "Inline"} */
   mode: "Both",
   initialText: "",
   includeButtons: defaultButtons,

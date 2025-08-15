@@ -1,12 +1,4 @@
 import { lineNumbers, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, keymap } from "@codemirror/view";
-
-
-// import { 
-//   lineNumbers, highlightSpecialChars, drawSelection, dropCursor,
-//   rectangularSelection, crosshairCursor, keymap, Decoration
-// } from "@codemirror/view";
-
-
 import { Compartment, EditorSelection, EditorState, Facet, Prec  } from "@codemirror/state";
 import { EditorView } from "codemirror";
 import { yCollab } from "y-codemirror.next";
@@ -49,14 +41,6 @@ import { aiRephraseExtension } from "./aiRephrase";
 import { harperExtension } from "./harperExtension";
 import { renameExtension } from "./renameImage";
 
-// import { createHarperExtension } from "./harperExtension.js";
-
-// const harperExtension = createHarperExtension({
-//   EditorView,
-//   Decoration,
-//   StateEffect,
-//   StateField
-// });
 
 const getRelativeCursorLocation = (view) => {
   const { from } = view.state.selection.main;
@@ -163,7 +147,7 @@ export class ExtensionBuilder {
   }
 
   useHarperGrammarChecker() {
-    this.extensions.push(harperExtension); // no spread
+    this.extensions.push(harperExtension); // no extra control to toggle extension or call it from external code, so run it immediatelly from this point
     return this;
   }
 

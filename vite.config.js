@@ -38,10 +38,8 @@ export default defineConfig({
             return "git";
           } else if (module.includes("MainOverride.js")) {
             return "MainOverride";
-          } else if (module.includes("MainOverrideStyle.css")) {
-            return "MainOverrideStyle";
-          } else if (module.includes("FuroStyleOverride.css")) {
-            return "FuroStyleOverride";
+          } else if (module.includes("PFXStyleOverride.css")) {
+            return "PFXStyleOverride";
           } else {
             return "MystEditor";
           }

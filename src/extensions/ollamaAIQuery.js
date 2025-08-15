@@ -23,7 +23,7 @@ class OllamaPopupWidget extends WidgetType {
     wrapper.style.padding = "10px";
     wrapper.style.borderRadius = "8px";
 
-    // 🔒 Prevent interaction from leaking to editor
+    // Prevent input interaction from leaking to editor
     wrapper.addEventListener("mousedown", e => e.stopPropagation());
     wrapper.addEventListener("keydown", e => e.stopPropagation());
 
@@ -32,7 +32,7 @@ class OllamaPopupWidget extends WidgetType {
     const root = createRoot(wrapper);
     root.render(
       React.createElement(PopupContent, {
-        key: `${this.from}-${this.to}`, // 👈 This line resets state on remount
+        key: `${this.from}-${this.to}`, // Resets state on remount
         editorView: this.editorView,
         from: this.from,
         to: this.to,

@@ -1,9 +1,5 @@
 import { ViewPlugin, Decoration, WidgetType } from "@codemirror/view";
 import { StateEffect, RangeSetBuilder } from "@codemirror/state";
-// import { markdownUpdatedEffect } from "@codemirror/text";
-
-// Connect React and Excalidraw (from online)
-// TODO: Make it local, i.e. create git submodule with Excalidraw
 import React from "https://esm.sh/react@19.0.0";
 import { createRoot } from "https://esm.sh/react-dom@19.0.0/client";
 import {

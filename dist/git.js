@@ -1,4 +1,4 @@
-import { e as m } from "./MystEditor-6TrRYQ_f.js";
+import { h as m } from "./MystEditor-D22XXGGf.js";
 const c = ["#30bced", "#60c771", "#e6aa3a", "#cbb63e", "#ee6352", "#9ac2c9", "#8acb88", "#14b2c4"], o = new URLSearchParams(window.location.search), l = o.get("username") || Math.floor(Math.random() * 1e3).toString(), d = c[Math.floor(Math.random() * c.length)];
 let g = [{
   target: "say",

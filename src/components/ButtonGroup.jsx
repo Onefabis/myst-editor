@@ -1,7 +1,7 @@
 import { useEffect } from "preact/hooks";
 import styled from "styled-components";
 import { DefaultButton } from "./CommonUI";
-import { useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 
 const GroupContainer = styled.div`
   display: flex;
@@ -57,9 +57,26 @@ const MoreIcon = () => (
 );
 
 const ButtonGroup = ({ buttons, clickedId, mainButtonsNum = buttons.value.length }) => {
+  // store current selection in a signal so UI updates when restored
+  const selectedIndex = useSignal(clickedId);
+
+  // Restore from localStorage on first load
   useEffect(() => {
-    buttons.value[clickedId].action();
+    const savedIndex = localStorage.getItem("mainButtonSelection");
+    if (savedIndex !== null && !isNaN(savedIndex)) {
+      selectedIndex.value = Number(savedIndex);
+      buttons.value[Number(savedIndex)]?.action();
+    } else {
+      buttons.value[clickedId]?.action();
+    }
   }, []);
+
+  // Handle clicks and store selection
+  const handleClick = (i, action) => {
+    selectedIndex.value = i;
+    localStorage.setItem("mainButtonSelection", i);
+    action();
+  };
 
   const mainButtons = useComputed(() => buttons.value.slice(0, mainButtonsNum));
   const dropdownButtons = useComputed(() => buttons.value.slice(mainButtonsNum));
@@ -73,16 +90,16 @@ const ButtonGroup = ({ buttons, clickedId, mainButtonsNum = buttons.value.length
           disabled={button.disabled}
           key={button.id}
           name={button.id}
-          onClick={() => button.action()}
+          onClick={() => handleClick(i, button.action)}
           onMouseOver={() => button.hover?.()}
           title={button.tooltip}
-          active={i === clickedId}
+          active={i === selectedIndex.value}
         >
           {typeof button.icon == "function" ? <button.icon /> : <img src={button.icon} />}
         </RadioButton>
       ))}
       <div>
-        <RadioButton className="icon radio-icon more" active={clickedId >= mainButtonsNum}>
+        <RadioButton className="icon radio-icon more" active={selectedIndex.value >= mainButtonsNum}>
           <MoreIcon />
         </RadioButton>
         <div className="btn-dropdown">
@@ -94,10 +111,10 @@ const ButtonGroup = ({ buttons, clickedId, mainButtonsNum = buttons.value.length
                   disabled={button.disabled}
                   key={button.id}
                   name={button.id}
-                  onClick={() => button.action()}
+                  onClick={() => handleClick(i + mainButtonsNum, button.action)}
                   onMouseOver={() => button.hover?.()}
                   title={button.tooltip}
-                  active={i + mainButtonsNum === clickedId}
+                  active={i + mainButtonsNum === selectedIndex.value}
                 >
                   {typeof button.icon == "function" ? <button.icon /> : <img src={button.icon} />}
                   <span>{button.text}</span>
@@ -110,5 +127,6 @@ const ButtonGroup = ({ buttons, clickedId, mainButtonsNum = buttons.value.length
     </GroupContainer>
   );
 };
+
 
 export default ButtonGroup;

@@ -1,18 +1,19 @@
 import os
 import re
 import shutil
-from fastapi import FastAPI, File, Form, UploadFile, Request, Query
+from fastapi import FastAPI, File, Form, UploadFile, Request
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List
+import time
 
 from git import Repo
-import difflib
 
 # ---------------------- CONFIG ----------------------
-BASE_DIR = os.path.abspath("../../docs")
+DOCS_DIR = "docs"
+BASE_DIR = os.path.abspath("../../" + DOCS_DIR)
 STATIC_FOLDER = "../dist"
 
 app = FastAPI()
@@ -95,10 +96,10 @@ def increment_filename(path, filename):
         i += 1
 
 # ---------------------- ROUTES ----------------------
-@app.get("/")
-async def index():
-    index_file = os.path.join(STATIC_FOLDER, "index.html")
-    return FileResponse(index_file)
+# @app.get("/")
+# async def index():
+#     index_file = os.path.join(STATIC_FOLDER, "index.html")
+#     return FileResponse(index_file)
 
 @app.get("/api/tree")
 async def get_file_tree():
@@ -108,8 +109,23 @@ async def get_file_tree():
 async def get_file(path: str):
     try:
         full_path = safe_join(BASE_DIR, path)
+        mtime = os.path.getmtime(full_path)  # seconds since epoch
         with open(full_path, "r", encoding="utf-8") as f:
-            return {"content": f.read()}
+            return {
+                "content": f.read(),
+                "last_modified": int(mtime * 1000)  # ms
+            }
+    except FileNotFoundError:
+        return JSONResponse({"error": "File not found"}, status_code=404)
+    except ValueError:
+        return JSONResponse({"error": "Invalid path"}, status_code=400)
+
+@app.get("/api/file/meta")
+async def get_file_meta(path: str):
+    try:
+        full_path = safe_join(BASE_DIR, path)
+        mtime = os.path.getmtime(full_path)
+        return {"last_modified": int(mtime * 1000)}
     except FileNotFoundError:
         return JSONResponse({"error": "File not found"}, status_code=404)
     except ValueError:
@@ -126,7 +142,11 @@ async def save_file(path: str, request: Request):
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
     with open(full_path, "w", encoding="utf-8") as f:
         f.write(content)
-    return {"status": "saved"}
+    mtime = os.path.getmtime(full_path)
+    return {
+        "status": "saved",
+        "last_modified": int(mtime * 1000)
+    }
 
 @app.get("/api/images_in_folder")
 async def images_in_folder(folder: str = ""):
@@ -303,31 +323,33 @@ async def serve_static_files(subpath: str):
         return FileResponse(full_path, headers=headers)
     return JSONResponse({"error": "File not found"}, status_code=404)
 
+
 @app.get("/dictionaries/{path:path}")
 async def send_dictionaries(path: str):
     return FileResponse(os.path.join(STATIC_FOLDER, "dictionaries", path))
+
 
 @app.get("/templates/{path:path}")
 async def get_templates(path: str):
     return FileResponse(os.path.join(STATIC_FOLDER, "templates", path))
 
+
 @app.get("/linkedtemplatelist.json")
 async def serve_linked_template_list():
     return FileResponse(os.path.join(STATIC_FOLDER, "linkedtemplatelist.json"))
 
-REMOTE_GIT_URL = "https://github.com/Onefabis/PFX_docs_project"
-
+# ----------------------- Git integration ------------------------- #
 
 repo_dir = "F:/!Work/PFX_Studio/PFX_docs_project"
+
+# Only open existing repo
 if not os.path.exists(os.path.join(repo_dir, ".git")):
-    Repo.clone_from(REMOTE_GIT_URL, repo_dir)
+    raise FileNotFoundError(f"Git repo not found in {repo_dir}. Clone it manually first.")
 
 repo = Repo(repo_dir)
 
-
 class FileRequest(BaseModel):
     filename: str
-
 
 class CompareRequest(BaseModel):
     branch: str
@@ -339,78 +361,53 @@ class CompareRequest(BaseModel):
 async def search_file(req: FileRequest):
     branches = []
     commits = []
-    # target_file = req.filename.replace("\\", "/")  # normalize path
-    target_file = f"docs/{req.filename.replace('\\', '/')}"
+    target_file = f"{DOCS_DIR}/{req.filename.replace('\\', '/')}"
+
     for branch in repo.branches:
         branch_name = branch.name
         try:
-            repo.git.checkout(branch_name)
-            # try:
-            _ = repo.head.commit.tree / target_file
-            print(f"✅ Found in: {branch_name}")
+            # Use the commit tree of the branch head, no checkout
+            commit = branch.commit
+            # Check if file exists in this branch
+            try:
+                _ = commit.tree / target_file
+            except KeyError:
+                continue  # File doesn't exist in this branch
+
             branches.append(branch_name)
-            for commit in repo.iter_commits(branch_name, paths=target_file):
+
+            for c in repo.iter_commits(branch_name, paths=target_file):
                 commits.append({
-                    "hash": commit.hexsha,
-                    "summary": commit.summary,
-                    "message": commit.message
+                    "hash": c.hexsha,
+                    "summary": c.summary,
+                    "message": c.message
                 })
-            # except KeyError:
-                # continue  # file not found in this branch
+
         except Exception as e:
             print(f"❌ Error in branch {branch_name}: {e}")
             continue
+
     return {
         "branches": sorted(set(branches)),
         "commits": commits
     }
 
-@app.post("/compare")
-async def compare_file(req: CompareRequest):
-    repo.git.checkout(req.branch)
-    file_content = ""
-
-    try:
-        blob = repo.commit(req.commit).tree / req.filename
-        file_content = blob.data_stream.read().decode("utf-8")
-    except Exception as e:
-        return JSONResponse(status_code=404, content={"error": str(e)})
-
-    diff = difflib.unified_diff(
-        file_content.splitlines(),
-        req.current_text.splitlines(),
-        fromfile='remote',
-        tofile='current',
-        lineterm=''
-    )
-    return {"diff": "\n".join(diff)}
-
 @app.post("/get-file-from-git")
 async def get_file_from_git(req: CompareRequest):
-    repo.git.checkout(req.branch)
-    target_file = f"docs/{req.filename.replace('\\', '/')}"
+    target_file = f"{DOCS_DIR}/{req.filename.replace('\\', '/')}"
+
     try:
         blob = repo.commit(req.commit).tree / target_file
         content = blob.data_stream.read().decode("utf-8").replace('\r', '')
         return {"content": content}
-    except Exception as e:
-        return JSONResponse(status_code=404, content={"error": str(e)})
 
-@app.get("/api/git-commit-info")
-async def get_commit_info(branch: str = Query(...), commit: str = Query(...), filename: str = Query(...)):
-    try:
-        repo.git.checkout(branch)
-        c = repo.commit(commit)
-        return {
-            "summary": c.summary,
-            "message": c.message
-        }
+    except KeyError:
+        return JSONResponse(status_code=404, content={"error": "File not found in commit"})
     except Exception as e:
-        return JSONResponse(status_code=400, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 # Mount frontend
 app.mount("/", StaticFiles(directory=STATIC_FOLDER, html=True), name="frontend")
-
 
 if __name__ == "__main__":
     import uvicorn
