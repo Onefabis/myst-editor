@@ -114,15 +114,29 @@ ul {
 }
 
 .controls {
-  display: flex;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
+    display: flex;
+    height: 35px;
 }
 
 .controls_row {
-  width: 100%;
+  width: 100%; 
+  margin: auto;
   display: flex;
   margin-bottom: 3px;
+}
+
+.controls_row button {
+  display: block;
+  vertical-align: middle;
+  white-space: nowrap;
+  margin: 3px;
+  cursor: pointer;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid rgb(206 206 206);
+  border-radius: 6px;
+  background: rgb(255 255 255);
+  height: 27px;
 }
 
 .subtree{
@@ -148,15 +162,6 @@ ul {
 
 .myst-editor-wrapper{
   padding: 0px !important;
-}
-
-button {
-  width: 100%;
-  white-space: nowrap;
-  margin-right: 2px;
-  cursor: pointer;
-  border: 1px solid rgb(181 181 181);
-  border-radius: 6px;
 }
 
 #container {
@@ -333,7 +338,6 @@ button {
 	border-left: 0.2rem solid var(--color-admonition-title);
 }
 
-
 aside.admonition {
 	border-top: none !important;
 	border-bottom: none !important;
@@ -341,7 +345,6 @@ aside.admonition {
 }
 
 /*.cm-inline-rendered-md aside.admonition>header*/
-
 
 aside {
 	border-radius: 1 !important;
@@ -374,7 +377,6 @@ aside.admonition>header::before {
 	mask-size: contain !important;
 	mask-repeat: no-repeat !important;
 }
-
 
 /* Attention */
 
@@ -742,7 +744,6 @@ aside.danger>header::before {
 /* ------------------- Rename Image Extension UI elements END ------------------ */
 
 
-
 /* ------------------- Left Panel File Tree Extension UI elements START ------------------ */
 
 .icon-margin {
@@ -867,6 +868,7 @@ aside.danger>header::before {
 
 /* ------------------- Left Panel File Tree Extension UI elements END ------------------ */
 
+
 /* ------------------- GitDiff Extension UI elements START ------------------ */
 
 /* File tree panel */
@@ -920,7 +922,6 @@ aside.danger>header::before {
 }
 
 /* ------------------- GitDiff Extension UI elements END ------------------ */
-
 
 
 /* ------------------- Harper Extension UI elements START ------------------ */
@@ -981,3 +982,59 @@ aside.danger>header::before {
 }
 
 /* ------------------- Harper Extension UI elements END ------------------ */
+
+
+/* ------------------- Excalidraw Extension UI elements START ------------------ */
+
+/* Wrapper around the Excalidraw widget */
+.excalidraw-wrapper {
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  aspect-ratio: 4/4;
+  width: 100%;
+  position: relative;
+  margin: 22px 0 0;
+}
+
+/* The container inside the wrapper */
+.excalidraw-app {
+  height: 100%;
+}
+
+/* Close button */
+.excalidraw-close-btn {
+  position: absolute;
+  top: -14px;
+  right: 2px;
+  z-index: 10;
+  cursor: pointer;
+  border-radius: 14px;
+  width: 25px;
+  height: 25px;
+  text-align: center;
+  border: 1px solid black;
+  background: red;
+}
+
+/* Save button (default) */
+.excalidraw-save-btn {
+  position: absolute;
+  top: -16px;
+  left: 2px;
+  z-index: 100;
+  padding: 4px 7px;
+  line-height: 16px;
+  background: #4caf50;
+  color: white;
+  border: 1px solid black;
+  border-radius: 15px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Save button alternate (if you ever need a different state) */
+.excalidraw-save-btn-alt {
+  background: #388e3c;
+}
+
+/* ------------------- Excalidraw Extension UI elements END ------------------ */

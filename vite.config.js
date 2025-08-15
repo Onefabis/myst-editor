@@ -48,6 +48,7 @@ export default defineConfig({
     },
   },
   define: {
+    "process.env.IS_PREACT": JSON.stringify("true"),
     "process.env": {},
   },
   // https://github.com/redhat-developer/yaml-language-server/issues/1014

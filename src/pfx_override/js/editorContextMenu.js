@@ -10,7 +10,7 @@ menu.id = "custom-menu";
 menu.style.position = "fixed"; // Ensures positioning is relative to the viewport
 menu.style.display = "none";   // Hidden by default
 menu.innerHTML = `
-  <div class="item" id="rename_image">✍️ Rename Image</div>
+  <div class="item" id="rename_image">✏️ Rename Image</div>
   <div class="item" id="excalidraw_image">🖼️ Excalidraw Image</div>
   <div class="item" style="display: flex; align-items: center; gap: 4px;">
     <button id="ai_rephrase_btn" style="flex: 9; height: 100%;border: 0px;border-right: 1px solid gray; border-radius: 0px; background: none; padding: 0px; text-align: left; font-size: 16px;">🪄 AI Rephrase</button>
