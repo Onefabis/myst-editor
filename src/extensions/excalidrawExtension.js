@@ -1,85 +1,74 @@
 import { ViewPlugin, Decoration, WidgetType } from "@codemirror/view";
 import { StateEffect, RangeSetBuilder } from "@codemirror/state";
-import React from "https://esm.sh/react@19.0.0";
-import { createRoot } from "https://esm.sh/react-dom@19.0.0/client";
-import {
-  Excalidraw,
-  exportToBlob, 
-  loadFromBlob 
-} from "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.js?external=react,react-dom";
 
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { Excalidraw, exportToBlob, loadFromBlob } from "@excalidraw/excalidraw";
+import "@excalidraw/excalidraw/index.css"
+import excalidrawCss from '@excalidraw/excalidraw/index.css?inline'; // use ?inline if your bundler supports it
+
+// import '@excalidraw/excalidraw/index.css';
 let pluginInstance = null;
+// Effect used to signal updates that require a re-measure / re-render of decorations
 export const customUpdatedEffect = StateEffect.define();
 
-/** @type {StateEffect<number>} */
-const customUpdatedEffect2 = StateEffect.define();
-
-// Widget with Excalidraw
+/* Class: ExcalidrawWidget
+   Purpose: Represent an embedded Excalidraw editor as a CodeMirror widget.
+   High-level: holds file info and editor references, creates DOM for the Excalidraw app,
+     and wires up save/close behavior.
+*/
 class ExcalidrawWidget extends WidgetType {
+  // Constructor: store initial parameters and derive a display filename
   constructor(filePath, editorView, widgetId, onClose) {
     super();
     this.filePath = filePath || "";
-    this.fileName = (typeof this.filePath === "string" && this.filePath.includes("/")) ? this.filePath.split("/").pop() : "untitled.png";
+    this.fileName = (typeof this.filePath === "string" && this.filePath.includes("/"))
+      ? this.filePath.split("/").pop()
+      : "untitled.png";
     this.editorView = editorView;
     this.widgetId = widgetId;
     this.onClose = onClose;
   }
 
+  /* Method: toDOM
+     Purpose: Build and return the DOM node for the widget.
+     High-level: create wrapper, load Excalidraw React app into it, handle loading of
+       scene data or fallback to a blank canvas/image, and expose save/close actions.
+  */
   toDOM() {
     const wrapper = document.createElement("div");
     wrapper.id = `excalidraw_${this.widgetId}`;
-    wrapper.style.border = "1px solid #ccc";
-    wrapper.style.boxShadow = "0 2px 5px rgba(0,0,0,0.15)";
-    wrapper.style.aspectRatio = "4/4";
-    wrapper.style.width = "100%";
-    wrapper.style.position = "relative";
-    wrapper.style.margin = "22px 0 0";
+    wrapper.classList.add("excalidraw-wrapper");
 
     const appDiv = document.createElement("div");
-    appDiv.style.height = "100%";
+    appDiv.classList.add("excalidraw-app");
     wrapper.appendChild(appDiv);
 
-    // Stylesheet
-    const styleLink = document.createElement("link");
-    styleLink.setAttribute("rel", "stylesheet");
-    styleLink.setAttribute("href", "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css");
-    wrapper.insertBefore(styleLink, appDiv);
+    const styleTag = document.createElement("style");
+    styleTag.textContent = excalidrawCss;
+    wrapper.insertBefore(styleTag, appDiv);
 
-    // ❌ Close Button
     const closeButton = document.createElement("button");
     closeButton.textContent = "✖";
-    closeButton.style.position = "absolute";
-    closeButton.style.top = "-14px";
-    closeButton.style.right = "2px";
-    closeButton.style.zIndex = "10";
-    closeButton.style.cursor = "pointer";
-    closeButton.style.borderRadius = "14px";
-    closeButton.style.width = "25px";
-    closeButton.style.height = "25px";
-    closeButton.style.textAlign = "center";
-    closeButton.style.border = "1px solid black";
-    closeButton.style.background = "red";
-    closeButton.onclick = () => {
-      if (this.onClose) {
-        this.onClose();
-      }
-    };
-
+    closeButton.classList.add("excalidraw-close-btn");
+    closeButton.onclick = () => this.onClose?.();
     wrapper.appendChild(closeButton);
-    wrapper.addEventListener("keydown", (e) => {
-      // Make sure events don’t escape to CodeMirror
-      e.stopPropagation();
-    });
-    wrapper.focus(); // Optional: auto-focus on open
-    wrapper.addEventListener("mousedown", (e) => {
-      e.stopPropagation();
-    });
+
+    // Prevent editor-level events from interfering with the embedded app's interactions
+    wrapper.addEventListener("keydown", e => e.stopPropagation());
+    wrapper.addEventListener("mousedown", e => e.stopPropagation());
 
     const root = createRoot(appDiv);
     root.render(
       React.createElement(() => {
+        // React state: reference to Excalidraw API setter and a promise for initial scene
         const [excalidrawAPI, setExcalidrawAPI] = React.useState(null);
         const initialStatePromiseRef = React.useRef({ promise: null });
+
+        /* helper: resolvablePromise
+           Purpose: create a promise that can be resolved externally.
+           High-level: provide a promise-like object the Excalidraw component can wait on.
+        */
         const resolvablePromise = () => {
           let resolve, reject;
           const promise = new Promise((res, rej) => {
@@ -91,17 +80,30 @@ class ExcalidrawWidget extends WidgetType {
           return promise;
         };
 
+        // Ensure an externally-resolvable promise exists for initial data
         if (!initialStatePromiseRef.current.promise) {
           initialStatePromiseRef.current.promise = resolvablePromise();
         }
 
+        /* Effect: loadScene
+           Purpose: attempt to load an Excalidraw scene or image from the provided file path.
+           High-level: fetch the file, decide whether it's a scene or image, and resolve the
+             initial data promise with the appropriate fallback if loading fails.
+        */
         React.useEffect(() => {
           const loadScene = async () => {
             try {
+              if (!this.filePath) {
+                initialStatePromiseRef.current.promise.resolve({
+                  elements: [],
+                  appState: { viewBackgroundColor: "#ffffff" }
+                });
+                return;
+              }
+
               const response = await fetch(this.filePath);
 
               if (!response.ok || response.status === 404) {
-                console.warn("⚠️ File not found:", this.filePath);
                 initialStatePromiseRef.current.promise.resolve({
                   elements: [],
                   appState: { viewBackgroundColor: "#ffffff" }
@@ -112,7 +114,6 @@ class ExcalidrawWidget extends WidgetType {
               const blob = await response.blob();
 
               if (blob.size < 100) {
-                console.warn("⚠️ File too small to contain valid scene:", blob.size, "bytes");
                 initialStatePromiseRef.current.promise.resolve({
                   elements: [],
                   appState: { viewBackgroundColor: "#ffffff" }
@@ -124,7 +125,68 @@ class ExcalidrawWidget extends WidgetType {
               initialStatePromiseRef.current.promise.resolve(sceneData);
 
             } catch (err) {
-              console.error("Failed to load scene:", err);
+              try {
+                // Fallback attempt: try to treat the resource as an image and embed it
+                if (this.filePath) {
+                  const response = await fetch(this.filePath);
+                  if (response.ok) {
+                    const imgBlob = await response.blob();
+                    const imageDataUrl = await new Promise((resolve) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => resolve(reader.result);
+                      reader.readAsDataURL(imgBlob);
+                    });
+
+                    const imageElement = {
+                      type: "image",
+                      version: 1,
+                      versionNonce: Math.floor(Math.random() * 2 ** 31),
+                      isDeleted: false,
+                      id: crypto.randomUUID(),
+                      fillStyle: "hachure",
+                      strokeWidth: 1,
+                      strokeStyle: "solid",
+                      roughness: 0,
+                      opacity: 100,
+                      angle: 0,
+                      x: 100,
+                      y: 100,
+                      strokeColor: "transparent",
+                      backgroundColor: "transparent",
+                      width: 300,
+                      height: 300,
+                      seed: Math.floor(Math.random() * 2 ** 31),
+                      groupIds: [],
+                      frameId: null,
+                      roundness: null,
+                      boundElements: null,
+                      updated: Date.now(),
+                      status: "pending",
+                      fileId: crypto.randomUUID(),
+                      scale: [1, 1],
+                    };
+
+                    initialStatePromiseRef.current.promise.resolve({
+                      elements: [imageElement],
+                      appState: { viewBackgroundColor: "#ffffff" },
+                      files: {
+                        [imageElement.fileId]: {
+                          mimeType: imgBlob.type,
+                          id: imageElement.fileId,
+                          dataURL: imageDataUrl,
+                          created: Date.now(),
+                          lastRetrieved: Date.now(),
+                        },
+                      },
+                    });
+                    return;
+                  }
+                }
+              } catch (imgErr) {
+                console.error("Image fetch failed:", imgErr);
+              }
+
+              // Final fallback: resolve to a blank scene
               initialStatePromiseRef.current.promise.resolve({
                 elements: [],
                 appState: { viewBackgroundColor: "#ffffff" }
@@ -135,6 +197,30 @@ class ExcalidrawWidget extends WidgetType {
           loadScene();
         }, []);
 
+        /* Function: derivePngSavePaths
+           Purpose: compute a PNG filename and full path derived from the original path.
+           High-level: sanitize the input path and return an appropriate .png name and path.
+        */
+        const derivePngSavePaths = (originalPath) => {
+          const clean = (originalPath || "").split("#")[0].split("?")[0];
+          const lastSlash = clean.lastIndexOf("/");
+          const dir = lastSlash >= 0 ? clean.slice(0, lastSlash) : "";
+          const base = lastSlash >= 0 ? clean.slice(lastSlash + 1) : clean;
+
+          const dotIndex = base.lastIndexOf(".");
+          const stem = dotIndex > -1 ? base.substring(0, dotIndex) : base;
+          const ext = dotIndex > -1 ? base.substring(dotIndex + 1).toLowerCase() : "";
+
+          const pngName = `${stem || "untitled"}.png`;
+          const pngFullPath = dir ? `${dir}/${pngName}` : pngName;
+          return { pngName, pngFullPath };
+        };
+
+        /* Function: handleExport
+           Purpose: export the current Excalidraw scene to a PNG blob and POST it to a save endpoint.
+           High-level: collect scene data, package it, send it to the server, then trigger a small
+             editor refresh and close the widget on successful save.
+        */
         const handleExport = async () => {
           if (!excalidrawAPI) return;
 
@@ -148,13 +234,12 @@ class ExcalidrawWidget extends WidgetType {
               exportPadding: 10
             });
 
+            const { pngName, pngFullPath } = derivePngSavePaths(this.filePath);
+
             const formData = new FormData();
-            console.log("📦 Saving blob of size:", blob.size);
+            formData.append("file", blob, pngName);
 
-            formData.append("file", blob, this.fileName);
-
-            // Send filename in the query string — not in the body
-            const res = await fetch(`/save?filename=${encodeURIComponent(this.filePath)}`, {
+            const res = await fetch(`/save?filename=${encodeURIComponent(pngFullPath)}`, {
               method: "POST",
               body: formData
             });
@@ -163,107 +248,98 @@ class ExcalidrawWidget extends WidgetType {
               const widgetOffset = pluginInstance?.widgetIdToOffsetMap.get(this.widgetId);
               const state = this.editorView.v.state;
               const docLength = state.doc.length;
-              const currentSelection = state.selection.main;
 
               if (widgetOffset != null && widgetOffset >= 0 && widgetOffset <= docLength) {
-                this.editorView.v.dispatch({
-                  changes: { from: widgetOffset, to: widgetOffset, insert: " " }
-                });
-
+                this.editorView.v.dispatch({ changes: { from: widgetOffset, to: widgetOffset, insert: " " } });
                 setTimeout(() => {
-                  this.editorView.v.dispatch({
-                    changes: { from: widgetOffset, to: widgetOffset + 1, insert: "" }
-                  });
-
-                  this.editorView.v.dispatch({
-                    selection: { anchor: widgetOffset }
-                  });
-
-                  this.editorView.v.dispatch({
-                    selection: {
-                      anchor: state.selection.main.anchor,
-                      head: state.selection.main.head
-                    }
-                  });
-
+                  this.editorView.v.dispatch({ changes: { from: widgetOffset, to: widgetOffset + 1, insert: "" } });
                   this.editorView.v.focus();
-
-                  if (this.onClose) {
-                    this.onClose();
-                  }
+                  this.onClose?.();
                 }, 100);
-
-              } else {
-                console.warn("⚠️ Invalid widgetOffset:", widgetOffset, "Document length:", docLength);
               }
             }
-
-          } catch (e) {
-            console.error(e);
-            alert("❌ Save failed.");
+          } catch (err) {
+            console.error(err);
+            alert("Save failed.");
           }
         };
 
+        // Render the Excalidraw component and a Save button inside the widget
         return React.createElement(
           "div",
           { style: { height: "100%", width: "100%", position: "relative" } },
-          React.createElement(
-            Excalidraw,
-            {
-              excalidrawAPI: setExcalidrawAPI,
-              initialData: initialStatePromiseRef.current.promise
-            }
-          ),
+          React.createElement(Excalidraw, {
+            excalidrawAPI: setExcalidrawAPI,
+            initialData: initialStatePromiseRef.current.promise
+          }),
           React.createElement(
             "button",
-            {
-              onClick: handleExport,
-              style: {
-                position: "absolute",
-                top: "-16px", 
-                left: "2px", 
-                zIndex: "100", 
-                padding: "4px 7px",
-                lineHeight: "16px", 
-                background: "#4caf50",
-                color: "white",
-                border: "1px solid black;",
-                borderRadius: "15px",
-                cursor: "pointer",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
-              }
-            },
+            { onClick: handleExport, className: "excalidraw-save-btn" },
             "📤 Save"
           )
         );
-
       })
     );
 
     return wrapper;
   }
 
-  updateDOM(wrapper) {
-    console.log("updating")
+  /* Method: updateDOM
+     Purpose: placeholder for DOM update handling required by the widget system.
+     High-level: kept as a no-op to comply with widget interface.
+  */
+  updateDOM() {}
+  /* Method: ignoreEvent
+     Purpose: indicate whether events should be ignored by the widget.
+     High-level: return false so default event handling is allowed.
+  */
+  ignoreEvent() { return false; }
+}
+
+// Function: updateImageMarkdownPath
+// Purpose: scan the editor document and replace occurrences of an old image path with a new one.
+// High-level: find markdown image links that reference oldPath and replace them with newPath.
+function updateImageMarkdownPath(editorView, oldPath, newPath) {
+  const state = editorView.v.state;
+  const changes = [];
+
+  const fullDoc = state.doc.toString();
+  const oldMarkdownPattern = new RegExp(`(!\\[[^\\]]*\\]\\()${oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\))`, 'g');
+
+  let match;
+  while ((match = oldMarkdownPattern.exec(fullDoc)) !== null) {
+    const from = match.index + match[1].length;
+    const to = from + oldPath.length;
+    changes.push({ from, to, insert: newPath });
   }
 
-  ignoreEvent() {
-    return false;
+  if (changes.length > 0) {
+    editorView.v.dispatch({ changes });
   }
 }
 
-// ViewPlugin for decoradion control
+/* Plugin class: excalidrawPlugin
+   Purpose: manage insertion, removal, and lifecycle of Excalidraw widgets inside the editor.
+   High-level: maintain maps of decorations and widget offsets, update positions after edits,
+     provide methods to show/clear/remove widgets, and rebuild decorations when needed.
+*/
 export const excalidrawPlugin = ViewPlugin.fromClass(class {
+  // Constructor: initialize plugin state and register global instance
   constructor(view) {
     this.view = view;
-    this.decorationsMap = new Map(); // key: line.from, val: Decoration
+    this.decorationsMap = new Map();
     this.widgetIdToOffsetMap = new Map();
     this.decorations = Decoration.none;
     pluginInstance = this;
   }
 
+  /* Method: update
+     Purpose: respond to document changes and custom effects.
+     High-level: remap stored decoration positions after edits and trigger a decoration refresh
+       or measurement when necessary.
+  */
   update(update) {
-    let changed = false;
+    let decorationsChanged = false;
 
     if (update.docChanged) {
       const newDecorationsMap = new Map();
@@ -271,57 +347,70 @@ export const excalidrawPlugin = ViewPlugin.fromClass(class {
 
       for (let [oldPos, deco] of this.decorationsMap.entries()) {
         const newPos = update.changes.mapPos(oldPos);
-        const widget = deco.value.spec.widget;
-        newDecorationsMap.set(newPos, Decoration.widget({
-          widget,
-          side: 1
-        }).range(newPos));
 
-        // Also update the ID-to-offset map
+        if (newPos === oldPos) {
+          newDecorationsMap.set(newPos, deco);
+          newWidgetIdToOffsetMap.set(deco.value.spec.widget.widgetId, newPos);
+          continue;
+        }
+
+        const widget = deco.value.spec.widget;
+        const newDeco = Decoration.widget({ widget, side: 1 }).range(newPos);
+        newDecorationsMap.set(newPos, newDeco);
         newWidgetIdToOffsetMap.set(widget.widgetId, newPos);
+        decorationsChanged = true;
       }
 
-      this.decorationsMap = newDecorationsMap;
-      this.widgetIdToOffsetMap = newWidgetIdToOffsetMap;
-
-      changed = true;
+      if (decorationsChanged) {
+        this.decorationsMap = newDecorationsMap;
+        this.widgetIdToOffsetMap = newWidgetIdToOffsetMap;
+      }
     }
 
-    // if (update.docChanged || update.viewportChanged || update.selectionSet || update.focusChanged) this.view.requestMeasure();
-
-    if (update.effects && update.effects.some(e => e.is(customUpdatedEffect))) {
-      // Trigger re-render without doc change
+    // Handle custom update triggers that require a re-measure
+    if (update.effects?.some(e => e.is(customUpdatedEffect))) {
       this.view.dispatch({ effects: [] });
       this.view.requestMeasure();
     }
 
-    if (changed) {
-      this.updateDecorations(); // rebuild .decorations
+    if (decorationsChanged) {
+      this.updateDecorations();
     }
   }
 
+  /* Method: show
+     Purpose: insert an Excalidraw widget at the current selection line.
+     High-level: optionally rewrite non-png markdown links to .png, avoid duplicates,
+       create a widget and register its decoration and offset.
+  */
   show(path, editorView) {
     const { state } = this.view;
     const line = state.doc.lineAt(state.selection.main.head);
     const from = line.to;
 
-    if (this.decorationsMap.has(from)) {
-      console.warn(`⚠️ Widget already exists at offset ${from}`);
-      return;
+    // If file is NOT a .png and no excalidraw scene, update markdown path
+    const dotIndex = path.lastIndexOf(".");
+    const ext = dotIndex > -1 ? path.substring(dotIndex + 1).toLowerCase() : "";
+    if (ext && ext !== "png") {
+      const newPath = path.substring(0, dotIndex) + ".png";
+      updateImageMarkdownPath(editorView, path, newPath);
     }
+
+    // continue with normal Excalidraw widget insertion
+    if (this.decorationsMap.has(from)) return;
     const id = crypto.randomUUID();
     const widget = new ExcalidrawWidget(path, editorView, id, () => this.removeById(id));
-    const deco = Decoration.widget({
-      widget,
-      side: 1  // ensure it's visually after text
-    }).range(from);
+    const deco = Decoration.widget({ widget, side: 1 }).range(from);
 
     this.decorationsMap.set(from, deco);
     this.widgetIdToOffsetMap.set(id, from);
-
     this.updateDecorations();
   }
 
+  /* Method: removeById
+     Purpose: remove a widget and its decoration by widget id.
+     High-level: lookup the offset and delete related entries, then refresh decorations.
+  */
   removeById(id) {
     const offset = this.widgetIdToOffsetMap.get(id);
     if (offset !== undefined) {
@@ -331,50 +420,61 @@ export const excalidrawPlugin = ViewPlugin.fromClass(class {
     }
   }
 
+  /* Method: clear
+     Purpose: remove all widgets managed by the plugin.
+     High-level: clear internal maps and refresh decorations.
+  */
   clear() {
     this.decorationsMap.clear();
     this.updateDecorations();
   }
 
+  /* Method: updateDecorations
+     Purpose: rebuild the RangeSet of decorations from the internal map.
+     High-level: sort decorations, assemble them into a RangeSet, and schedule a small
+       deferred update to trigger editor measure/refresh.
+  */
   updateDecorations() {
     const builder = new RangeSetBuilder();
-    const sorted = Array.from(this.decorationsMap.entries())
-      .sort((a, b) => {
-        const aFrom = a[1].from;
-        const bFrom = b[1].from;
-        if (aFrom !== bFrom) return aFrom - bFrom;
-        const aSide = a[1].value.spec.side ?? 0;
-        const bSide = b[1].value.spec.side ?? 0;
-        return aSide - bSide;
-      });
+    const sortedEntries = Array.from(this.decorationsMap.entries()).sort((a, b) => {
+      const aFrom = a[1].from, bFrom = b[1].from;
+      if (aFrom !== bFrom) return aFrom - bFrom;
+      const aSide = a[1].value.spec.side ?? 0;
+      const bSide = b[1].value.spec.side ?? 0;
+      return aSide - bSide;
+    });
 
-    for (const [, deco] of sorted) {
+    for (const [, deco] of sortedEntries) {
       builder.add(deco.from, deco.to, deco.value);
     }
+
     this.decorations = builder.finish();
 
-    // ✅ Trigger a view refresh AFTER the current update cycle
-    setTimeout(() => {
-      if (this.view && this.view.state) {
-        this.view.dispatch({ effects: [customUpdatedEffect.of(null)] });
-        this.view.requestMeasure(); // optional, improves layout timing
-      }
-    }, 20);
+    if (!this.refreshScheduled) {
+      this.refreshScheduled = true;
+      setTimeout(() => {
+        if (this.view?.state) {
+          this.view.dispatch({ effects: [customUpdatedEffect.of(null)] });
+          this.view.requestMeasure();
+        }
+        this.refreshScheduled = false;
+      }, 20);
+    }
   }
 
+  /* Method: destroy
+     Purpose: cleanup when plugin is destroyed.
+     High-level: clear global references so the plugin can be GC'd.
+  */
   destroy() {
     pluginInstance = null;
   }
-}, {
-  decorations: v => v.decorations
-});
+}, { decorations: v => v.decorations });
 
 export const excalidrawExtension = [excalidrawPlugin];
 
+// Function: showExcalidraw
+// Purpose: convenience wrapper to call the plugin's show method from outside.
 export function showExcalidraw(path, editorView) {
-  if (pluginInstance) {
-    pluginInstance.show(path, editorView);
-  } else {
-    console.warn("⚠️ excalidrawPlugin not active");
-  }
+  pluginInstance?.show(path, editorView);
 }

@@ -74,5 +74,11 @@
   "alias": {
     "react": "@preact/compat",
     "react-dom": "@preact/compat"
+  }, 
+  "overrides": {
+    "rollup": "4.44.1"
+  },
+  "resolutions": {
+    "rollup": "4.44.1"
   }
 }

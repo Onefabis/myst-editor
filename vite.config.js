@@ -24,7 +24,6 @@ export default defineConfig({
       entry: [
         resolve(__dirname, "src/MystEditor.jsx"),
         resolve(__dirname, "src/index.html"),
-        resolve(__dirname, "src/myst-git/git.html"), 
         resolve(__dirname, "src/pfx_override/js/MainOverride.js")
       ],
       formats: ["es"],
@@ -32,10 +31,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (module) => {
-          if (module.includes("index_for_build.html")) {
+          if (module.includes("index.html")) {
             return "index";
-          } else if (module.includes("git.html")) {
-            return "git";
           } else if (module.includes("MainOverride.js")) {
             return "MainOverride";
           } else if (module.includes("PFXStyleOverride.css")) {
@@ -48,10 +45,8 @@ export default defineConfig({
     },
   },
   define: {
-    "process.env.IS_PREACT": JSON.stringify("true"),
     "process.env": {},
   },
-  // https://github.com/redhat-developer/yaml-language-server/issues/1014
   resolve: {
     alias: [
       {

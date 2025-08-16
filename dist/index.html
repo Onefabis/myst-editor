@@ -4,34 +4,13 @@
     <meta charset="UTF-8" />
     <title>MyST Editor Integration</title>
     <link rel="icon" href="data:," />  
-
-
-
     <link rel="icon" href="data:," />
-    <link
+    <!-- <link
       rel="stylesheet"
       href="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.css"
-    />
-
-    <script>
-      window.EXCALIDRAW_ASSET_PATH =
-        "https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/";
-    </script>
-
-     <script type="importmap">
-      {
-        "imports": {
-          "react": "https://esm.sh/react@19.0.0",
-          "react/jsx-runtime": "https://esm.sh/react@19.0.0/jsx-runtime",
-          "react-dom": "https://esm.sh/react-dom@19.0.0"
-        }
-      }
-    </script>
+    /> -->
     <script type="module" crossorigin src="./MainOverride.js"></script>
-    <script type="module" crossorigin src="https://esm.sh/react@19.0.0"></script>
-    <script type="module" crossorigin src="https://esm.sh/react-dom@19.0.0/client"></script>
-    <script type="module" crossorigin src="https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/dev/index.js?external=react,react-dom"></script>
-    <script type="module" crossorigin src="./MystEditor-D22XXGGf.js"></script>
+    <script type="module" crossorigin src="./MystEditor-DycCI9xg.js"></script>
     <link rel="stylesheet" crossorigin href="./PFXStyleOverride.css">
     <link rel="stylesheet" crossorigin href="./MystEditor.css">
   </head>
@@ -41,14 +20,12 @@
       <div id="tree-panel">
         <div class="controls">
           <div class="controls_row" >
-            <button id="new-file">➕ File</button>
-            <button id="new-folder">➕ Folder</button>
-            <button id="delete">🗑️ Delete</button>
-          </div>
-          <div class="controls_row" >
-            <button id="rename">✏️ Rename</button>
-            <button id="move">📁 Move</button>
-            <button id="upload-image">📤 Upload</button>
+            <button id="new-file" title="File">📄</button>
+            <button id="new-folder" title="Folder">📁</button>
+            <button id="delete" title="Delete">🗑️</button>
+            <button id="rename" title="Rename">✏️</button>
+            <button id="move" title="Move">👉🏻</button>
+            <button id="upload-image" title="Upload">📤</button>
           </div>
         </div>
         <div id="tree"></div>

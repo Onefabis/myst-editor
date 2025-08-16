@@ -1,8 +1,5 @@
-import { Decoration, WidgetType, ViewPlugin } from "@codemirror/view";
 import { StateEffect } from "@codemirror/state";
-import { createRoot } from "https://esm.sh/react-dom@19.0.0/client";
-import React, { useEffect, useState, useRef } from "https://esm.sh/react@19.0.0";
-
+import { Decoration, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
 
 class OllamaPopupWidget extends WidgetType {
   constructor(editorView, from, to) {
@@ -10,6 +7,9 @@ class OllamaPopupWidget extends WidgetType {
     this.editorView = editorView;
     this.from = from;
     this.to = to;
+    this.abortController = null;
+    this.responseHistory = [];
+    this.currentIndex = -1;
   }
 
   toDOM() {
@@ -22,23 +22,233 @@ class OllamaPopupWidget extends WidgetType {
     wrapper.style.boxShadow = "0 4px 10px rgba(0,0,0,0.1)";
     wrapper.style.padding = "10px";
     wrapper.style.borderRadius = "8px";
+    wrapper.style.display = "flex";
+    wrapper.style.flexDirection = "column";
+    wrapper.style.gap = "8px";
 
-    // Prevent input interaction from leaking to editor
+    // Prevent editor interaction
     wrapper.addEventListener("mousedown", e => e.stopPropagation());
     wrapper.addEventListener("keydown", e => e.stopPropagation());
 
     const selectionText = this.editorView.state.sliceDoc(this.from, this.to);
 
-    const root = createRoot(wrapper);
-    root.render(
-      React.createElement(PopupContent, {
-        key: `${this.from}-${this.to}`, // Resets state on remount
-        editorView: this.editorView,
-        from: this.from,
-        to: this.to,
-        context: selectionText
+    // --- Create prompt textarea ---
+    const promptInput = document.createElement("textarea");
+    promptInput.rows = 2;
+    promptInput.placeholder = "Enter prompt...";
+    promptInput.style.fontFamily = "system-ui";
+    promptInput.style.resize = "vertical";
+    promptInput.style.fontSize = "13px";
+    promptInput.style.padding = "2px";
+
+    // --- Model select ---
+    const modelSelect = document.createElement("select");
+    modelSelect.style.fontFamily = "system-ui";
+
+    // --- Buttons ---
+    const sendBtn = document.createElement("button");
+    sendBtn.textContent = "Send";
+
+    const stopBtn = document.createElement("button");
+    stopBtn.textContent = "Stop";
+    stopBtn.style.display = "none";
+
+    // --- Response textarea ---
+    const responseArea = document.createElement("textarea");
+    responseArea.rows = 6;
+    responseArea.readOnly = true;
+    responseArea.style.fontFamily = "system-ui";
+    responseArea.style.resize = "vertical";
+    responseArea.style.overflowY = "auto";
+    responseArea.style.fontSize = "13px";
+    responseArea.style.padding = "2px";
+    responseArea.style.color = "#999";
+
+    // --- History nav ---
+    const navDiv = document.createElement("div");
+    navDiv.style.display = "flex";
+    navDiv.style.justifyContent = "left";
+    navDiv.style.alignItems = "center";
+    navDiv.style.gap = "10px";
+
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "<";
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = ">";
+    const modelLabel = document.createElement("span");
+    modelLabel.style.fontFamily = "system-ui";
+
+    navDiv.append(prevBtn, nextBtn, modelLabel);
+
+    // --- Host input and bottom buttons ---
+    const bottomDiv = document.createElement("div");
+    bottomDiv.style.display = "flex";
+    bottomDiv.style.alignItems = "center";
+    bottomDiv.style.justifyContent = "space-between";
+    bottomDiv.style.gap = "6px";
+
+    const hostInput = document.createElement("input");
+    hostInput.type = "text";
+    hostInput.style.flex = "1";
+    hostInput.style.fontFamily = "system-ui";
+    hostInput.style.fontSize = "12px";
+    hostInput.style.padding = "4px";
+
+    const addBtn = document.createElement("button");
+    addBtn.textContent = "Add";
+    const insertBtn = document.createElement("button");
+    insertBtn.textContent = "Insert";
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "Close";
+
+    bottomDiv.append(hostInput, addBtn, insertBtn, closeBtn);
+
+    wrapper.append(promptInput, modelSelect, sendBtn, stopBtn, responseArea, navDiv, bottomDiv);
+
+    // --- JS logic ---
+    const defaultHost = "http://localhost:11434";
+    let ollamaHost = localStorage.getItem("ollama-host") || defaultHost;
+    hostInput.value = ollamaHost;
+
+    const models = [];
+    let model = localStorage.getItem("ollama-last-model") || "";
+
+    // Fetch models
+    fetch(`${ollamaHost}/api/tags`)
+      .then(res => res.json())
+      .then(data => {
+        data.models.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m.name;
+          opt.textContent = m.name;
+          modelSelect.append(opt);
+        });
+        const saved = localStorage.getItem("ollama-last-model");
+        modelSelect.value = saved && data.models.map(m => m.name).includes(saved) ? saved : data.models[0].name;
+        model = modelSelect.value;
       })
-    );
+      .catch(err => console.error(err));
+
+    // --- Event handlers ---
+    modelSelect.addEventListener("change", () => {
+      model = modelSelect.value;
+      localStorage.setItem("ollama-last-model", model);
+    });
+
+    hostInput.addEventListener("change", () => {
+      ollamaHost = hostInput.value.trim();
+      localStorage.setItem("ollama-host", ollamaHost);
+    });
+
+    sendBtn.addEventListener("click", async () => {
+      if (!promptInput.value.trim()) {
+        responseArea.value = "⚠️ Prompt is empty.";
+        return;
+      }
+      sendBtn.style.display = "none";
+      stopBtn.style.display = "inline";
+      responseArea.value = "";
+      responseArea.style.color = "black";
+
+      const controller = new AbortController();
+      this.abortController = controller;
+      let fullResponse = "";
+
+      try {
+        const res = await fetch(`${ollamaHost}/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model, prompt: `${promptInput.value}\n\n${selectionText}`, stream: true }),
+          signal: controller.signal
+        });
+
+        if (!res.ok || !res.body) {
+          const text = await res.text();
+          responseArea.value = `❌ Ollama error: ${res.status} - ${text}`;
+          sendBtn.style.display = "inline";
+          stopBtn.style.display = "none";
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        const read = async () => {
+          const { value, done } = await reader.read();
+          if (done) {
+            const cleanResponse = fullResponse.trim();
+            this.responseHistory.push({ model, text: cleanResponse });
+            this.currentIndex = this.responseHistory.length - 1;
+            modelLabel.textContent = `${this.currentIndex + 1}: ${model}`;
+            sendBtn.style.display = "inline";
+            stopBtn.style.display = "none";
+            return;
+          }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+          lines.forEach(line => {
+            if (!line.trim()) return;
+            try {
+              const json = JSON.parse(line);
+              if (json.response) {
+                fullResponse += json.response;
+                responseArea.value = fullResponse;
+              }
+            } catch {}
+          });
+          await read();
+        };
+        await read();
+      } catch (err) {
+        if (err.name === "AbortError") {
+          responseArea.value += "\n⛔ Request aborted.";
+        } else {
+          console.error(err);
+          responseArea.value = "❌ Failed to connect to Ollama.";
+        }
+        sendBtn.style.display = "inline";
+        stopBtn.style.display = "none";
+      }
+    });
+
+    stopBtn.addEventListener("click", () => {
+      this.abortController?.abort();
+      sendBtn.style.display = "inline";
+      stopBtn.style.display = "none";
+    });
+
+    insertBtn.addEventListener("click", () => {
+      const clean = responseArea.value.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+      this.editorView.dispatch({ changes: { from: this.from, to: this.to, insert: clean } });
+      closePopup(this.editorView);
+    });
+
+    addBtn.addEventListener("click", () => {
+      const clean = responseArea.value.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+      const textBefore = this.editorView.state.sliceDoc(this.from, this.to);
+      this.editorView.dispatch({ changes: { from: this.from, to: this.to, insert: textBefore + " " + clean } });
+      closePopup(this.editorView);
+    });
+
+    closeBtn.addEventListener("click", () => closePopup(this.editorView));
+
+    prevBtn.addEventListener("click", () => {
+      if (this.currentIndex > 0) {
+        this.currentIndex--;
+        responseArea.value = this.responseHistory[this.currentIndex].text;
+        modelLabel.textContent = `${this.currentIndex + 1}: ${this.responseHistory[this.currentIndex].model}`;
+      }
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (this.currentIndex < this.responseHistory.length - 1) {
+        this.currentIndex++;
+        responseArea.value = this.responseHistory[this.currentIndex].text;
+        modelLabel.textContent = `${this.currentIndex + 1}: ${this.responseHistory[this.currentIndex].model}`;
+      }
+    });
 
     return wrapper;
   }
@@ -48,266 +258,7 @@ class OllamaPopupWidget extends WidgetType {
   }
 }
 
-function PopupContent({ editorView, from, to, context }) {
-  const defaultHost = "http://localhost:11434";
-  const [ollamaHost, setOllamaHost] = useState(localStorage.getItem("ollama-host") || defaultHost);
-  const [models, setModels] = useState([]);
-  const [model, setModel] = useState(localStorage.getItem("ollama-last-model") || "");
-  const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState("");
-  const [responseHistory, setResponseHistory] = useState([]); // { model, text }
-  const [currentIndex, setCurrentIndex] = useState(-1);
-  const [loading, setLoading] = useState(false);
-  const [autoScroll, setAutoScroll] = useState(true);
-
-  const responseRef = useRef(null);
-  const readerRef = useRef(null);
-  const abortControllerRef = useRef(null);
-
-  useEffect(() => {
-    fetch(`${ollamaHost}/api/tags`)
-      .then(res => res.json())
-      .then(data => {
-        const modelList = data.models.map(m => m.name);
-        setModels(modelList);
-        const savedModel = localStorage.getItem("ollama-last-model");
-        setModel(savedModel && modelList.includes(savedModel) ? savedModel : modelList[0]);
-      })
-      .catch(err => console.error("Model fetch failed", err));
-  }, [ollamaHost]);
-
-  useEffect(() => {
-    if (autoScroll && responseRef.current) {
-      responseRef.current.scrollTop = responseRef.current.scrollHeight;
-    }
-  }, [response, autoScroll]);
-
-  const handleModelChange = (e) => {
-    const newModel = e.target.value;
-    setModel(newModel);
-    localStorage.setItem("ollama-last-model", newModel);
-  };
-
-  const handleStop = () => {
-    abortControllerRef.current?.abort();
-    setLoading(false);
-  };
-
-  const handleSend = async () => {
-    if (!prompt.trim()) {
-      setResponse("⚠️ Prompt is empty.");
-      return;
-    }
-
-    setLoading(true);
-    setResponse("");
-    setAutoScroll(true);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    try {
-      const res = await fetch(`${ollamaHost}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          prompt: `${prompt}\n\n${context}`,
-          stream: true
-        }),
-        signal: controller.signal
-      });
-
-      if (!res.ok || !res.body) {
-        const text = await res.text();
-        setResponse(`❌ Ollama error: ${res.status} - ${text}`);
-        setLoading(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      readerRef.current = reader;
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-      let fullResponse = "";
-
-      const read = async () => {
-        const { value, done } = await reader.read();
-        if (done) {
-          // Save to history
-          const cleanResponse = fullResponse.trim();
-          const newEntry = { model, text: cleanResponse };
-          setResponseHistory(prev => [...prev, newEntry]);
-          setCurrentIndex(prev => prev + 1);
-          setLoading(false);
-          return;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const json = JSON.parse(line.trim());
-            if (json.response) {
-              fullResponse += json.response;
-              setResponse(fullResponse);
-            }
-          } catch (err) {
-            console.error("Failed to parse stream chunk:", line, err);
-          }
-        }
-
-        await read();
-      };
-
-      await read();
-    } catch (err) {
-      if (err.name === "AbortError") {
-        setResponse(fullResponse => fullResponse + "\n⛔ Request aborted.");
-      } else {
-        console.error("Ollama fetch failed:", err);
-        setResponse("❌ Failed to connect to Ollama.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInsert = () => {
-    const clean = response.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-    editorView.dispatch({ changes: { from, to, insert: clean } });
-    closePopup(editorView);
-  };
-
-  const handleAdd = () => {
-    const clean = response.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-    const textBefore = editorView.state.sliceDoc(from, to);
-    editorView.dispatch({ changes: { from, to, insert: textBefore + " " + clean } });
-    closePopup(editorView);
-  };
-
-  const handleHostChange = (e) => {
-    const newHost = e.target.value.trim();
-    setOllamaHost(newHost);
-    localStorage.setItem("ollama-host", newHost);
-  };
-
-  const handleScroll = () => {
-    const el = responseRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 10;
-    if (!nearBottom && autoScroll) setAutoScroll(false);
-  };
-
-  const showPrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-      setResponse(responseHistory[currentIndex - 1].text);
-    }
-  };
-
-  const showNext = () => {
-    if (currentIndex < responseHistory.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setResponse(responseHistory[currentIndex + 1].text);
-    }
-  };
-
-  const currentModelLabel = responseHistory[currentIndex]?.model || "";
-
-  return React.createElement("div", {
-    style: { display: "flex", flexDirection: "column", gap: "8px" }
-  },
-    React.createElement("textarea", {
-      rows: 2,
-      placeholder: "Enter prompt...",
-      value: prompt,
-      onChange: (e) => setPrompt(e.target.value),
-      style: { fontFamily: "system-ui", resize: "vertical", fontSize: "13px", padding: "2px" }
-    }),
-
-    React.createElement("select", {
-      value: model,
-      onChange: handleModelChange
-    }, ...models.map(m => React.createElement("option", { key: m, value: m }, m))),
-
-    React.createElement("button", {
-      onClick: loading ? handleStop : handleSend
-    }, loading ? "Stop" : "Send"),
-
-    // response && 
-    React.createElement("textarea", {
-      rows: 6,
-      readOnly: true,
-      value: response,
-      ref: responseRef,
-      onScroll: handleScroll,
-      placeholder: "Model answer...",
-      style: {
-        fontFamily: "system-ui",
-        resize: "vertical",
-        overflowY: "auto",
-        fontSize: "13px", 
-        padding: "2px", 
-        color: response ? "black" : "#999" // gray text if empty
-      }
-    }),
-
-    // Navigation + Model label
-    // response && 
-    React.createElement("div", {
-      style: { display: "flex", justifyContent: "left", alignItems: "center", gap: "10px" }
-    },
-      React.createElement("button", {
-        onClick: showPrevious,
-        disabled: currentIndex <= 0,
-        title: "Previous answer"
-      }, "<"),
-      React.createElement("button", {
-        onClick: showNext,
-        disabled: currentIndex >= responseHistory.length - 1,
-        title: "Next answer"
-      }, ">"),
-      React.createElement("span", {
-        style: { fontFamily: "system-ui" }
-      }, currentIndex >= 0 ? `${currentIndex + 1}: ${responseHistory[currentIndex]?.model}` : "")
-    ), 
-
-    // Host input and buttons
-    React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "6px"
-      }
-    },
-      React.createElement("input", {
-        type: "text",
-        value: ollamaHost,
-        onChange: handleHostChange,
-        style: {
-          flex: "1",
-          fontFamily: "system-ui",
-          fontSize: "12px",
-          padding: "4px"
-        }
-      }),
-      React.createElement("button", { onClick: handleAdd }, "Add"),
-      React.createElement("button", { onClick: handleInsert }, "Insert"),
-      React.createElement("button", { onClick: () => closePopup(editorView) }, "Close")
-    )
-  );
-}
-
-
-function closePopup(view) {
-  view.dispatch({ effects: closePopupEffect.of(null) }); //
-}
-
+// --- Popup plugin and effects ---
 const addPopupEffect = StateEffect.define();
 const closePopupEffect = StateEffect.define();
 let popupOffset = null;
@@ -326,12 +277,10 @@ const ollamaPopupPlugin = ViewPlugin.fromClass(class {
         if (e.is(addPopupEffect)) {
           const sel = update.state.selection.main;
           popupOffset = sel.to;
-
           const deco = Decoration.widget({
             widget: new OllamaPopupWidget(this.view, sel.from, sel.to),
             side: 1
           }).range(popupOffset);
-
           this.decorations = Decoration.set([deco]);
           needsRedraw = true;
         } else if (e.is(closePopupEffect)) {
@@ -345,22 +294,17 @@ const ollamaPopupPlugin = ViewPlugin.fromClass(class {
     if (update.docChanged && popupOffset !== null) {
       const newOffset = update.changes.mapPos(popupOffset);
       popupOffset = newOffset;
-
       const sel = update.state.selection.main;
       const deco = Decoration.widget({
         widget: new OllamaPopupWidget(this.view, sel.from, sel.to),
         side: 1
       }).range(newOffset);
-
       this.decorations = Decoration.set([deco]);
       needsRedraw = true;
     }
 
-    if (needsRedraw) {
-      this.view.requestMeasure(); // optional but improves visual accuracy
-    }
+    if (needsRedraw) this.view.requestMeasure();
   }
-
 
   destroy() {}
 }, {
@@ -370,5 +314,9 @@ const ollamaPopupPlugin = ViewPlugin.fromClass(class {
 export const ollamaExtension = [ollamaPopupPlugin];
 
 export function showOllamaPopup(view) {
-  view.v.dispatch({ effects: addPopupEffect.of(null) }); 
+  view.v.dispatch({ effects: addPopupEffect.of(null) });
+}
+
+function closePopup(view) {
+  view.dispatch({ effects: closePopupEffect.of(null) });
 }
