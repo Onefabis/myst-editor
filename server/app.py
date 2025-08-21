@@ -96,10 +96,6 @@ def increment_filename(path, filename):
         i += 1
 
 # ---------------------- ROUTES ----------------------
-# @app.get("/")
-# async def index():
-#     index_file = os.path.join(STATIC_FOLDER, "index.html")
-#     return FileResponse(index_file)
 
 @app.get("/api/tree")
 async def get_file_tree():
@@ -340,7 +336,7 @@ async def serve_linked_template_list():
 
 # ----------------------- Git integration ------------------------- #
 
-repo_dir = "F:/!Work/PFX_Studio/PFX_docs_project"
+repo_dir = "../../"
 
 # Only open existing repo
 if not os.path.exists(os.path.join(repo_dir, ".git")):
@@ -360,37 +356,25 @@ class CompareRequest(BaseModel):
 @app.post("/search-file")
 async def search_file(req: FileRequest):
     branches = []
-    commits = []
-    target_file = f"{DOCS_DIR}/{req.filename.replace('\\', '/')}"
+    commits = {}
 
     for branch in repo.branches:
         branch_name = branch.name
-        try:
-            # Use the commit tree of the branch head, no checkout
-            commit = branch.commit
-            # Check if file exists in this branch
-            try:
-                _ = commit.tree / target_file
-            except KeyError:
-                continue  # File doesn't exist in this branch
+        branches.append(branch_name)
 
-            branches.append(branch_name)
-
-            for c in repo.iter_commits(branch_name, paths=target_file):
-                commits.append({
-                    "hash": c.hexsha,
-                    "summary": c.summary,
-                    "message": c.message
-                })
-
-        except Exception as e:
-            print(f"❌ Error in branch {branch_name}: {e}")
-            continue
+        commits[branch_name] = []
+        for c in repo.iter_commits(branch_name):
+            commits[branch_name].append({
+                "hash": c.hexsha,
+                "summary": c.summary,
+                "message": c.message
+            })
 
     return {
         "branches": sorted(set(branches)),
         "commits": commits
     }
+    
 
 @app.post("/get-file-from-git")
 async def get_file_from_git(req: CompareRequest):

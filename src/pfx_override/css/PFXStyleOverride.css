@@ -883,7 +883,6 @@ aside.danger>header::before {
   background-color: #fff;
   border-left: 1px solid #ccc;
   padding: 0.5rem;
-  display: none;
 }
 
 /* Resizer */

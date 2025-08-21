@@ -1,126 +1,128 @@
-/* GitDiff Extension - UI Interaction Logic
-- Listens for branch and commit dropdown changes
-- Handles panel resizing and state persistence
-- Loads commit details dynamically */
+/* Git Commit UI Logic
+   - Handles dual branch/commit selectors (left & right halves)
+   - Fetches branch/commit info from backend
+   - Updates commit dropdowns when branch changes
+   - Logs commit details when commit changes
+*/
+function updateCommits(selectedBranch, commitDropdown, gitData) {
+  if (!selectedBranch || !commitDropdown || !gitData) return;
 
-export function setupGitDiffListeners() {
-  // Dropdown selectors for Git branches and commits
-  const branchDropdown = document.getElementById("branchDropdown");
-  const commitDropdown = document.getElementById("commitDropdown");
+  try {
+    // Get commits for the selected branch
+    const commitsForBranch = gitData.commits[selectedBranch] || [];
 
-  // Reload GitDiff extension when branch changes
-  if (branchDropdown) {
-    branchDropdown.addEventListener("change", () => {
-      if (window.reloadGitdiff) window.reloadGitdiff();
-    });
-  }
+    // Map commits to { value, label, message } for dropdown
+    const commitItems = commitsForBranch.map(c => ({
+      value: c.hash || c.id || c, // adjust according to your backend
+      label: (c.shortMessage || c.message || c).split("\n")[0],
+      message: c.message || c
+    }));
 
-  // Reload GitDiff extension when commit changes
-  if (commitDropdown) {
-    commitDropdown.addEventListener("change", () => {
-      if (window.reloadGitdiff) window.reloadGitdiff();
-    });
-  }
-}
+    // Populate commit dropdown
+    populateDropdown(commitDropdown, commitItems);
 
-// Panels and horizontal resizer elements
-const fileTree = document.getElementById("tree-panel");
-const hor_resizer = document.getElementById("resizer-horizontal");
-const gitPanel = document.getElementById("gitPanel");
-
-/* Horizontal Resizing Logic for File Tree Panel
-- Adjusts height based on mouse drag
-- Saves height in localStorage for persistence */
-hor_resizer.onmousedown = function (e) {
-  e.preventDefault();
-  const startY = e.clientY;
-  const startHeight = fileTree.offsetHeight;
-
-  document.onmousemove = function (e) {
-    const newHeight = startHeight + (e.clientY - startY);
-    if (newHeight >= 100) {
-      fileTree.style.height = newHeight + 'px'; // style linked to CSS via height
-      localStorage.setItem('fileTreeHeight', newHeight);
+    // Ensure a default selection exists
+    if (commitDropdown.options.length) {
+      commitDropdown.selectedIndex = 0;
+      setupCommitChangeHandler(commitDropdown);
+      commitDropdown.dispatchEvent(new Event('change'));
     }
-  };
-
-  document.onmouseup = function () {
-    document.onmousemove = null;
-    document.onmouseup = null;
-  };
-};
-
-// Sets hidden input's filename for backend usage
-function setHiddenFilename(filename) {
-  const hiddenInput = document.getElementById('hidden-filename');
-  if (hiddenInput) {
-    hiddenInput.value = filename;
+  } catch (err) {
+    console.error("Failed to update commits:", err);
+    commitDropdown.innerHTML = ""; // clear if error
   }
 }
 
-// Restore saved panel height from previous session
-const savedHeight = localStorage.getItem('fileTreeHeight');
-if (savedHeight) {
-  fileTree.style.height = savedHeight + 'px';
-}
-
-// Git panel dropdowns and details
-const branchSelect = document.getElementById('branch-select');
-const commitSelect = document.getElementById('commit-select');
-const commitDetails = document.getElementById('commit-details');
-
-/* Fetches and populates branch/commit.
-   Updates commit details dynamically on selection */
-export async function updateGitPanel(filename) {
-  const branchDropdown = document.getElementById("branchDropdown");
-  const commitDropdown = document.getElementById("commitDropdown");
-  const commitDetails = document.getElementById("commitDetails");
-
-  // Reset UI state
-  branchDropdown.innerHTML = "";
-  commitDropdown.innerHTML = "";
-  commitDetails.innerText = "";
-
-  // Request branch & commit data from backend
+async function fetchGitData() {
+  console.log("fetching /search-file...");
   const response = await fetch("/search-file", {
     method: "POST",
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: "" })
   });
-
-  const data = await response.json();
-  setHiddenFilename(filename);
-
-  // Populate branches
-  data.branches.forEach(branch => {
-    const opt = document.createElement("option");
-    opt.value = branch;
-    opt.innerText = branch;
-    branchDropdown.appendChild(opt);
-  });
-
-  // Populate commits
-  data.commits.forEach(commit => {
-    const opt = document.createElement("option");
-    opt.value = commit.hash;
-    opt.innerText = commit.summary || commit.hash;
-    opt.dataset.message = commit.message;
-    commitDropdown.appendChild(opt);
-  });
-
-  // Show commit message on selection
-  commitDropdown.onchange = function () {
-    const selected = commitDropdown.options[commitDropdown.selectedIndex];
-    const message = selected.dataset.message || ' ';
-    // Remove the first line (summary) for the details panel
-    const body = message.split('\n').slice(1).join('\n').trim();
-    commitDetails.innerText = body;
-  };
-
-  // Auto-select first commit
-  if (commitDropdown.options.length) {
-    commitDropdown.selectedIndex = 0;
-    commitDropdown.onchange();
-  }
+  console.log("response status:", response.status);
+  const json = await response.json();
+  console.log("response json:", json);
+  return json;
 }
 
+function populateDropdown(select, items) {
+  select.innerHTML = "";
+  items.forEach(item => {
+    const opt = document.createElement("option");
+    opt.value = item.value || item;
+    opt.innerText = item.label || item;
+    if (item.message) opt.dataset.message = item.message;
+    select.appendChild(opt);
+  });
+}
+
+function setupCommitChangeHandler(commitDropdown) {
+  commitDropdown.onchange = () => {
+    const selected = commitDropdown.options[commitDropdown.selectedIndex];
+    if (!selected) return;
+    const message = selected.dataset.message || "";
+    const body = message.split("\n").slice(1).join("\n").trim();
+    console.log("Selected commit:", body || "(no description)");
+  };
+}
+
+function waitForShadowElement(hostSelector, id, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const host = document.querySelector(hostSelector);
+    if (!host) return reject(new Error("Shadow host not found"));
+
+    const check = () => {
+      const el = host.shadowRoot?.getElementById(id);
+      if (el) return resolve(el);
+      return false;
+    }
+
+    if (check()) return;
+
+    const observer = new MutationObserver(() => {
+      if (check()) observer.disconnect();
+    });
+
+    observer.observe(host.shadowRoot || host, { childList: true, subtree: true });
+
+    setTimeout(() => {
+      observer.disconnect();
+      reject(new Error(`Element #${id} not found in shadow root within ${timeout}ms`));
+    }, timeout);
+  });
+}
+
+export async function setupGitPanel() {
+
+  const branchLeft = await waitForShadowElement('#myst', 'branchDropdownLeft');
+  const commitLeft = await waitForShadowElement('#myst', 'commitDropdownLeft');
+  const branchRight = await waitForShadowElement('#myst', 'branchDropdownRight');
+  const commitRight = await waitForShadowElement('#myst', 'commitDropdownRight');
+
+  if (!branchLeft) {
+    console.error("branchDropdownLeft not found after waiting!");
+    return;
+  }
+
+  const data = await fetchGitData();
+  // console.log("Git data:", data);
+
+  populateDropdown(branchLeft, data.branches.map(b => ({ value: b, label: b })));
+  populateDropdown(branchRight, data.branches.map(b => ({ value: b, label: b })));
+
+  // Ensure a default selection exists
+  if (branchLeft.options.length) branchLeft.selectedIndex = 0;
+  if (branchRight.options.length) branchRight.selectedIndex = 0;
+
+  if (branchLeft.value) updateCommits(branchLeft.value, commitLeft, data);
+  if (branchRight.value) updateCommits(branchRight.value, commitRight, data);
+
+  branchLeft.onchange = () => updateCommits(branchLeft.value, commitLeft, data);
+  branchRight.onchange = () => updateCommits(branchRight.value, commitRight, data);
+
+  // Reload GitDiff extension when commit changes 
+  if (commitLeft) { commitLeft.addEventListener("change", () => { if (window.reloadGitdiff) window.reloadGitdiff(); }); }
+  if (commitRight) { commitRight.addEventListener("change", () => { if (window.reloadGitdiff) window.reloadGitdiff(); }); }
+
+}

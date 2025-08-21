@@ -20,15 +20,14 @@ import { createLogger, Logger } from "./logger";
 
 const EditorParent = styled.div`
   font-family: "Lato";
-  display: flex;
-  flex-flow: column wrap;
   width: 100%;
   height: 100%;
   ${(props) => props.fullscreen && "position: fixed; left: 0; top: 0; z-index: 10;"}
   ${(props) => {
     switch (props.mode) {
       case "Gitdiff":
-        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
+        return ``;
+        // return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
       case "Preview":
         return "#editor-wrapper { display: none }";
       case "Source":
@@ -47,6 +46,33 @@ const EditorParent = styled.div`
         return ``;
     }
   }}
+`;
+
+const GitPanel = styled.div`
+  display: flex;
+  width: 100%;
+  padding: 10px;
+  background-color: var(--panel-bg);
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--accent-light);
+`;
+
+const GitHalf = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+
+  label {
+    font-weight: 600;
+  }
+
+  select {
+    flex: 1;
+    min-width: 100px;
+    padding: 4px;
+  }
 `;
 
 const MystWrapper = styled.div`
@@ -141,6 +167,24 @@ const MystEditor = () => {
               <StatusBanner>Connecting to the collaboration server ...</StatusBanner>
             )}
             {options.collaboration.value.enabled && collab.value.lockMsg.value && <StatusBanner>{collab.value.lockMsg}</StatusBanner>}
+
+            {options.mode.value === "Gitdiff" && (
+            <GitPanel id="gitPanel">
+              <GitHalf>
+                <label htmlFor="branchDropdownLeft">Branch:</label>
+                <select id="branchDropdownLeft"></select>
+                <label htmlFor="commitDropdownLeft">Commit:</label>
+                <select id="commitDropdownLeft"></select>
+              </GitHalf>
+              <GitHalf>
+                <label htmlFor="branchDropdownRight">Branch:</label>
+                <select id="branchDropdownRight"></select>
+                <label htmlFor="commitDropdownRight">Commit:</label>
+                <select id="commitDropdownRight"></select>
+              </GitHalf>
+            </GitPanel>
+            )}
+
             <MystWrapper className="myst-editor-wrapper" fullscreen={fullscreen.value}>
               <FlexWrapper id="editor-wrapper" className="flex-wrapper">
                 <CodeMirror />
@@ -163,11 +207,6 @@ const MystEditor = () => {
               {options.mode.value === "Diff" && (
                 <FlexWrapper className="flex-wrapper">
                   <Diff />
-                </FlexWrapper>
-              )}
-              {options.mode.value === "Gitdiff" && (
-                <FlexWrapper className="flex-wrapper">
-                  <Gitdiff />
                 </FlexWrapper>
               )}
               {options.mode.value == "Resolved" &&

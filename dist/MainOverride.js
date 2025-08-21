@@ -1,10 +1,10 @@
 /* empty css                          */
-import { s as u, M as p, d as f, a as y, o as h, c as g, b as w, e as v, f as x, w as S, g as I } from "./MystEditor-DycCI9xg.js";
+import { s as p, M as f, d as h, a as y, o as g, c as v, b as w, e as x, f as S, g as I, w as b, h as B } from "./MystEditor-BZc5nGFP.js";
 let a = null;
 document.getElementById("editor-panel");
-const r = document.getElementById("sidebar"), B = document.getElementById("resizer"), d = localStorage.getItem("sidebarWidth");
-d && (r.style.width = d + "px");
-B.onmousedown = function(e) {
+const r = document.getElementById("sidebar"), E = document.getElementById("resizer"), m = localStorage.getItem("sidebarWidth");
+m && (r.style.width = m + "px");
+E.onmousedown = function(e) {
   e.preventDefault();
   const o = e.clientX, s = r.offsetWidth;
   document.onmousemove = function(i) {
@@ -14,11 +14,11 @@ B.onmousedown = function(e) {
     document.onmousemove = null, document.onmouseup = null;
   };
 };
-function E(e) {
+function C(e) {
   return e.replace(/\\/g, "/");
 }
-async function T(e) {
-  const o = await fetch(`/api/file?path=${encodeURIComponent(E(e))}`);
+async function W(e) {
+  const o = await fetch(`/api/file?path=${encodeURIComponent(C(e))}`);
   if (o.status === 404) {
     console.warn("Last opened file not found."), localStorage.removeItem("lastOpened");
     return;
@@ -28,45 +28,47 @@ async function T(e) {
     return;
   }
   const s = await o.json();
-  u(s.last_modified);
+  p(s.last_modified);
   const i = document.getElementById("myst"), t = document.createElement("div");
   t.id = "myst", t.style.flexGrow = "1", t.style.border = "1px solid #ccc", t.style.marginBottom = "0.5rem", t.style.height = "80vh", i.replaceWith(t), localStorage.setItem("currentPath", e);
   const n = new CSSStyleSheet(), c = await (await fetch("../PFXStyleOverride.css")).text();
   await n.replace(c), document.adoptedStyleSheets = [...document.adoptedStyleSheets, n];
   const l = e.split("\\").pop().split("/").pop();
   requestAnimationFrame(async () => {
-    a = p({
+    a = f({
       templatelist: "linkedtemplatelist.json",
       initialText: s.content,
       title: l,
       additionalStyles: n,
-      includeButtons: f.concat([{
+      includeButtons: h.concat([{
         text: "💾 Save",
         action: () => y(!0)
       }, {
         text: "🗃️ Image",
-        action: () => h()
+        action: () => g()
       }, {
         text: "Clear",
-        action: () => g()
+        action: () => v()
       }, {
         text: "H1",
         action: () => w()
       }, {
         text: "H2",
-        action: () => v()
+        action: () => x()
       }, {
         text: "B",
-        action: () => x()
+        action: () => S()
       }]),
       spellcheckOpts: !1,
       syncScroll: !0
-    }, t), window._mystEditor = a;
-    const m = await S();
-    I(m);
+    }, t), window._mystEditor = a, a.options.mode.subscribe((d) => {
+      console.log("Mode changed:", d), d === "Gitdiff" && I();
+    });
+    const u = await b();
+    B(u);
   }), localStorage.setItem("lastOpened", e);
 }
-function O(e) {
+function F(e) {
   const o = e.split("/").pop() || "", s = o.lastIndexOf("."), t = `![${s > -1 ? o.substring(0, s) : o}](/${e})`, n = a == null ? void 0 : a.editorView;
   if (!n) {
     alert("Editor is not ready yet.");
@@ -86,8 +88,8 @@ function O(e) {
   }), n.v.focus();
 }
 export {
-  O as insertImageMarkdown,
-  T as loadFile,
+  F as insertImageMarkdown,
+  W as loadFile,
   a as mystEditorInstance
 };
 //# sourceMappingURL=MainOverride.js.map

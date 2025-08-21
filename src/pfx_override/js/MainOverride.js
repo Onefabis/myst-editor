@@ -1,6 +1,6 @@
 import '../css/PFXStyleOverride.css';
 
-import "./gitDiffUI.js";
+import { setupGitPanel } from "./gitDiffUI.js";
 import "./leftPanelFileTree.js";
 import "./editorContextMenu.js";
 
@@ -57,6 +57,7 @@ export async function loadFile(filename) {
     alert(`File loading error: ${res.statusText}`);
     return;
   }
+
   const data = await res.json();
   setLastSavedTimestamp(data.last_modified);
   const old = document.getElementById("myst");
@@ -94,8 +95,12 @@ export async function loadFile(filename) {
     }, newContainer);
 
     window._mystEditor = mystEditorInstance;
-    // setLastSavedContent(data.content);
-    // lastSavedContent = data.content;
+    mystEditorInstance.options.mode.subscribe((newMode) => {
+      console.log("Mode changed:", newMode);
+      if (newMode === "Gitdiff") {
+        setupGitPanel();
+      }
+    });
     const view = await waitForEditorReady();
     bindFocusBlurHandlers(view);
   });

@@ -1,5 +1,5 @@
 import "./gitDiffUI.js";
-import { updateGitPanel, setupGitDiffListeners } from "./gitDiffUI.js";
+// import { updateGitPanel, setupGitDiffListeners } from "./gitDiffUI.js";
 import { loadFile, insertImageMarkdown } from "./MainOverride.js";
 import { saveCurrentEditorContent, setLastSavedTimestamp } from './saveEditorText.js'; 
 import { autosaveEnabled } from '../../MystEditor.jsx';
@@ -129,8 +129,8 @@ function renderTree(nodes, parent) {
         }
         setLastSavedTimestamp(null);
 
-        updateGitPanel(newPath);
-        setupGitDiffListeners();
+        // updateGitPanel(newPath);
+        // setupGitDiffListeners();
         loadFile(newPath);
       } else {
         activeFolderPath = node.path;

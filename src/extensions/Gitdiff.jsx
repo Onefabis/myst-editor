@@ -56,22 +56,38 @@ const Gitdiff = () => {
 
   /* This fetches file content from git backend and initializes the MergeView. Also cleans up on unmount */
   useEffect(() => {
+    // helper to get element inside editor's shadow root (fallback to document)
+    const getEl = (id) => {
+      try {
+        return options.parent?.getElementById?.(id) ?? document.getElementById(id);
+      } catch (e) {
+        return document.getElementById(id);
+      }
+    };
+
+    // read filename from a hidden input (same shadow root)
+    const getFilename = () => {
+      const hidden = getEl("hidden-filename");
+      return hidden?.value || "";
+    };
+
+    // the actual reload function (reads branch/commit from shadow root)
     window.reloadGitdiff = async () => {
       try {
-        const branchDropdown = document.getElementById("branchDropdown");
-        const commitDropdown = document.getElementById("commitDropdown");
-        const hiddenInput = document.getElementById("hidden-filename");
+        const branchDropdown = getEl("branchDropdownRight");
+        const commitDropdown = getEl("commitDropdownRight");
 
         const branch = branchDropdown?.value || "";
         const commit = commitDropdown?.value || "";
-        const filename = hiddenInput?.value || "";
+        const filename = getFilename();
+
+        console.log("git diff extension run — branch:", branch, "commit:", commit, "file:", filename);
 
         if (!branch || !commit || !filename) {
-          console.warn("Missing branch, commit, or filename, skipping Git diff.");
+          console.warn("Missing branch, commit or filename — skipping Git diff reload.");
           return;
         }
 
-        // Fetch old content from backend API with current text for context
         const response = await fetch("/get-file-from-git", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -83,22 +99,34 @@ const Gitdiff = () => {
           }),
         });
 
-        const result = await response.json();
-        const oldContent = result.content || "// Failed to fetch content";
+        if (!response.ok) {
+          console.error("Failed to fetch file from git:", response.status, await response.text());
+          return;
+        }
 
-        // Destroy any previous MergeView instance before creating new one
+        const result = await response.json();
+        const oldContent = result.content ?? "// Failed to fetch content";
+
+        // destroy previous MergeView if present
         mergeView.current?.destroy();
 
         mergeView.current = initMergeView({
           old: oldContent,
           current: text.text.peek(),
-          root: options.parent,
+          root: options.parent, // keep using editor's root/transforms
           transforms: options.transforms.value,
         });
+
+        // Ensure left/right refs exist
+        if (!leftRef.current || !rightRef.current) {
+          console.warn("Left/right containers not ready yet");
+          return;
+        }
 
         // Clear containers and append new MergeView editors
         leftRef.current.innerHTML = "";
         rightRef.current.innerHTML = "";
+        // mergeView.current.a is left (old), b is right (current) — you used b/a previously, keep consistent
         leftRef.current.appendChild(mergeView.current.b.dom);
         rightRef.current.appendChild(mergeView.current.a.dom);
 
@@ -107,16 +135,31 @@ const Gitdiff = () => {
       }
     };
 
-    // Initial load of the diff view
+    // find branch/commit selects in shadow root and attach change listeners to trigger reload
+    const branchR = getEl("branchDropdownRight");
+    const commitR = getEl("commitDropdownRight");
+
+    const onChangeTrigger = () => {
+      if (typeof window.reloadGitdiff === "function") window.reloadGitdiff();
+    };
+
+    if (branchR) branchR.addEventListener("change", onChangeTrigger);
+    if (commitR) commitR.addEventListener("change", onChangeTrigger);
+
+    // Call it once on mount to try load initial state
     window.reloadGitdiff();
 
-    // Cleanup function on unmount
+    // Cleanup
     return () => {
       mergeView.current?.destroy();
       mergeView.current = null;
       delete window.reloadGitdiff;
+      if (branchR) branchR.removeEventListener("change", onChangeTrigger);
+      if (commitR) commitR.removeEventListener("change", onChangeTrigger);
     };
+    // NOTE: we intentionally run this effect once on mount so keep deps empty
   }, []);
+
 
   /* Sync current text changes to right side editor document. Uses signals for reactive updates. */
   useSignalEffect(() => { mergeView.current?.b?.dispatch?.({ changes: { from: 0, to: mergeView.current?.b?.state?.doc?.length, insert: text.text.value, }, }); });

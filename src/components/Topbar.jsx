@@ -300,28 +300,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
   const { options, editorView, collab, suggestMode } = useContext(MystState);
   const titleHtml = useComputed(() => purify.sanitize(renderMdLinks(options.title.value)));
   const emptyDiff = useSignal(false);
-
-  // Helper function to show/hide gitPanel
-  const toggleGitPanel = (show) => {
-    const gitPanel = document.getElementById("gitPanel");
-    const treePanel = document.getElementById("tree-panel");
-    const hor_resizer = document.getElementById("resizer-horizontal");
-    const savedHeight = localStorage.getItem('fileTreeHeight');
-    
-    if (gitPanel) {
-      gitPanel.style.display = show ? "block" : "none";
-    }
-
-    if (treePanel) {
-      treePanel.style.height = show ? savedHeight + 'px' : "100%";
-    }
-
-    if (hor_resizer) {
-      hor_resizer.style.display = show ? "block" : "none";
-    }
-
-  };
-
   const editorModeButtons = useComputed(() => {
     const modeButtons = [
       { 
@@ -329,7 +307,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Source", 
         action: () => { 
           options.mode.value = "Source"; 
-          toggleGitPanel(false); 
         }, 
         icon: SourceIcon 
       },
@@ -338,7 +315,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Preview", 
         action: () => { 
           options.mode.value = "Preview"; 
-          toggleGitPanel(false); 
         }, 
         icon: PreviewIcon 
       },
@@ -347,7 +323,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Dual Pane", 
         action: () => { 
           options.mode.value = "Both"; 
-          toggleGitPanel(false); 
         }, 
         icon: BothIcon 
       },
@@ -356,7 +331,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Inline Preview", 
         action: () => { 
           options.mode.value = "Inline"; 
-          toggleGitPanel(false); 
         }, 
         icon: InlinePreviewIcon 
       },
@@ -366,7 +340,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
         text: "Git Diff", 
         action: () => { 
           options.mode.value = "Gitdiff"; 
-          toggleGitPanel(true); 
         }, 
         icon: GitdiffIcon 
       },
@@ -375,7 +348,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
         text: "Table of Contents", 
         action: () => { 
           options.mode.value = "Outline"; 
-          toggleGitPanel(false); 
         }, 
         icon: TocIcon 
       },
@@ -387,7 +359,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
         text: "Resolved", 
         action: () => { 
           options.mode.value = "Resolved"; 
-          toggleGitPanel(false); 
         }, 
         icon: ResolvedIcon 
       });
