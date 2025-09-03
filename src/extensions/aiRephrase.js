@@ -318,12 +318,10 @@ async function runAIRephrase(view) {
 Placeholder plugin to attach the AI rephrase system to the editor.
 Could be extended in future to respond to document changes, keyboard shortcuts, etc.
 */
-const aiRephrasePlugin = ViewPlugin.fromClass(class {
-  constructor(view) { this.view = view; }
-  update() {}
-});
-
-
+// const aiRephrasePlugin = ViewPlugin.fromClass(class {
+//   constructor(view) { this.view = view; }
+//   update() {}
+// });
 
 /*
 Exported showAIRephrasePopup function so it may be called from external code
@@ -339,4 +337,4 @@ export function showAIRephrasePopup(view, options = {}) {
 /*
 Register the extension as plugin in index.js
  */
-export const aiRephraseExtension = [aiRephrasePlugin, popupField];
+export const aiRephraseExtension = [popupField];

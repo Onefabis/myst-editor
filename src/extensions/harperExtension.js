@@ -1,8 +1,6 @@
 import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import { WorkerLinter, binary } from "harper.js/dist/harper.js";
-// import '../pfx_override/css/MainOverrideStyle.css';
-// import '../pfx_overridecss/PFXStyleOverride.css';
 
 export const harperExtension = (() => {
   // This is crutial initialization of the Harper extension 

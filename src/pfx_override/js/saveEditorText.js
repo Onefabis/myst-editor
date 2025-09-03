@@ -39,6 +39,69 @@ export async function bindFocusBlurHandlers(view) {
   });
 
   view.contentDOM.addEventListener('focus', async () => {
+
+    // Simple modal with Ok / Cancel buttons
+    function createConfirmModal() {
+      const modal = document.createElement("div");
+      modal.id = "custom-confirm-modal";
+      modal.className = "upload-modal hidden";
+
+      const content = document.createElement("div");
+      content.className = "upload-modal-content";
+
+      const title = document.createElement("h3");
+      title.className = "upload-modal-title";
+      title.textContent = "File Changed";
+
+      const message = document.createElement("p");
+      message.className = "confirm-modal-message";
+
+      const actions = document.createElement("div");
+      actions.className = "upload-modal-actions";
+
+      const okBtn = document.createElement("button");
+      okBtn.textContent = "Reload";
+      okBtn.className = "btn-green";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.textContent = "Discard changes";
+      cancelBtn.className = "btn-orange";
+
+      actions.appendChild(okBtn);
+      actions.appendChild(cancelBtn);
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(actions);
+      modal.appendChild(content);
+      document.body.appendChild(modal);
+
+      return { modal, message, okBtn, cancelBtn };
+    }
+
+    const confirmModal = createConfirmModal();
+
+    function showConfirmModal(text) {
+      return new Promise((resolve) => {
+        confirmModal.message.textContent = text;
+        confirmModal.modal.classList.remove("hidden");
+
+        function cleanup() {
+          confirmModal.modal.classList.add("hidden");
+          confirmModal.okBtn.onclick = null;
+          confirmModal.cancelBtn.onclick = null;
+        }
+
+        confirmModal.okBtn.onclick = () => {
+          cleanup();
+          resolve(true); // Ok → reload
+        };
+        confirmModal.cancelBtn.onclick = () => {
+          cleanup();
+          resolve(false); // Cancel → keep current (save)
+        };
+      });
+    }
+
     if (!isAutosaveOn()) return; 
     const path = localStorage.getItem('currentPath');
     if (!path) return;
@@ -49,8 +112,8 @@ export async function bindFocusBlurHandlers(view) {
       const latest = await res.json();
       
       if (latest.last_modified && latest.last_modified !== lastSavedTimestamp) {
-        const shouldReload = confirm(
-          'File changed externally. Reload and discard unsaved changes?'
+        const shouldReload = await showConfirmModal(
+          'File changed externally. Reload with external changes or discard external changes?'
         );
         if (shouldReload) {
           view.dispatch({
@@ -58,6 +121,7 @@ export async function bindFocusBlurHandlers(view) {
             selection: { anchor: 0 }
           });
           lastSavedTimestamp = latest.last_modified;
+          saveCurrentEditorContent(true);
         } else {
           saveCurrentEditorContent(true);
         }

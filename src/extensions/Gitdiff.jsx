@@ -1,183 +1,261 @@
-import { MergeView } from "@codemirror/merge"; 
+import { MergeView } from "@codemirror/merge";
 import { useRef, useEffect, useContext } from "preact/hooks";
 import { CodeEditor } from "../components/CodeMirror";
 import { styled } from "styled-components";
 import { ExtensionBuilder } from "../extensions";
 import { MystState } from "../mystState";
-import { DefaultButton, Modal } from "../components/CommonUI";
 import { useSignalEffect } from "@preact/signals";
+import { highlightActiveLine } from "@codemirror/view";
 
-
+// Layout for diff view
 const GitDiffContainer = styled.div`
-  display: grid;
+  display: flex;
   grid-auto-flow: column;
   grid-template-rows: max-content;
   width: 100%;
   height: 100%;
   scrollbar-width: thin;
   overflow-y: auto;
-  overscroll-behavior: contain;`
-;
+  overscroll-behavior: contain;
+`;
 
 const MergeViewCodeEditor = styled(CodeEditor)`
   overflow-y: visible;
   overscroll-behavior: contain;
-  display: block;`
-;
+  display: table;
+`;
 
+/**
+ * Initialize MergeView.
+ *  - "a" = OLDER (red/removed)
+ *  - "b" = NEWER (green/added, editable)
+ */
+const initMergeView = ({ aDoc, bDoc, root, transforms, useReadonlyA = true, useReadonlyB = true }) => {
+  const builderA = new ExtensionBuilder().useMarkdown(transforms);
+  if (useReadonlyA) builderA.useReadonly();
+  const extensionsA = builderA.create();
 
-/* Initializes and returns a new MergeView instance. 
-Configures git commit document as readonly and latest current document as editable, with markdown and transforms extensions. */
-const initMergeView = ({ old, current, root, transforms }) => {
-  const extensionsOld = new ExtensionBuilder()
-    .useReadonly()
-    .useMarkdown(transforms)
-    .create();
+  const builderB = new ExtensionBuilder().useMarkdown(transforms);
+  if (useReadonlyB) builderB.useReadonly();
+  const extensionsB = builderB.create();
 
-  const extensionsCurrent = new ExtensionBuilder()
-    .useMarkdown(transforms)
-    .create();
+  extensionsA.push(highlightActiveLine());
+  extensionsB.push(highlightActiveLine());
 
   return new MergeView({
-    a: { doc: old, extensions: extensionsOld },
-    b: { doc: current, extensions: extensionsCurrent, allowEdit: true },
-    orientation: "b-a",
+    a: { doc: aDoc, extensions: extensionsA, editable: true },
+    b: { doc: bDoc, extensions: extensionsB, editable: true },
+    orientation: "a-b",
     root,
   });
 };
 
-/* React component displaying a Git-style diff view with side-by-side
-editors for commit and latest current file versions. Handles syncing, fetching, and reloading diffs from the backend API */
+/** Gitdiff component: shows commit vs commit diff using MergeView */
 const Gitdiff = () => {
-  const { options, text } = useContext(MystState); // Shared state context
-  const leftRef = useRef();   // Ref to left editor container
-  const rightRef = useRef();  // Ref to right editor container
-  const mergeView = useRef(); // Ref to MergeView instance
+  const { options, text } = useContext(MystState);
+  const leftRef = useRef(null);
+  const rightRef = useRef(null);
+  const mergeView = useRef(null);
 
-  /* This fetches file content from git backend and initializes the MergeView. Also cleans up on unmount */
   useEffect(() => {
-    // helper to get element inside editor's shadow root (fallback to document)
     const getEl = (id) => {
       try {
         return options.parent?.getElementById?.(id) ?? document.getElementById(id);
-      } catch (e) {
+      } catch {
         return document.getElementById(id);
       }
     };
 
-    // read filename from a hidden input (same shadow root)
-    const getFilename = () => {
-      const hidden = getEl("hidden-filename");
-      return hidden?.value || "";
+    const getFilename = () => localStorage.getItem("currentPath") || "";
+    
+
+    // Parse numeric index from label like "[37]" or "[37*] Commit msg"
+    const parseIndexFromOption = (opt) => {
+      if (!opt) return 0;
+      const m = (opt.textContent || "").match(/\[(\d+)\*?\]/);
+      return m ? parseInt(m[1], 10) : 0;
     };
 
-    // the actual reload function (reads branch/commit from shadow root)
-    window.reloadGitdiff = async () => {
+    const reloadGitdiff = async (modeArg) => {
       try {
-        const branchDropdown = getEl("branchDropdownRight");
-        const commitDropdown = getEl("commitDropdownRight");
+        const branchLeft = getEl("branchDropdownLeft");
+        const commitLeft = getEl("commitDropdownLeft");
+        const branchRight = getEl("branchDropdownRight");
+        const commitRight = getEl("commitDropdownRight");
 
-        const branch = branchDropdown?.value || "";
-        const commit = commitDropdown?.value || "";
         const filename = getFilename();
+        // const gitCommitToggle = localStorage.getItem("gitLeftToggle") || true;
+        const gitCommitToggle = localStorage.getItem("gitLeftToggle") === "true";
+        const mode = modeArg || (gitCommitToggle ? "commits" : "local") || "commits";
 
-        console.log("git diff extension run — branch:", branch, "commit:", commit, "file:", filename);
-
-        if (!branch || !commit || !filename) {
-          console.warn("Missing branch, commit or filename — skipping Git diff reload.");
+        if (!filename) {
+          console.warn("[Gitdiff] Missing filename — skipping reload.");
           return;
         }
 
-        const response = await fetch("/get-file-from-git", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename,
-            branch,
-            commit,
-            current_text: text.text.peek(),
-          }),
-        });
+        let aDoc, bDoc, newerSide;
 
-        if (!response.ok) {
-          console.error("Failed to fetch file from git:", response.status, await response.text());
-          return;
+        if (mode === "local") {
+          // Compare HEAD vs working tree file
+          const headRes = await fetch("/api/git-head");
+          const headJson = await headRes.json();
+          const headCommit = headJson.head;
+
+          const gitRes = await fetch("/get-file-from-git", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename,
+              branch_left: "", // unused
+              commit_left: headCommit,
+              branch_right: "", // unused
+              commit_right: headCommit,
+            }),
+          });
+          const gitJson = await gitRes.json();
+          const headContent = gitJson.right_content ?? "// Failed to fetch HEAD";
+
+          let localContent = text.text.value;
+          try {
+            const localRes = await fetch(`/api/file?path=${encodeURIComponent(filename)}`);
+            if (localRes.ok) {
+              const localJson = await localRes.json();
+              localContent = localJson.content ?? localContent;
+            }
+          } catch (err) {
+            console.warn("[Gitdiff] Failed to fetch local file:", err);
+          }
+
+          aDoc = headContent;
+          bDoc = localContent;
+          newerSide = "right";
+        } else {
+          // Commits mode
+          const leftCommit = commitLeft?.value || "";
+          const rightCommit = commitRight?.value || "";
+          const leftBranch = branchLeft?.value || "";
+          const rightBranch = branchRight?.value || "";
+
+          if (!leftCommit || !rightCommit) {
+            console.warn("[Gitdiff] Missing commits — skipping reload.");
+            return;
+          }
+
+          const res = await fetch("/get-file-from-git", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename,
+              branch_left: leftBranch,
+              commit_left: leftCommit,
+              branch_right: rightBranch,
+              commit_right: rightCommit,
+            }),
+          });
+
+          if (!res.ok) {
+            console.error("[Gitdiff] Fetch failed:", res.status, await res.text());
+            return;
+          }
+
+          const result = await res.json();
+          const leftContentFromGit = result.left_content ?? "// Failed left commit";
+          const rightContent = result.right_content ?? "// Failed right commit";
+
+          const leftIdx = parseIndexFromOption(commitLeft?.selectedOptions?.[0]);
+          const rightIdx = parseIndexFromOption(commitRight?.selectedOptions?.[0]);
+
+          if (leftIdx > rightIdx) {
+            aDoc = rightContent;
+            bDoc = leftContentFromGit;
+            newerSide = "left";
+          } else {
+            aDoc = leftContentFromGit;
+            bDoc = rightContent;
+            newerSide = "right";
+          }
         }
 
-        const result = await response.json();
-        const oldContent = result.content ?? "// Failed to fetch content";
-
-        // destroy previous MergeView if present
+        // Init MergeView
         mergeView.current?.destroy();
-
         mergeView.current = initMergeView({
-          old: oldContent,
-          current: text.text.peek(),
-          root: options.parent, // keep using editor's root/transforms
+          aDoc,
+          bDoc,
+          root: options.parent,
           transforms: options.transforms.value,
+          useReadonlyA: true,
+          useReadonlyB: mode === "local" ? false : true, // local file editable
         });
 
-        // Ensure left/right refs exist
-        if (!leftRef.current || !rightRef.current) {
-          console.warn("Left/right containers not ready yet");
-          return;
+        if (leftRef.current && rightRef.current) {
+          leftRef.current.innerHTML = "";
+          rightRef.current.innerHTML = "";
+          if (mode === "local"){
+              leftRef.current.appendChild(mergeView.current.b.dom);
+              rightRef.current.appendChild(mergeView.current.a.dom);
+          } else {
+            if (newerSide === "left") {
+              leftRef.current.appendChild(mergeView.current.b.dom);
+              rightRef.current.appendChild(mergeView.current.a.dom);
+            } else {
+              leftRef.current.appendChild(mergeView.current.a.dom);
+              rightRef.current.appendChild(mergeView.current.b.dom);
+            }
+          }
+          
         }
-
-        // Clear containers and append new MergeView editors
-        leftRef.current.innerHTML = "";
-        rightRef.current.innerHTML = "";
-        // mergeView.current.a is left (old), b is right (current) — you used b/a previously, keep consistent
-        leftRef.current.appendChild(mergeView.current.b.dom);
-        rightRef.current.appendChild(mergeView.current.a.dom);
-
-      } catch (error) {
-        console.error("Failed to reload Git diff:", error);
+      } catch (err) {
+        console.error("[Gitdiff] reload error:", err);
       }
     };
 
-    // find branch/commit selects in shadow root and attach change listeners to trigger reload
-    const branchR = getEl("branchDropdownRight");
-    const commitR = getEl("commitDropdownRight");
 
-    const onChangeTrigger = () => {
-      if (typeof window.reloadGitdiff === "function") window.reloadGitdiff();
-    };
 
-    if (branchR) branchR.addEventListener("change", onChangeTrigger);
-    if (commitR) commitR.addEventListener("change", onChangeTrigger);
+    // Expose for external triggers
+    window.reloadGitdiff = reloadGitdiff;
 
-    // Call it once on mount to try load initial state
-    window.reloadGitdiff();
+    const dropdowns = [
+      getEl("branchDropdownLeft"),
+      getEl("commitDropdownLeft"),
+      getEl("branchDropdownRight"),
+      getEl("commitDropdownRight"),
+    ];
+    dropdowns.forEach((el) => el?.addEventListener("change", reloadGitdiff));
 
-    // Cleanup
+    reloadGitdiff();
+
     return () => {
       mergeView.current?.destroy();
       mergeView.current = null;
       delete window.reloadGitdiff;
-      if (branchR) branchR.removeEventListener("change", onChangeTrigger);
-      if (commitR) commitR.removeEventListener("change", onChangeTrigger);
+      dropdowns.forEach((el) => el?.removeEventListener("change", reloadGitdiff));
     };
-    // NOTE: we intentionally run this effect once on mount so keep deps empty
   }, []);
 
+  // Keep reactive signals in sync (B is the editable/newer side)
+  useSignalEffect(() => {
+    if (mergeView.current?.b) {
+      mergeView.current.b.dispatch({
+        changes: { from: 0, to: mergeView.current.b.state.doc.length, insert: text.text.value },
+      });
+    }
+  });
 
-  /* Sync current text changes to right side editor document. Uses signals for reactive updates. */
-  useSignalEffect(() => { mergeView.current?.b?.dispatch?.({ changes: { from: 0, to: mergeView.current?.b?.state?.doc?.length, insert: text.text.value, }, }); });
+  useSignalEffect(() => {
+    if (mergeView.current?.a) {
+      mergeView.current.a.dispatch({
+        changes: { from: 0, to: mergeView.current.a.state.doc.length, insert: options.initialText.value },
+      });
+    }
+  });
 
-  /* Sync initial text changes to left side editor document. Uses signals for reactive updates. */
-  useSignalEffect(() => { mergeView.current?.a?.dispatch?.({ changes: { from: 0, to: mergeView.current?.a?.state?.doc?.length, insert: options.initialText.value, }, }); });
-
-  // Render the diff UI and discard changes modal dialog
   return (
-    <>
-      <GitDiffContainer>
-        <MergeViewCodeEditor ref={leftRef} />
-        <MergeViewCodeEditor ref={rightRef} />
-      </GitDiffContainer>
-    </>
+    <GitDiffContainer>
+      <MergeViewCodeEditor className="gitDiffEditor" ref={leftRef} />
+      <MergeViewCodeEditor className="gitDiffEditor" ref={rightRef} />
+    </GitDiffContainer>
   );
 };
 
 Gitdiff.defaultProps = { className: "Gitdiff" };
-
 export default Gitdiff;

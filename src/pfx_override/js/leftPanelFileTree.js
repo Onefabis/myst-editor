@@ -1,32 +1,94 @@
 import "./gitDiffUI.js";
-// import { updateGitPanel, setupGitDiffListeners } from "./gitDiffUI.js";
 import { loadFile, insertImageMarkdown } from "./MainOverride.js";
-import { saveCurrentEditorContent, setLastSavedTimestamp } from './saveEditorText.js'; 
+import { saveCurrentEditorContent, setLastSavedTimestamp } from './saveEditorText.js';
 import { autosaveEnabled } from '../../MystEditor.jsx';
+import { useContext } from "preact/hooks";
+import { MystState } from "../../mystState.js";
 
-/* Tracks which folders are currently open in the file tree.
-Stored in localStorage for persistence across page reloads. */
-const openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
+// ========================= CONSTANTS =========================
 
-//List of folders that are hidden in a tree
-const bulletproof = ["_static", "_templates"];
+const SVG_ICONS = {
+  closedFolder: `<svg width="14" height="14" viewBox="0 0 24 24"><polygon points="9,4 21,12 9,20" fill="#888888"/></svg>`,
+  openFolder: `<svg width="14" height="14" viewBox="0 0 24 24"><polygon points="7,6 15,18 23,6" fill="#888888"/></svg>`,
+  spacer: `<svg width="14" height="14" viewBox="0 0 24 24"><rect width="24" height="24" fill="transparent"/></svg>`,
+  git: {
+    deleted: `<svg width="18" height="18" viewBox="0 0 20 20" class="diff-icon diff-deleted">
+      <circle cx="10" cy="10" r="6"></circle>
+      <path d="M 6.5 13.2 L 13.2 6.5"></path>
+    </svg>`,
+    modified: `<svg width="18" height="18" viewBox="0 0 20 20" class="diff-icon diff-modified">
+      <circle cx="10" cy="10" r="6"></circle>
+      <circle cx="10" cy="10" r="2.5" class="inner"></circle>
+    </svg>`,
+    added: `<svg width="18" height="18" viewBox="0 0 20 20" class="diff-icon diff-added">
+      <circle cx="10" cy="10" r="6"></circle>
+      <path d="M 10 13.5 L 10 6.5"></path>
+      <path d="M 13.5 10 L 6.5 10"></path>
+    </svg>`
+  }
+};
 
-//Currently active folder path in the file tree
-let activeFolderPath = '';
+const GIT_STATUS = {
+  ADDED: "A",
+  DELETED: "D",
+  MODIFIED: "M",
+  RENAMED: "R"
+};
 
-function isAutosaveOn() {
-  return !!autosaveEnabled.value;
+const CONFIG = {
+  ignoredFolders: ["_static", "_templates"],
+  treeRoot: 'docs/',
+  maxDropdownWaitAttempts: 50,
+  dropdownWaitInterval: 100
+};
+
+// ========================= STATE MANAGEMENT =========================
+
+class FileTreeState {
+  constructor() {
+    this.openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
+    this.activeFolderPath = '';
+  }
+
+  addOpenFolder(path) {
+    this.openFolders.add(path);
+    this.saveOpenFolders();
+  }
+
+  removeOpenFolder(path) {
+    this.openFolders.delete(path);
+    this.saveOpenFolders();
+  }
+
+  isOpen(path) {
+    return this.openFolders.has(path);
+  }
+
+  saveOpenFolders() {
+    localStorage.setItem('openFolders', JSON.stringify([...this.openFolders]));
+  }
+
+  setActiveFolderPath(path) {
+    this.activeFolderPath = path;
+  }
+
+  getActiveFolderPath() {
+    return this.activeFolderPath;
+  }
 }
 
-// ----------------------- Utility Functions ----------------------- //
+const treeState = new FileTreeState();
 
-// Converts backslashes to forward slashes for consistency
-function normalizePath(path) {
+// ========================= UTILITY FUNCTIONS =========================
+
+export function normalizePath(path) {
   return path.replace(/\\/g, '/');
 }
 
-/* Recursively checks if a file exists in the provided tree data.
-Used to prevent loading files that no longer exist. */
+function isAutosaveEnabled() {
+  return !!autosaveEnabled.value;
+}
+
 function fileExistsInTree(path, nodes) {
   for (const node of nodes) {
     if (node.path === path && node.type === 'file') return true;
@@ -37,493 +99,485 @@ function fileExistsInTree(path, nodes) {
   return false;
 }
 
-/* Clears all "active" classes from file and folder elements.
-Ensures only one selected item at a time in the file tree. */
-function clearActiveStates() {
-  document.querySelectorAll('.file, .folder').forEach(el => {
+// ========================= DOM MANIPULATION =========================
+
+export function clearActiveStates() {
+  document.querySelectorAll('.file').forEach(el => {
     el.classList.remove('active');
   });
 }
 
-// ----------------------- Tree Rendering ----------------------- //
-
-/* Fetches the file tree from the backend API and renders it in the UI.
-Main entry point for loading and refreshing the project’s file structure. */
-function fetchTree() {
-  fetch('/api/tree')
-    .then(res => res.json())
-    .then(data => {
-      renderTree(data, document.getElementById('tree'));
-
-      // After rendering tree, restore selected file if it still exists
-      let currentPath = localStorage.getItem('currentPath');
-      if (currentPath) {
-        if (fileExistsInTree(currentPath, data)) {
-          fetch(`/api/file?path=${encodeURIComponent(currentPath)}`)
-            .then(res => {
-              if (!res.ok) throw new Error('File missing');
-              return res.json();
-            })
-            .then(() => loadFile(normalizePath(currentPath)))
-            .catch(() => {
-              console.warn("Last opened file not found.");
-              localStorage.removeItem('currentPath');
-            });
-        } else {
-          localStorage.removeItem('currentPath');
-          localStorage.removeItem('lastOpened');
-        }
-      }
-    });
+function restoreActiveFile(currentPath) {
+  const allFiles = document.querySelectorAll('.file');
+  for (const fileEl of allFiles) {
+    if (normalizePath(fileEl.title) === currentPath) {
+      fileEl.classList.add('active');
+      fileEl.scrollIntoView({ block: 'center' });
+      break;
+    }
+  }
 }
 
-/* Renders the file/folder tree recursively into a given parent element.
-Central visual component for navigating the project’s structure. */
-function renderTree(nodes, parent) {
-  parent.innerHTML = '';
-  const ul = document.createElement('ul');
+function restoreActiveFileAfterRender() {
+  const currentPath = localStorage.getItem('currentPath');
+  if (!currentPath) return;
 
-  const closedFolderSVG = `
-    <svg width="14" height="14" viewBox="0 0 24 24" style="transform: translate(2px, 2px);">
-      <polygon points="6,4 18,12 6,20" fill="#888888"/>
-    </svg>`;
-  const openFolderSVG = `
-    <svg width="14" height="14" viewBox="0 0 24 24" style="transform: translate(2px, 2px);">
-      <polygon points="4,6 12,18 20,6" fill="#888888"/>
-    </svg>`;
-  const spacerSVG = `
-    <svg width="14" height="14" viewBox="0 0 24 24">
-      <rect width="24" height="24" fill="transparent"/>
-    </svg>`;
+  requestAnimationFrame(() => {
+    const allFiles = document.querySelectorAll('.file');
+    for (const fileEl of allFiles) {
+      if (normalizePath(fileEl.title) === currentPath) {
+        fileEl.classList.add('active');
+        fileEl.scrollIntoView({ block: 'center', inline: 'nearest' });
+        break;
+      }
+    }
+  });
+}
 
-  for (const node of nodes) {
+function observeShadowElement(hostSelector, elementId, callback) {
+  const host = document.querySelector(hostSelector);
+  if (!host?.shadowRoot) return;
+
+  const shadow = host.shadowRoot;
+  const existing = shadow.getElementById(elementId);
+  
+  if (existing) {
+    callback(existing);
+    return;
+  }
+
+  const observer = new MutationObserver(() => {
+    const el = shadow.getElementById(elementId);
+    if (el) {
+      observer.disconnect();
+      callback(el);
+    }
+  });
+
+  observer.observe(shadow, { childList: true, subtree: true });
+}
+
+// ========================= GIT OPERATIONS =========================
+
+class GitDiffManager {
+  static buildDiffMap(diffs, treeRoot = CONFIG.treeRoot) {
+    const map = {};
+    
+    for (const diff of diffs) {
+      const keyOld = diff.old_path?.startsWith(treeRoot) 
+        ? diff.old_path.slice(treeRoot.length) 
+        : diff.old_path;
+      const keyNew = diff.new_path?.startsWith(treeRoot) 
+        ? diff.new_path.slice(treeRoot.length) 
+        : diff.new_path;
+
+      if (diff.status === GIT_STATUS.RENAMED) {
+        if (keyOld) map[keyOld] = GIT_STATUS.DELETED;
+        if (keyNew) map[keyNew] = GIT_STATUS.ADDED;
+      } else {
+        const key = keyNew || keyOld;
+        if (key) map[key] = diff.status;
+      }
+    }
+    
+    return map;
+  }
+
+  static computeChangedFolders(nodes, diffMap) {
+    const changedFolders = new Set();
+    const isChangedFile = (path) => [GIT_STATUS.ADDED, GIT_STATUS.DELETED, GIT_STATUS.MODIFIED].includes(diffMap[path]);
+
+    function dfs(node) {
+      if (node.type === 'file') {
+        return isChangedFile(node.path);
+      }
+      
+      let subtreeHasChange = false;
+      for (const child of (node.children || [])) {
+        if (dfs(child)) subtreeHasChange = true;
+      }
+      
+      if (subtreeHasChange) changedFolders.add(node.path);
+      return subtreeHasChange || isChangedFile(node.path);
+    }
+
+    for (const node of nodes) dfs(node);
+    return changedFolders;
+  }
+
+  static applyDiffStatus(element, status) {
+    element.classList.remove("diff-added", "diff-deleted", "diff-modified");
+    
+    switch (status) {
+      case GIT_STATUS.ADDED:
+        element.classList.add("diff-added");
+        break;
+      case GIT_STATUS.DELETED:
+        element.classList.add("diff-deleted");
+        break;
+      case GIT_STATUS.MODIFIED:
+        element.classList.add("diff-modified");
+        break;
+    }
+  }
+}
+
+// ========================= TREE RENDERING =========================
+
+class TreeRenderer {
+  static setFolderIcon(icon, isOpen, gitDiffActive, status) {
+    if (gitDiffActive) {
+      switch (status) {
+        case GIT_STATUS.ADDED:
+          icon.innerHTML = SVG_ICONS.git.added;
+          return;
+        case GIT_STATUS.DELETED:
+          icon.innerHTML = SVG_ICONS.git.deleted;
+          return;
+        case GIT_STATUS.MODIFIED:
+          icon.innerHTML = SVG_ICONS.git.modified;
+          return;
+      }
+    }
+    
+    icon.innerHTML = isOpen ? SVG_ICONS.openFolder : SVG_ICONS.closedFolder;
+  }
+
+  static createFolderElement(node, gitDiffActive, diffMap, changedFolders) {
     const li = document.createElement('li');
     const title = document.createElement('span');
-    title.textContent = node.name.endsWith('.md') ? node.name.replace(/\.md$/, '') : node.name;
-    title.title = node.path;
-    title.className = node.type;
-
     const icon = document.createElement('span');
-    icon.classList.add('icon-margin'); // consistent spacing
+    const textSpan = document.createElement('span');
 
-    if (node.type === 'folder') {
-      if (node.name.startsWith('.') || node.name.startsWith('_')) continue;
-      icon.innerHTML = closedFolderSVG; // default closed
-      title.prepend(icon);
-    } else if (node.type === 'file') {
-      icon.innerHTML = spacerSVG; // keeps text aligned
-      title.prepend(icon);
+    icon.classList.add('icon-margin');
+    textSpan.classList.add('folder-text');
+    textSpan.textContent = node.name.endsWith('.md') ? node.name.replace(/\.md$/, '') : node.name;
+
+    title.className = 'folder';
+    title.title = node.path;
+    title.appendChild(icon);
+    title.appendChild(textSpan);
+
+    if (gitDiffActive && changedFolders.has(node.path)) {
+      textSpan.classList.add('changed-path');
     }
 
-      title.onclick = async e => {
-      e.stopPropagation();
-      clearActiveStates();
-      title.classList.add('active');
+    if (gitDiffActive) {
+      GitDiffManager.applyDiffStatus(textSpan, diffMap[node.path]);
+    }
 
-      if (node.type === 'file') {
-        const newPath = normalizePath(node.path);
-        const currentPath = localStorage.getItem('currentPath');
+    return { li, title, icon, textSpan };
+  }
 
-        if (isAutosaveOn() && currentPath && currentPath !== newPath) {
-          await saveCurrentEditorContent();
+  static createFileElement(node, gitDiffActive, diffMap) {
+    const li = document.createElement('li');
+    const title = document.createElement('span');
+    const icon = document.createElement('span');
+
+    icon.classList.add('icon-margin');
+    icon.innerHTML = SVG_ICONS.spacer;
+
+    title.className = 'file';
+    title.title = node.path;
+    title.textContent = node.name.endsWith('.md') ? node.name.replace(/\.md$/, '') : node.name;
+    title.prepend(icon);
+
+    if (gitDiffActive) {
+      GitDiffManager.applyDiffStatus(title, diffMap[node.path]);
+      
+      observeShadowElement("#myst", "gitPanel", () => {
+        switch (diffMap[node.path]) {
+          case GIT_STATUS.ADDED:
+            icon.innerHTML = SVG_ICONS.git.added;
+            break;
+          case GIT_STATUS.DELETED:
+            icon.innerHTML = SVG_ICONS.git.deleted;
+            break;
+          case GIT_STATUS.MODIFIED:
+            icon.innerHTML = SVG_ICONS.git.modified;
+            break;
         }
-        setLastSavedTimestamp(null);
-
-        // updateGitPanel(newPath);
-        // setupGitDiffListeners();
-        loadFile(newPath);
-      } else {
-        activeFolderPath = node.path;
-        const subtreeContainer = li.querySelector('.subtree');
-        const isOpen = subtreeContainer.hasChildNodes();
-        if (isOpen) {
-          subtreeContainer.innerHTML = '';
-          icon.innerHTML = closedFolderSVG;
-          openFolders.delete(node.path);
-          localStorage.setItem('openFolders', JSON.stringify([...openFolders]));
-        } else if (node.children) {
-          renderTree(node.children, subtreeContainer);
-          icon.innerHTML = openFolderSVG;
-          openFolders.add(node.path);
-          localStorage.setItem('openFolders', JSON.stringify([...openFolders]));
-        }
-      }
-    };
-
-    const subtreeContainer = document.createElement('div');
-    subtreeContainer.className = 'subtree';
-    li.appendChild(title);
-    li.appendChild(subtreeContainer);
-    ul.appendChild(li);
-
-    if (node.type === 'folder' && openFolders.has(node.path)) {
-      renderTree(node.children || [], subtreeContainer);
-      icon.innerHTML = openFolderSVG;
+      });
     }
+
+    return { li, title, icon };
   }
 
-  parent.appendChild(ul);
-  parent.addEventListener('click', e => {
-    if (!e.target.closest('span.file') && !e.target.closest('span.folder')) {
-      clearActiveStates();
-      activeFolderPath = '';
-    }
-  });
-}
-
-
-// ----------------------- Move To Dialog ----------------------- //
-
-/* Opens the "Move To" dialog for relocating files or folders.
-Allows restructuring of the project’s file/folder hierarchy on a raw "doc" (markdown) folder.
-This structure doesn't reflect the final Sphinx navigation tree, because it's driven by "toctree" defined inside key markdown files.
-Read Sphinx docs here - https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#table-of-contents
- */
-function openMoveToDialog(itemPath) {
-  const modal = document.createElement("div");
-  modal.className = "move-modal";
-
-  modal.innerHTML = `
-    <h3>Select folder to move to</h3>
-    <div id="move-tree" class="move-tree"></div>
-    <div class="move-actions">
-      <button id="move-cancel">❌ Cancel</button>
-      <button id="move-ok">✅ OK</button>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  let selectedMovePath = "";
-
-  fetch("/api/tree").then(res => res.json()).then(data => {
-    const container = document.getElementById("move-tree");
-    const rootNode = {
-      type: "folder",
-      name: "root",
-      path: "",
-      children: data
-    };
-    renderMoveTree([rootNode], container);
-  });
-
-  function renderMoveTree(nodes, parent) {
-    const ul = document.createElement("ul");
-    for (const node of nodes) {
-      if (node.type !== "folder") continue;
-      const li = document.createElement("li");
-      const btn = document.createElement("div");
-      btn.textContent = "📁 " + node.name;
-      btn.className = "move-folder-btn";
-      btn.onclick = () => {
-        selectedMovePath = node.path.replace(/\\/g, "/");
-        document.querySelectorAll("#move-tree div").forEach(el => el.classList.remove("selected"));
-        btn.classList.add("selected");
-      };
-      li.appendChild(btn);
-      if (node.children) {
-        renderMoveTree(node.children, li);
-      }
-      ul.appendChild(li);
-    }
-    parent.appendChild(ul);
-  }
-
-  document.getElementById("move-ok").onclick = async () => {
-    if (selectedMovePath === null) {
-      alert("Select a file or folder to move.");
-      return;
-    }
-    const name = itemPath.replace(/\\/g, "/").split("/").pop();
-    const newPath = selectedMovePath ? `${selectedMovePath}/${name}` : name;
-    const res = await fetch("/api/rename", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ oldPath: itemPath, newPath }),
-    });
-    if (!res.ok) {
-      alert("Error while moving.");
-    } else {
-      if (currentPath === itemPath) {
-        localStorage.setItem('currentPath', newPath);
-        // currentPath = newPath;
-      }
-      fetchTree();
-    }
-    modal.remove();
-  };
-
-  document.getElementById("move-cancel").onclick = () => {
-    modal.remove();
-  };
-}
-
-// ----------------------- Toolbar Button Actions START ----------------------- //
-
-document.getElementById("move").onclick = () => {
-  const selectedEl = document.querySelector(".file.active, .folder.active");
-  if (!selectedEl) {
-    alert("Select a file or folder to move.");
-    return;
-  }
-  const path = selectedEl.title;
-  const name = path.split('/').pop();
-  if (bulletproof.includes(name)) {
-    alert(`Cannot move protected folder: ${name}`);
-    return;
-  }
-  openMoveToDialog(path);
-};
-
-document.getElementById("new-file").onclick = async () => {
-  const name = prompt('Enter new file name (without ".md")');
-  if (!name || name.trim() === '') return;
-  const fullName = name.endsWith('.md') ? name : `${name}.md`;
-  const path = activeFolderPath ? `${activeFolderPath}/${fullName}` : fullName;
-  fetch('/api/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, type: 'file' }),
-  }).then(() => {
-    fetchTree();
-    setTimeout(() => loadFile(normalizePath(path)), 500);
-  });
-};
-
-document.getElementById("new-folder").onclick = async () => {
-  const name = prompt('Enter new folder name (e.g.: newfolder)');
-  if (!name) return;
-  const path = activeFolderPath ? `${activeFolderPath}/${name}` : name;
-  fetch('/api/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, type: 'folder' }),
-  }).then(() => fetchTree());
-};
-
-document.getElementById("delete").onclick = async () => {
-  const selectedEl = document.querySelector(".file.active, .folder.active");
-  if (!selectedEl) {
-    alert("Select a file or folder to delete.");
-    return;
-  }
-  const path = selectedEl.title;
-  const name = path.split('/').pop();
-  if (bulletproof.includes(name)) {
-    alert(`Cannot delete protected folder: ${name}`);
-    return;
-  }
-  const isFolder = selectedEl.classList.contains("folder");
-  const confirmText = isFolder
-    ? `Are you sure you want to delete the folder "${path}" and all its contents?`
-    : `Are you sure you want to delete the file "${path}"?`;
-  if (!confirm(confirmText)) return;
-  try {
-    const res = await fetch('/api/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
-    });
-    if (!res.ok) {
-      const error = await res.text();
-      alert(`Error while deleting: ${error}`);
-      return;
-    }
+  static async handleFileClick(node) {
     clearActiveStates();
-    let currentPath = localStorage.getItem('currentPath');
-    if (currentPath) {
-      if (isFolder && currentPath.startsWith(path + '/')) {
-        localStorage.removeItem('currentPath');
-        localStorage.removeItem('lastOpened');
-        localStorage.removeItem('currentPath');
-        // currentPath = '';
-        const editor = document.getElementById("myst");
-        if (editor) editor.innerHTML = "";
-      } else if (!isFolder && currentPath === path) {
-        localStorage.removeItem('currentPath');
-        localStorage.removeItem('lastOpened');
-        localStorage.removeItem('currentPath');
-        // currentPath = '';
-        const editor = document.getElementById("myst");
-        if (editor) editor.innerHTML = "";
-      }
+    const title = event.target;
+    title.classList.add('active');
+
+    const newPath = normalizePath(node.path);
+    const currentPath = localStorage.getItem('currentPath');
+
+    if (isAutosaveEnabled() && currentPath && currentPath !== newPath) {
+      await saveCurrentEditorContent();
     }
-    fetchTree();
-  } catch (err) {
-    alert(`Error while deleting: ${err.message}`);
+    
+    setLastSavedTimestamp(null);
+    loadFile(newPath);
   }
-};
 
-document.getElementById("rename").onclick = async () => {
-  const selectedEl = document.querySelector(".file.active, .folder.active");
-  if (!selectedEl) {
-    alert("Select a file or folder to rename.");
-    return;
+  static handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, event) {
+    event.stopPropagation();
+
+    clearActiveStates();
+    const title = event.target;
+    title.classList.add('active');
+    
+    treeState.setActiveFolderPath(node.path);
+    const subtreeContainer = li.querySelector('.subtree');
+    const isOpen = subtreeContainer && subtreeContainer.childElementCount > 0;
+
+    if (event.ctrlKey) {
+      if (isOpen) {
+        TreeOperations.collapseAllSubfolders(li, node, gitDiffActive, diffMap, changedFolders);
+      } else if (node.children) {
+        TreeOperations.expandAllSubfolders(li, node, gitDiffActive, diffMap, changedFolders);
+        this.setFolderIcon(icon, true, gitDiffActive, diffMap[node.path]);
+      }
+      return;
+    }
+
+    if (isOpen) {
+      subtreeContainer.innerHTML = '';
+      this.setFolderIcon(icon, false, gitDiffActive, diffMap[node.path]);
+      treeState.removeOpenFolder(node.path);
+    } else if (node.children) {
+      this.renderTree(node.children, subtreeContainer, gitDiffActive, diffMap, changedFolders);
+      this.setFolderIcon(icon, true, gitDiffActive, diffMap[node.path]);
+      treeState.addOpenFolder(node.path);
+    }
   }
-  const path = selectedEl.title;
-  const name = path.split('/').pop();
-  if (bulletproof.includes(name)) {
-    alert(`Cannot rename protected folder: ${name}`);
-    return;
-  }
-  const oldPath = path.replace(/\\/g, "/");
-  const segments = oldPath.split("/");
-  const oldName = segments.pop();
-  const dirPath = segments.join("/");
 
-  const displayName = oldName.endsWith(".md") ? oldName.replace(/\.md$/, "") : oldName;
-  const inputName = prompt("Enter new name:", displayName);
-  if (!inputName || inputName.trim() === "" || inputName === displayName) return;
-  const newName = oldName.endsWith(".md") && !inputName.endsWith(".md")
-    ? `${inputName}.md` : inputName;
-  const newPath = dirPath ? `${dirPath}/${newName}` : newName;
-  const res = await fetch("/api/rename", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ oldPath, newPath }),
-  });
-  if (!res.ok) {
-    alert("Rename error.");
-    return;
-  }
-  if (currentPath === oldPath) {
-    // currentPath = newPath;
-    localStorage.setItem("currentPath", newPath);
-  }
-  fetchTree();
-};
+  static renderTree(nodes, parent, gitDiffActive = false, diffMap = {}, changedFolders = new Set()) {
+    parent.innerHTML = '';
+    const ul = document.createElement('ul');
 
-// ----------------------- Toolbar Button Actions END ----------------------- //
+    for (const node of nodes) {
+      if (node.type === 'folder' && CONFIG.ignoredFolders.includes(node.name)) {
+        continue;
+      }
 
-// ----------------------- Upload Modal Image START ------------------------- //
+      if (node.type === 'folder') {
+        if (!gitDiffActive && (node.name.startsWith('.') || node.name.startsWith('_'))) {
+          continue;
+        }
 
-//Creates the image upload modal DOM constructor to show it in a popup window.
-function createuploadImageModal() {
-  const modal = document.createElement("div");
-  modal.id = "upload-image-modal";
-  modal.className = "upload-modal hidden";
+        const { li, title, icon } = this.createFolderElement(node, gitDiffActive, diffMap, changedFolders);
+        
+        title.onclick = (e) => this.handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, e);
 
-  const content = document.createElement("div");
-  content.className = "upload-modal-content";
+        const subtreeContainer = document.createElement('div');
+        subtreeContainer.className = 'subtree';
+        li.appendChild(title);
+        li.appendChild(subtreeContainer);
+        ul.appendChild(li);
 
-  const closeBtn = document.createElement("div");
-  closeBtn.innerHTML = "&times;";
-  closeBtn.className = "upload-modal-close";
+        if (treeState.isOpen(node.path)) {
+          this.renderTree(node.children || [], subtreeContainer, gitDiffActive, diffMap, changedFolders);
+          this.setFolderIcon(icon, true, gitDiffActive, diffMap[node.path]);
+        } else {
+          this.setFolderIcon(icon, false, gitDiffActive, diffMap[node.path]);
+        }
+      } else if (node.type === 'file') {
+        const { li, title } = this.createFileElement(node, gitDiffActive, diffMap);
+        
+        title.onclick = async (e) => {
+          e.stopPropagation();
+          await this.handleFileClick(node);
+        };
 
-  const title = document.createElement("h3");
-  title.textContent = "Name Image";
-  title.className = "upload-modal-title";
-
-  const input = document.createElement("input");
-  input.type = "text";
-  input.className = "upload-modal-input";
-
-  const actions = document.createElement("div");
-  actions.className = "upload-modal-actions";
-
-  const nameBtn = document.createElement("button");
-  nameBtn.textContent = "Name";
-  nameBtn.className = "btn-green";
-
-  const incrementBtn = document.createElement("button");
-  incrementBtn.textContent = "Increment";
-  incrementBtn.className = "btn-blue hidden";
-
-  const overwriteBtn = document.createElement("button");
-  overwriteBtn.textContent = "Overwrite";
-  overwriteBtn.className = "btn-orange hidden";
-
-  actions.appendChild(nameBtn);
-  actions.appendChild(overwriteBtn);
-  actions.appendChild(incrementBtn);
-
-  content.appendChild(closeBtn);
-  content.appendChild(title);
-  content.appendChild(input);
-  content.appendChild(actions);
-  modal.appendChild(content);
-  document.body.appendChild(modal);
-
-  return { modal, input, nameBtn, incrementBtn, overwriteBtn, closeBtn, title };
-}
-
-const uploadImageModal = createuploadImageModal();
-
-/* Shows the upload modal, handles name collision checks, and resolves with upload action.
-Ensures user-controlled image naming before upload. */
-function showUploadImageModal(file, currentPath) {
-  return new Promise((resolve) => {
-    const dotIndex = file.name.lastIndexOf(".");
-    const baseName = dotIndex > -1 ? file.name.substring(0, dotIndex) : file.name;
-    const extension = dotIndex > -1 ? file.name.substring(dotIndex) : "";
-
-    uploadImageModal.input.value = baseName;
-    uploadImageModal.title.textContent = "Name Image";
-    uploadImageModal.nameBtn.classList.remove("hidden");
-    uploadImageModal.overwriteBtn.classList.add("hidden");
-    uploadImageModal.incrementBtn.classList.add("hidden");
-    uploadImageModal.modal.classList.remove("hidden");
-    uploadImageModal.input.focus();
-
-    async function checkCollision(actionType) {
-      const newName = uploadImageModal.input.value.trim() + extension;
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("path", currentPath);
-      formData.append("action", actionType);
-
-      const res = await fetch("/api/upload_image", { method: "POST", body: formData });
-      const data = await res.json();
-
-      if (res.status === 409 && data.collision) {
-        uploadImageModal.title.textContent = `Image "${uploadImageModal.input.value.trim()}" already exists`;
-        uploadImageModal.nameBtn.classList.add("hidden");
-        uploadImageModal.overwriteBtn.classList.remove("hidden");
-        uploadImageModal.incrementBtn.classList.remove("hidden");
-      } else if (res.ok) {
-        uploadImageModal.modal.classList.add("hidden");
-        resolve({ action: actionType, savedPath: data.newPath });
-      } else {
-        alert(data.error || "Upload failed");
+        li.appendChild(title);
+        ul.appendChild(li);
       }
     }
 
-    uploadImageModal.nameBtn.onclick = () => checkCollision("check");
-    uploadImageModal.incrementBtn.onclick = () => checkCollision("increment");
-    uploadImageModal.overwriteBtn.onclick = () => checkCollision("overwrite");
-    uploadImageModal.closeBtn.onclick = () => {
-      uploadImageModal.modal.classList.add("hidden");
-      resolve(null);
-    };
+    parent.appendChild(ul);
+    restoreActiveFileAfterRender();
 
-    document.onkeydown = (e) => {
-      if (e.key === "Enter") uploadImageModal.nameBtn.click();
-      else if (e.key === "Escape") uploadImageModal.closeBtn.click();
-    };
-  });
+    parent.addEventListener('click', (e) => {
+      if (!e.target.closest('span.file') && !e.target.closest('span.folder')) {
+        clearActiveStates();
+        treeState.setActiveFolderPath('');
+      }
+    });
+  }
 }
 
-document.getElementById("upload-image").onclick = () => {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = "image/*";
-  input.onchange = async () => {
-    const file = input.files[0];
-    if (!file) return;
+// ========================= TREE OPERATIONS =========================
 
-    const mdPath = localStorage.getItem("currentPath") || "";
-    const segments = mdPath.split("/");
-    segments.pop();
-
-    let imagePath = segments.join("/");
-    if (imagePath.startsWith("/")) imagePath = imagePath.slice(1);
-
-    const result = await showUploadImageModal(file, imagePath);
-    if (result && result.savedPath) {
-      insertImageMarkdown(result.savedPath);
+class TreeOperations {
+  static markAllOpenFolders(node, add = true) {
+    function walk(n) {
+      if (n.type === 'folder') {
+        if (add) {
+          treeState.addOpenFolder(n.path);
+        } else {
+          treeState.removeOpenFolder(n.path);
+        }
+        (n.children || []).forEach(walk);
+      }
     }
-  };
-  input.click();
-};
+    walk(node);
+  }
 
-// Initial load
-fetchTree();
+  static expandAllSubfolders(li, node, gitDiffActive, diffMap, changedFolders) {
+    const container = li.querySelector('.subtree');
+    container.innerHTML = '';
+
+    TreeRenderer.renderTree(node.children || [], container, gitDiffActive, diffMap, changedFolders);
+
+    const childLis = Array.from(container.querySelectorAll(':scope > ul > li'));
+
+    (node.children || []).forEach((childNode, idx) => {
+      const childLi = childLis[idx];
+      if (!childLi) return;
+
+      const childIcon = childLi.querySelector('.icon-margin');
+      if (childNode.type === 'folder' && childIcon) {
+        TreeRenderer.setFolderIcon(childIcon, true, gitDiffActive, diffMap[childNode.path]);
+        treeState.addOpenFolder(childNode.path);
+        this.expandAllSubfolders(childLi, childNode, gitDiffActive, diffMap, changedFolders);
+      }
+    });
+
+    treeState.addOpenFolder(node.path);
+  }
+
+  static collapseAllSubfolders(li, node) {
+    const container = li.querySelector('.subtree');
+    container.innerHTML = '';
+
+    this.markAllOpenFolders(node, false);
+
+    const icon = li.querySelector('.icon-margin');
+    if (icon) {
+      TreeRenderer.setFolderIcon(icon, false, false, null);
+    }
+  }
+}
+
+// ========================= API LAYER =========================
+
+class TreeAPI {
+  static async getHeadCommit() {
+    const response = await fetch("/api/git-head");
+    const { head } = await response.json();
+    return head;
+  }
+
+  static async getTree(commit = null) {
+    const url = commit ? `/api/tree?commit=${encodeURIComponent(commit)}` : '/api/tree';
+    const response = await fetch(url);
+    return response.json();
+  }
+
+  static async getDiff(type, params) {
+    let url;
+    switch (type) {
+      case 'working-tree':
+        url = `/api/git-diff-working-tree?commit=${encodeURIComponent(params.commit)}`;
+        break;
+      case 'tree':
+        url = `/api/git-diff-tree?commit_left=${params.left}&commit_right=${params.right}`;
+        break;
+      default:
+        throw new Error(`Unknown diff type: ${type}`);
+    }
+    
+    const response = await fetch(url);
+    return response.json();
+  }
+
+  static async waitForDropdowns() {
+    const host = document.querySelector('#myst');
+    if (!host) return null;
+
+    let attempts = 0;
+    while (attempts < CONFIG.maxDropdownWaitAttempts) {
+      const left = host.shadowRoot?.getElementById("commitDropdownLeft");
+      const right = host.shadowRoot?.getElementById("commitDropdownRight");
+      
+      if (left && right && left.options.length > 0 && right.options.length > 0) {
+        return { left, right };
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, CONFIG.dropdownWaitInterval));
+      attempts++;
+    }
+    
+    console.warn("Commit dropdowns not ready in time");
+    return null;
+  }
+}
+
+// ========================= MAIN FUNCTIONS =========================
+
+export async function fetchLocalTree(loadfile=true) {
+  console.log("tree fetched");
+  const commitHash = await TreeAPI.getHeadCommit();
+  const baseTree = await TreeAPI.getTree();
+  const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
+
+  const rawDiffMap = GitDiffManager.buildDiffMap(diffs);
+  
+  // Force all changes to "M" (as in original code)
+  const diffMap = {};
+  for (const key in rawDiffMap) {
+    diffMap[key] = GIT_STATUS.MODIFIED;
+  }
+
+  const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
+  TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
+  console.log(diffMap);
+  console.log(baseTree);
+  console.log(changedFolders);
+
+  
+  const currentPath = localStorage.getItem('currentPath');
+  if (loadfile){
+    loadFile(normalizePath(currentPath));
+  }
+  restoreActiveFile(normalizePath(currentPath));
+}
+
+export async function fetchGitTree(gitCommit) {
+  const dropdowns = await TreeAPI.waitForDropdowns();
+  if (!dropdowns) return;
+
+  if (gitCommit) {
+    // Commit vs commit comparison
+    const leftCommit = dropdowns.left.value;
+    const rightCommit = dropdowns.right.value;
+    
+    const baseTree = await TreeAPI.getTree(rightCommit);
+    let diffMap = {};
+    
+    if (leftCommit !== rightCommit) {
+      const diffs = await TreeAPI.getDiff('tree', { left: rightCommit, right: leftCommit });
+      diffMap = GitDiffManager.buildDiffMap(diffs);
+    }
+    
+    const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
+    TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
+  } else {
+    // Working tree vs HEAD comparison
+    const commitHash = await TreeAPI.getHeadCommit();
+    const baseTree = await TreeAPI.getTree();
+    const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
+    const diffMap = GitDiffManager.buildDiffMap(diffs);
+    const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
+    
+    TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
+  }
+}
+
+// ========================= EXPORTS =========================
+
+export const ignoredFolders = CONFIG.ignoredFolders;
+export let activeFolderPath = treeState.getActiveFolderPath();
+
+// Initialize
+fetchLocalTree(true);

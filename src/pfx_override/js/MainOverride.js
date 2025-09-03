@@ -1,6 +1,7 @@
 import '../css/PFXStyleOverride.css';
 
 import { setupGitPanel } from "./gitDiffUI.js";
+import "./leftPanelButtons.js";
 import "./leftPanelFileTree.js";
 import "./editorContextMenu.js";
 
@@ -94,15 +95,17 @@ export async function loadFile(filename) {
       syncScroll: true,
     }, newContainer);
 
+    // If git diff buton is pressed, launch setupGitPanel with top menu that allow to select branch and commit
     window._mystEditor = mystEditorInstance;
     mystEditorInstance.options.mode.subscribe((newMode) => {
-      console.log("Mode changed:", newMode);
+      // console.log("Mode changed:", newMode);
       if (newMode === "Gitdiff") {
         setupGitPanel();
       }
     });
     const view = await waitForEditorReady();
     bindFocusBlurHandlers(view);
+    
   });
 
   localStorage.setItem('lastOpened', filename);
@@ -120,12 +123,15 @@ export function insertImageMarkdown(path) {
     return;
   }
 
-  const state = view.v;
-  const start = view.v.contentDOM.editContext.selectionStart;
-  const end = view.v.contentDOM.editContext.selectionEnd;
-  view.v.dispatch({
-    changes: { from: start, to: end, insert: imgSyntax },
-    selection: { anchor: start + imgSyntax.length }
+  // const state = view.v;
+  console.log(view);
+  const { state } = view.v;
+  const { from, to } = state.selection.main; // selection range
+  // const start = view.v.state.selection;
+  // const end = view.v.contentDOM.editContext.selectionEnd;
+   view.v.dispatch({
+    changes: { from, to, insert: imgSyntax },
+    selection: { anchor: from + imgSyntax.length } // cursor after insert
   });
 
   view.v.focus();

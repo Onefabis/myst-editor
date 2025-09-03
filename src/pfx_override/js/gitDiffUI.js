@@ -1,128 +1,160 @@
-/* Git Commit UI Logic
-   - Handles dual branch/commit selectors (left & right halves)
-   - Fetches branch/commit info from backend
-   - Updates commit dropdowns when branch changes
-   - Logs commit details when commit changes
-*/
-function updateCommits(selectedBranch, commitDropdown, gitData) {
+import { fetchGitTree } from "./leftPanelFileTree.js";
+
+// Update commit list for a branch
+export function updateCommits(selectedBranch, commitDropdown, gitData, savedCommit = null, suppressEvent = false) {
   if (!selectedBranch || !commitDropdown || !gitData) return;
 
   try {
-    // Get commits for the selected branch
     const commitsForBranch = gitData.commits[selectedBranch] || [];
-
-    // Map commits to { value, label, message } for dropdown
+    const total = commitsForBranch.length;
     const commitItems = commitsForBranch.map(c => ({
-      value: c.hash || c.id || c, // adjust according to your backend
-      label: (c.shortMessage || c.message || c).split("\n")[0],
-      message: c.message || c
+      value: c.hash,
+      label: (c.summary || c.message || c).split("\n")[0],
+      message: c.message,
+      index: total - c.index + 1,
+      file_exists: c.file_exists,
     }));
 
-    // Populate commit dropdown
-    populateDropdown(commitDropdown, commitItems);
+    const headCommit = gitData.head_commit;
+    populateDropdown(commitDropdown, commitItems, null, headCommit);
 
-    // Ensure a default selection exists
+    if (savedCommit) {
+      const opt = [...commitDropdown.options].find(o => o.value === savedCommit);
+      if (opt) commitDropdown.value = savedCommit;
+    }
+
     if (commitDropdown.options.length) {
-      commitDropdown.selectedIndex = 0;
       setupCommitChangeHandler(commitDropdown);
-      commitDropdown.dispatchEvent(new Event('change'));
+      if (!suppressEvent) {
+        commitDropdown.dispatchEvent(new Event("change"));
+      }
     }
   } catch (err) {
     console.error("Failed to update commits:", err);
-    commitDropdown.innerHTML = ""; // clear if error
+    commitDropdown.innerHTML = "";
   }
 }
 
+// Fetch Git data from backend
 async function fetchGitData() {
-  console.log("fetching /search-file...");
-  const response = await fetch("/search-file", {
+  const currentPath = localStorage.getItem('currentPath') || "";
+  const res = await fetch("/search-file", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename: "" })
+    body: JSON.stringify({ filename: currentPath })
   });
-  console.log("response status:", response.status);
-  const json = await response.json();
-  console.log("response json:", json);
-  return json;
+  return await res.json();
 }
 
-function populateDropdown(select, items) {
+// Populate a dropdown
+function populateDropdown(select, items, activeItem = null, headItem = null) {
   select.innerHTML = "";
-  items.forEach(item => {
+  let reordered = [...items];
+
+  if (headItem) {
+    const idx = reordered.findIndex(i => i.value === headItem);
+    if (idx >= 0) reordered.unshift(reordered.splice(idx, 1)[0]);
+  }
+  if (activeItem) {
+    const idx = reordered.findIndex(i => i.value === activeItem);
+    if (idx >= 0) reordered.unshift(reordered.splice(idx, 1)[0]);
+  }
+
+  reordered.forEach(item => {
     const opt = document.createElement("option");
     opt.value = item.value || item;
-    opt.innerText = item.label || item;
+    opt.innerText = item.index ? `[${item.index}${item.file_exists === false ? "*" : ""}] ${item.label || item}` : item.label || item;
     if (item.message) opt.dataset.message = item.message;
     select.appendChild(opt);
   });
 }
 
+// Git commit dropdown change handler
 function setupCommitChangeHandler(commitDropdown) {
-  commitDropdown.onchange = () => {
+  commitDropdown.addEventListener("change", () => {
     const selected = commitDropdown.options[commitDropdown.selectedIndex];
     if (!selected) return;
-    const message = selected.dataset.message || "";
-    const body = message.split("\n").slice(1).join("\n").trim();
-    console.log("Selected commit:", body || "(no description)");
-  };
-}
-
-function waitForShadowElement(hostSelector, id, timeout = 5000) {
-  return new Promise((resolve, reject) => {
-    const host = document.querySelector(hostSelector);
-    if (!host) return reject(new Error("Shadow host not found"));
-
-    const check = () => {
-      const el = host.shadowRoot?.getElementById(id);
-      if (el) return resolve(el);
-      return false;
+    const mode = localStorage.getItem("gitLeftToggle") || true;
+    if (mode){
+      if (window.reloadGitdiff) window.reloadGitdiff(mode);
     }
-
-    if (check()) return;
-
-    const observer = new MutationObserver(() => {
-      if (check()) observer.disconnect();
-    });
-
-    observer.observe(host.shadowRoot || host, { childList: true, subtree: true });
-
-    setTimeout(() => {
-      observer.disconnect();
-      reject(new Error(`Element #${id} not found in shadow root within ${timeout}ms`));
-    }, timeout);
+    applyGitToggle();
   });
 }
 
-export async function setupGitPanel() {
+// Wait for shadow DOM element
+function waitForShadowElement(hostSelector, id, timeout = 5000) {
+  return new Promise(resolve => {
+    const host = document.querySelector(hostSelector);
+    if (!host) return resolve(null);
 
+    const check = () => host.shadowRoot?.getElementById(id) || null;
+    const el = check();
+    if (el) return resolve(el);
+
+    const observer = new MutationObserver(() => {
+      const found = check();
+      if (found) {
+        observer.disconnect();
+        resolve(found);
+      }
+    });
+    observer.observe(host.shadowRoot || host, { childList: true, subtree: true });
+
+    setTimeout(() => { observer.disconnect(); resolve(null); }, timeout);
+  });
+}
+
+// Apply gitLeftToggle
+function applyGitToggle() {
+  const toggle = localStorage.getItem("gitLeftToggle");
+  fetchGitTree(toggle === "true");
+}
+
+// Main setup
+export async function setupGitPanel() {
   const branchLeft = await waitForShadowElement('#myst', 'branchDropdownLeft');
   const commitLeft = await waitForShadowElement('#myst', 'commitDropdownLeft');
   const branchRight = await waitForShadowElement('#myst', 'branchDropdownRight');
   const commitRight = await waitForShadowElement('#myst', 'commitDropdownRight');
 
-  if (!branchLeft) {
-    console.error("branchDropdownLeft not found after waiting!");
+  if (!branchLeft || !branchRight) {
+    console.error("Git branch dropdowns not found!");
     return;
   }
 
+  // Persist dropdown changes
+  const persist = (id, el) => el.addEventListener("change", () => localStorage.setItem(id, el.value));
+  persist("branchDropdownLeft", branchLeft);
+  persist("commitDropdownLeft", commitLeft);
+  persist("branchDropdownRight", branchRight);
+  persist("commitDropdownRight", commitRight);
+
   const data = await fetchGitData();
-  // console.log("Git data:", data);
 
-  populateDropdown(branchLeft, data.branches.map(b => ({ value: b, label: b })));
-  populateDropdown(branchRight, data.branches.map(b => ({ value: b, label: b })));
+  // Populate branches
+  const branchItems = data.branches.map((b,i) => ({ value:b, label:b, index:data.branches.length-i }));
+  populateDropdown(branchLeft, branchItems, data.active_branch);
+  populateDropdown(branchRight, branchItems, data.active_branch);
 
-  // Ensure a default selection exists
-  if (branchLeft.options.length) branchLeft.selectedIndex = 0;
-  if (branchRight.options.length) branchRight.selectedIndex = 0;
+  // Restore saved branch & commit
+  const savedBranchLeft  = localStorage.getItem("branchDropdownLeft");
+  const savedBranchRight = localStorage.getItem("branchDropdownRight");
+  const savedCommitLeft  = localStorage.getItem("commitDropdownLeft");
+  const savedCommitRight = localStorage.getItem("commitDropdownRight");
 
-  if (branchLeft.value) updateCommits(branchLeft.value, commitLeft, data);
-  if (branchRight.value) updateCommits(branchRight.value, commitRight, data);
+  if (savedBranchLeft)  branchLeft.value  = savedBranchLeft;
+  if (savedBranchRight) branchRight.value = savedBranchRight;
 
-  branchLeft.onchange = () => updateCommits(branchLeft.value, commitLeft, data);
+  updateCommits(branchLeft.value, commitLeft, data, savedCommitLeft, true);
+  updateCommits(branchRight.value, commitRight, data, savedCommitRight, true);
+
+  // Branch change events
+  branchLeft.onchange  = () => updateCommits(branchLeft.value, commitLeft, data);
   branchRight.onchange = () => updateCommits(branchRight.value, commitRight, data);
 
-  // Reload GitDiff extension when commit changes 
-  if (commitLeft) { commitLeft.addEventListener("change", () => { if (window.reloadGitdiff) window.reloadGitdiff(); }); }
-  if (commitRight) { commitRight.addEventListener("change", () => { if (window.reloadGitdiff) window.reloadGitdiff(); }); }
-
+  // Only trigger once after restoration
+  const mode = localStorage.getItem("gitLeftToggle") || true;
+  if (window.reloadGitdiff) window.reloadGitdiff(mode ? "commits" : "local" );
+  applyGitToggle();
 }

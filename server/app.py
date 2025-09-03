@@ -1,14 +1,12 @@
 import os
 import re
 import shutil
-from fastapi import FastAPI, File, Form, UploadFile, Request
+from fastapi import FastAPI, File, Form, UploadFile, Request, Query
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List
-import time
-
 from git import Repo
 
 # ---------------------- CONFIG ----------------------
@@ -26,15 +24,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ---------------------- MODELS ----------------------
 class PathModel(BaseModel):
     path: str
     type: Optional[str] = None
 
+
 class RenameModel(BaseModel):
     oldPath: str
     newPath: str
     action: str = "check"  # "check" | "overwrite" | "increment"
+
 
 # ---------------------- HELPERS ----------------------
 def normalize_relative_path(path: str) -> str:
@@ -51,6 +52,7 @@ def normalize_relative_path(path: str) -> str:
         raise ValueError("Invalid path: directory traversal detected")
     return path
 
+
 def safe_join(base: str, *paths) -> str:
     """Join paths safely to prevent directory traversal."""
     paths = [normalize_relative_path(p) for p in paths]
@@ -58,6 +60,7 @@ def safe_join(base: str, *paths) -> str:
     if not final_path.startswith(base):
         raise ValueError("Unsafe path")
     return final_path
+
 
 def scan_dir(path: str, base: str, ext_filter: Optional[List[str]] = None):
     entries = []
@@ -75,10 +78,12 @@ def scan_dir(path: str, base: str, ext_filter: Optional[List[str]] = None):
             entries.append({"type": "file", "name": entry, "path": rel_path})
     return entries
 
+
 def sanitize_filename(filename):
     name, ext = os.path.splitext(filename)
     name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name)  # Replace unsafe chars
     return f"{name}{ext}"
+
 
 def increment_filename(path, filename):
     name, ext = os.path.splitext(filename)
@@ -97,9 +102,11 @@ def increment_filename(path, filename):
 
 # ---------------------- ROUTES ----------------------
 
+
 @app.get("/api/tree")
 async def get_file_tree():
     return scan_dir(BASE_DIR, BASE_DIR, [".md"])
+
 
 @app.get("/api/file")
 async def get_file(path: str):
@@ -116,6 +123,7 @@ async def get_file(path: str):
     except ValueError:
         return JSONResponse({"error": "Invalid path"}, status_code=400)
 
+
 @app.get("/api/file/meta")
 async def get_file_meta(path: str):
     try:
@@ -126,6 +134,7 @@ async def get_file_meta(path: str):
         return JSONResponse({"error": "File not found"}, status_code=404)
     except ValueError:
         return JSONResponse({"error": "Invalid path"}, status_code=400)
+
 
 @app.post("/api/file")
 async def save_file(path: str, request: Request):
@@ -144,6 +153,7 @@ async def save_file(path: str, request: Request):
         "last_modified": int(mtime * 1000)
     }
 
+
 @app.get("/api/images_in_folder")
 async def images_in_folder(folder: str = ""):
     try:
@@ -156,6 +166,7 @@ async def images_in_folder(folder: str = ""):
         return []
     allowed_exts = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg"}
     return scan_dir(folder_path, static_dir, allowed_exts)
+
 
 @app.post("/api/create")
 async def create_file_or_folder(data: PathModel):
@@ -170,6 +181,7 @@ async def create_file_or_folder(data: PathModel):
         open(full_path, "w", encoding="utf-8").close()
     return {"status": "created", "path": data.path}
 
+
 @app.post("/api/delete")
 async def delete_path(data: PathModel):
     try:
@@ -183,6 +195,7 @@ async def delete_path(data: PathModel):
     else:
         shutil.rmtree(full_path)
     return {"status": "deleted", "path": data.path}
+
 
 # ------------------------------ COLLISION HANDLER ------------------------------
 def handle_collision(base_dir, old_path=None, file: UploadFile = None,
@@ -245,6 +258,7 @@ def handle_collision(base_dir, old_path=None, file: UploadFile = None,
         traceback.print_exc()
         return JSONResponse({"error": f"Internal Server Error: {str(e)}"}, status_code=500)
 
+
 @app.post("/api/rename")
 async def rename_path(data: RenameModel):
     try:
@@ -261,6 +275,7 @@ async def rename_path(data: RenameModel):
         )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
 
 @app.post("/api/upload_image")
 async def upload_image(
@@ -293,6 +308,7 @@ async def get_image_tree():
     static_root = os.path.join(BASE_DIR, "_static")
     return scan_dir(static_root, static_root)
 
+
 @app.post("/save")
 async def save_uploaded_file(file: UploadFile = File(...), filename: str = ""):
     if not filename:
@@ -306,6 +322,7 @@ async def save_uploaded_file(file: UploadFile = File(...), filename: str = ""):
     with open(save_path, "wb") as f:
         f.write(await file.read())
     return {"success": True, "path": save_path}
+
 
 # ---------------------- STATIC FILE ROUTES ----------------------
 @app.get("/_static/{subpath:path}")
@@ -344,8 +361,10 @@ if not os.path.exists(os.path.join(repo_dir, ".git")):
 
 repo = Repo(repo_dir)
 
+
 class FileRequest(BaseModel):
     filename: str
+
 
 class CompareRequest(BaseModel):
     branch: str
@@ -353,42 +372,149 @@ class CompareRequest(BaseModel):
     filename: str
     current_text: str
 
+
 @app.post("/search-file")
 async def search_file(req: FileRequest):
     branches = []
     commits = {}
+    target_file = f"{DOCS_DIR}/{req.filename.replace('\\', '/')}" if req.filename else None
 
     for branch in repo.branches:
         branch_name = branch.name
         branches.append(branch_name)
-
         commits[branch_name] = []
-        for c in repo.iter_commits(branch_name):
+
+        for idx, c in enumerate(repo.iter_commits(branch_name)):
+            file_exists = True
+            if target_file:
+                try:
+                    _ = c.tree / target_file
+                except KeyError:
+                    file_exists = False
+
             commits[branch_name].append({
                 "hash": c.hexsha,
                 "summary": c.summary,
-                "message": c.message
+                "message": c.message,
+                "index": idx + 1,  # chronological index (newest = 1)
+                "file_exists": file_exists
             })
+
+    active_branch = repo.active_branch.name if not repo.head.is_detached else None
+    head_commit = repo.head.commit.hexsha
 
     return {
         "branches": sorted(set(branches)),
-        "commits": commits
+        "commits": commits,
+        "active_branch": active_branch,
+        "head_commit": head_commit,
     }
     
 
+class DiffRequest(BaseModel):
+    filename: str
+    branch_left: str
+    commit_left: str
+    branch_right: str
+    commit_right: str
+
+    
 @app.post("/get-file-from-git")
-async def get_file_from_git(req: CompareRequest):
+async def get_file_from_git(req: DiffRequest):
     target_file = f"{DOCS_DIR}/{req.filename.replace('\\', '/')}"
+    
+    def read_file_from_commit(commit_hash: str) -> str:
+        try:
+            blob = repo.commit(commit_hash).tree / target_file
+            return blob.data_stream.read().decode("utf-8").replace("\r", "")
+        except KeyError:
+            return f"// File not found in commit {commit_hash}"
+        except Exception as e:
+            return f"// Error reading file: {e}"
 
+    left_content = read_file_from_commit(req.commit_left)
+    right_content = read_file_from_commit(req.commit_right)
+
+    return {
+        "left_content": left_content,
+        "right_content": right_content,
+    }
+
+
+@app.get("/api/git-diff-tree")
+async def git_diff_tree_get(commit_left: str = Query(...), commit_right: str = Query(...)):
+    commit_left_obj = repo.commit(commit_left)
+    commit_right_obj = repo.commit(commit_right)
+
+    diffs = commit_left_obj.diff(commit_right_obj, paths=DOCS_DIR)
+
+    result = []
+    for d in diffs:
+        status = "M"
+        if d.new_file:
+            status = "A"
+        elif d.deleted_file:
+            status = "D"
+        elif d.renamed:
+            status = "R"
+        result.append({
+            "old_path": d.rename_from if d.renamed else d.a_path,
+            "new_path": d.rename_to if d.renamed else d.b_path,
+            "status": status,
+        })
+    return result
+
+
+@app.get("/api/git-head")
+async def git_head():
+    """
+    Return the HEAD commit hash of the current branch.
+    """
     try:
-        blob = repo.commit(req.commit).tree / target_file
-        content = blob.data_stream.read().decode("utf-8").replace('\r', '')
-        return {"content": content}
-
-    except KeyError:
-        return JSONResponse(status_code=404, content={"error": "File not found in commit"})
+        return {"head": repo.head.commit.hexsha}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return {"error": str(e)}
+
+
+class CompareWorkingRequest(BaseModel):
+    commit: str
+    filename: str
+
+
+@app.get("/api/git-diff-working-tree")
+async def git_diff_working_tree(commit: str = Query(...)):
+    """
+    Compare the working tree against a given commit.
+    Returns a list of changed files with statuses (M/A/D/R).
+    """
+    try:
+        # equivalent to: git diff --name-status <commit>
+        diff_output = repo.git.diff("--name-status", commit, DOCS_DIR)
+        result = []
+        for line in diff_output.splitlines():
+            parts = line.split("\t")
+            if not parts:
+                continue
+            status = parts[0]
+            if status.startswith("R"):
+                # Renamed: "R100 old new"
+                _, old, new = parts
+                result.append({
+                    "old_path": old,
+                    "new_path": new,
+                    "status": "R"
+                })
+            else:
+                path = parts[1]
+                result.append({
+                    "old_path": path if status != "A" else None,
+                    "new_path": path if status != "D" else None,
+                    "status": status
+                })
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
 
 # Mount frontend
 app.mount("/", StaticFiles(directory=STATIC_FOLDER, html=True), name="frontend")

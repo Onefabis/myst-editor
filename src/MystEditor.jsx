@@ -1,5 +1,5 @@
 import { render } from "preact";
-import { useEffect, useRef, useMemo, useContext } from "preact/hooks";
+import { useEffect, useRef, useMemo, useContext, useState } from "preact/hooks";
 import { StyleSheetManager, styled } from "styled-components";
 import CodeMirror from "./components/CodeMirror";
 import Preview, { PreviewFocusHighlight } from "./components/Preview";
@@ -16,6 +16,7 @@ import { TableOfContents } from "./components/TableOfContents";
 import ErrorModal from "./components/ErrorModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { createLogger, Logger } from "./logger";
+import { fetchGitTree } from "./pfx_override/js/leftPanelFileTree.js"
 
 
 const EditorParent = styled.div`
@@ -26,8 +27,8 @@ const EditorParent = styled.div`
   ${(props) => {
     switch (props.mode) {
       case "Gitdiff":
-        return ``;
-        // return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
+        // return ``;
+        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
       case "Preview":
         return "#editor-wrapper { display: none }";
       case "Source":
@@ -49,31 +50,59 @@ const EditorParent = styled.div`
 `;
 
 const GitPanel = styled.div`
-  display: flex;
+  display: table;
+  table-layout: fixed;
   width: 100%;
-  padding: 10px;
+  padding: 0;
   background-color: var(--panel-bg);
   box-sizing: border-box;
   border-bottom: 1px solid var(--accent-light);
 `;
 
 const GitHalf = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
+  display: table-cell;
+  vertical-align: middle;
+  padding: 0.5rem 0.8rem;
+  width: 50%;
+  white-space: nowrap;
 
-  label {
-    font-weight: 600;
+  /* Only labels used for dropdowns */
+  label.git-dropdown-label {
+    display: inline-block;
+    margin-right: 6px;
+    font-weight: 500;
+    color: #333;
   }
 
   select {
-    flex: 1;
-    min-width: 100px;
+    display: inline-block;
+    min-width: 120px;
     padding: 4px;
+    margin-right: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  /* Keep toggle inline and unaffected */
+  .toggle-wrapper {
+    display: inline-block;
+    margin-right: 12px;
+    vertical-align: middle;
   }
 `;
+
+
+const ToggleWrapper = styled.label`
+`;
+
+const ToggleInput = styled.input`
+`;
+
+const Slider = styled.span`
+`;
+
+// Git panel elements style END
 
 const MystWrapper = styled.div`
   padding: 20px;
@@ -115,7 +144,33 @@ const FlexWrapper = styled.div`
 const hideBodyScrollIf = (val) => (document.documentElement.style.overflow = val ? "hidden" : "visible");
 
 const MystEditor = () => {
+
   const { editorView, cache, options, collab, text, suggestMode } = useContext(MystState);
+
+  // Git panel elements style START
+  // Initialize the signal with saved state
+  const savedLeft = localStorage.getItem("gitLeftToggle");
+
+  const showLeft = useSignal(savedLeft === null ? true : savedLeft === "true");
+  // track first render to suppress auto-calls
+  const firstRender = useRef(true);
+
+  useSignalEffect(() => {
+    localStorage.setItem("gitLeftToggle", showLeft.value.toString());
+
+    if (firstRender.current) {
+      // skip first change triggered on page load
+      firstRender.current = false;
+      return;
+    }
+
+    // user actually changed the toggle
+    if (window.reloadGitdiff) {
+      window.reloadGitdiff(showLeft.value ? "commits" : "local");
+    }
+    fetchGitTree(showLeft.value);
+  }, [showLeft]);
+
   const fullscreen = useSignal(false);
   useSignalEffect(() => hideBodyScrollIf(fullscreen.value));
 
@@ -169,46 +224,95 @@ const MystEditor = () => {
             {options.collaboration.value.enabled && collab.value.lockMsg.value && <StatusBanner>{collab.value.lockMsg}</StatusBanner>}
 
             {options.mode.value === "Gitdiff" && (
-            <GitPanel id="gitPanel">
+              <GitPanel id="gitPanel">
               <GitHalf>
-                <label htmlFor="branchDropdownLeft">Branch:</label>
-                <select id="branchDropdownLeft"></select>
-                <label htmlFor="commitDropdownLeft">Commit:</label>
-                <select id="commitDropdownLeft"></select>
+
+                <ToggleWrapper className="toggle-wrapper">
+
+                  <ToggleInput className="toggle-input" 
+                    type="checkbox"
+                    checked={showLeft.value}
+                    onChange={() => {
+                      showLeft.value = !showLeft.value;
+                    }}
+                  />
+                  <Slider className="toggle-slider" />
+                </ToggleWrapper>
+
+                {/* Left dropdowns always exist, toggle visibility */}
+                <div className={showLeft.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
+                  <div className="git-dropdown-group">
+                    <label htmlFor="branchDropdownLeft">Branch:</label>
+                    <select id="branchDropdownLeft"></select>
+                  </div>
+
+                  <div className="git-dropdown-group">
+                    <label htmlFor="commitDropdownLeft">Commit:</label>
+                    <select id="commitDropdownLeft"></select>
+                  </div>
+                </div>
+
+                {/* Current file text always exists */}
+                <div className={showLeft.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
+                  <span id="current_file_label">Current file</span>
+                </div>
               </GitHalf>
+
               <GitHalf>
-                <label htmlFor="branchDropdownRight">Branch:</label>
-                <select id="branchDropdownRight"></select>
-                <label htmlFor="commitDropdownRight">Commit:</label>
-                <select id="commitDropdownRight"></select>
+                {/*<div className="git-dropdown-group">*/}
+                <div  className={showLeft.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
+                  <label htmlFor="branchDropdownRight">Branch:</label>
+                  <select id="branchDropdownRight"></select>
+                </div>
+
+                {/*<div className="git-dropdown-group">*/}
+                <div  className={showLeft.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
+                  <label htmlFor="commitDropdownRight">Commit:</label>
+                  <select id="commitDropdownRight"></select>
+                </div>
+
+                <div className={showLeft.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
+                  <span id="current_file_label">HEAD Commit</span>
+                </div>
+
               </GitHalf>
             </GitPanel>
             )}
 
             <MystWrapper className="myst-editor-wrapper" fullscreen={fullscreen.value}>
-              <FlexWrapper id="editor-wrapper" className="flex-wrapper">
-                <CodeMirror />
-              </FlexWrapper>
-              <FlexWrapper id="preview-wrapper" className="flex-wrapper">
-                <Preview
-                  className="myst-preview"
-                  ref={preview}
-                  mode={options.mode.value}
-                  onClick={(ev) => {
-                    if (options.onPreviewClick.value?.(ev)) return;
-                    syncCheckboxes(ev, text.lineMap, editorView.value);
-                    if (options.syncScroll.value && options.mode.value == "Both")
-                      handlePreviewClickToScroll(ev, text.lineMap, preview, editorView.value);
-                  }}
-                >
-                  <PreviewFocusHighlight className="cm-previewFocus" />
-                </Preview>
-              </FlexWrapper>
+              {options.mode.value === "Gitdiff" ? (
+                <FlexWrapper className="flex-wrapper">
+                  <Gitdiff />
+                </FlexWrapper>
+              ) : (
+                <>
+                  <FlexWrapper id="editor-wrapper" className="flex-wrapper">
+                    <CodeMirror />
+                  </FlexWrapper>
+                  <FlexWrapper id="preview-wrapper" className="flex-wrapper">
+                    <Preview
+                      className="myst-preview"
+                      ref={preview}
+                      mode={options.mode.value}
+                      onClick={(ev) => {
+                        if (options.onPreviewClick.value?.(ev)) return;
+                        syncCheckboxes(ev, text.lineMap, editorView.value);
+                        if (options.syncScroll.value && options.mode.value == "Both")
+                          handlePreviewClickToScroll(ev, text.lineMap, preview, editorView.value);
+                      }}
+                    >
+                      <PreviewFocusHighlight className="cm-previewFocus" />
+                    </Preview>
+                  </FlexWrapper>
+                </>
+              )}
+
               {options.mode.value === "Diff" && (
                 <FlexWrapper className="flex-wrapper">
                   <Diff />
                 </FlexWrapper>
               )}
+
               {options.mode.value == "Resolved" &&
                 options.collaboration.value.commentsEnabled &&
                 options.collaboration.value.resolvingCommentsEnabled &&
@@ -217,12 +321,14 @@ const MystEditor = () => {
                     <ResolvedComments />
                   </FlexWrapper>
                 )}
+
               {options.mode.value === "Outline" && (
                 <FlexWrapper className="flex-wrapper">
                   <TableOfContents />
                 </FlexWrapper>
               )}
             </MystWrapper>
+
           </EditorParent>
         </ErrorBoundary>
       </MystContainer>

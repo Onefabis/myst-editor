@@ -1,12 +1,13 @@
 import { styled } from "styled-components";
-import { useContext, useMemo } from "preact/hooks";
+import { useEffect, useContext, useMemo, useRef } from "preact/hooks";
+import { batch, computed, signal, effect } from "@preact/signals";
 import purify from "dompurify";
-
 import { DefaultButton } from "./CommonUI";
 import ButtonGroup from "./ButtonGroup";
 import Avatars from "./Avatars";
 import { MystState } from "../mystState";
-import { useComputed, useSignal } from "@preact/signals";
+import { useComputed, useSignal, useSignalEffect } from "@preact/signals";
+import { fetchLocalTree, fetchGitTree } from "../pfx_override/js/leftPanelFileTree.js"
 
 const renderMdLinks = (title) =>
   [...(title || "").matchAll(/\[(.+)\]\(([^\s]+)\)/g)].reduce(
@@ -296,10 +297,34 @@ const icons = {
   "suggest-mode": SuggestIcon,
 };
 
-export const EditorTopbar = ({ alert, buttons }) => { 
+export const EditorTopbar = ({ alert, buttons }) => {
   const { options, editorView, collab, suggestMode } = useContext(MystState);
   const titleHtml = useComputed(() => purify.sanitize(renderMdLinks(options.title.value)));
-  const emptyDiff = useSignal(false);
+
+  const gitCommitDiff = localStorage.getItem("gitLeftToggle");
+  const showLeft = useSignal(gitCommitDiff === null ? true : gitCommitDiff === "true");
+
+  // track first render to suppress auto-calls
+  const firstRender = useRef(true);
+
+  useSignalEffect(() => {
+    // save to localStorage
+    localStorage.setItem("gitLeftToggle", showLeft.value.toString());
+
+    if (firstRender.current) {
+      firstRender.current = false;
+      return; // skip fetchGitTree at initial render
+    }
+
+    // only run after user toggles
+    if (options.mode.value === "Gitdiff") {
+      if (window.reloadGitdiff) {
+        window.reloadGitdiff(showLeft.value ? "commits" : "local");
+      }
+      fetchGitTree(showLeft.value);
+    }
+  });
+
   const editorModeButtons = useComputed(() => {
     const modeButtons = [
       { 
@@ -307,6 +332,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Source", 
         action: () => { 
           options.mode.value = "Source"; 
+          fetchLocalTree(false);
         }, 
         icon: SourceIcon 
       },
@@ -315,6 +341,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Preview", 
         action: () => { 
           options.mode.value = "Preview"; 
+          fetchLocalTree(false);
         }, 
         icon: PreviewIcon 
       },
@@ -323,6 +350,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Dual Pane", 
         action: () => { 
           options.mode.value = "Both"; 
+          fetchLocalTree(false);
         }, 
         icon: BothIcon 
       },
@@ -331,13 +359,13 @@ export const EditorTopbar = ({ alert, buttons }) => {
         tooltip: "Inline Preview", 
         action: () => { 
           options.mode.value = "Inline"; 
+          fetchLocalTree(false);
         }, 
         icon: InlinePreviewIcon 
       },
       { 
         id: "gitdiff", 
         tooltip: "Git Diff", 
-        text: "Git Diff", 
         action: () => { 
           options.mode.value = "Gitdiff"; 
         }, 
@@ -372,17 +400,19 @@ export const EditorTopbar = ({ alert, buttons }) => {
       (b) => b.id[0].toUpperCase() + b.id.slice(1) === options.mode.value
     )
   );
+
   const buttonsLeft = useMemo(() => 
     buttons.map((b) => ({ ...b, icon: b.icon || icons[b.id] }))
            .filter((b) => b.icon), 
     [buttons]
   );
+
   const textButtons = useMemo(() => buttons.filter((b) => b.text), [buttons]);
 
   return (
     <Topbar id="topbar">
       <div className="side">
-        <div class="btns">
+        <div className="btns">
           {buttonsLeft.map((button) => (
             <div key={button.id}>
               <TopbarButton
@@ -422,3 +452,4 @@ export const EditorTopbar = ({ alert, buttons }) => {
     </Topbar>
   );
 };
+

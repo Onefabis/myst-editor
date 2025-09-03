@@ -25,6 +25,8 @@ document.addEventListener("contextmenu", (e) => {
 
   const isInMystMainEditor = path.some(el => el.classList?.contains("cm-content"));
 
+  const isInGitEditor = path.some(el => el.classList?.contains("gitDiffEditor"));
+
   const isInExcalidraw = path.some(el =>
     typeof el.id === "string" && el.id.startsWith("excalidraw")
   );
@@ -39,7 +41,7 @@ document.addEventListener("contextmenu", (e) => {
     typeof el.id === "string" && el.id === "ollama-ai-reprhase-settings"
   );
 
-  if (isInMystMainEditor && !isInExcalidraw && !isInOllamaAI && !isInAIRephrase) {
+  if (isInMystMainEditor && !isInExcalidraw && !isInOllamaAI && !isInAIRephrase && !isInGitEditor) {
     e.preventDefault();
 
     // Show temporarily to measure size

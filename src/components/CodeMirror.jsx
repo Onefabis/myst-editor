@@ -21,6 +21,7 @@ const CodeEditor = styled.div`
   padding: 20px;
   box-sizing: border-box;
   height: 100%;
+  width: 100%;
   scrollbar-width: thin;
   overflow-y: auto;
   overscroll-behavior: contain;

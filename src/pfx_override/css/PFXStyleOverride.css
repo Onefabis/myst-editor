@@ -19,6 +19,21 @@ body {
   box-sizing: border-box;
 }
 
+#tree {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+#tree span.file,
+#tree span.folder {
+  display: inline-flex;
+  align-items: center;
+  max-width: 400px; 
+  overflow: hidden;
+  height: 26px;
+  text-overflow: ellipsis;
+}
+
 #tree-panel {
   flex-grow: 1;
   overflow: auto;
@@ -29,47 +44,6 @@ body {
   background: #ccc;
   cursor: row-resize;
   display: none;
-}
-
-#gitPanel {
-  font-family: system-ui, sans-serif;
-  font-size: 14px;
-  padding: 12px;
-  border-top: 1px solid #ccc;
-  background-color: #f9f9f9;
-}
-
-#gitPanel label {
-  display: block;
-  margin-top: 10px;
-  font-weight: bold;
-  color: #333;
-}
-
-#gitPanel select {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  padding: 6px;
-  font-family: inherit;
-  font-size: inherit;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
-
-#gitPanel pre#commitDetails {
-  display: block;
-  margin-top: 6px;
-  min-height: 1em;
-  padding: 10px;
-  background-color: #f0f0f0;
-  border-radius: 4px;
-  white-space: pre-wrap;
-  font-family: inherit;
-  font-size: inherit;
-  color: #333;
-  border: 1px solid #ddd;
 }
 
 .resizer-vertical {
@@ -139,6 +113,10 @@ ul {
   height: 27px;
 }
 
+#tree {
+  font-size: 1.09em;
+}
+
 .subtree{
   display: inline-flex;
   width: 100%;
@@ -150,6 +128,7 @@ ul {
 
 .subtree li, #tree li{
   display: grid;
+  line-height: 23px;
 }
 
 #myst {
@@ -210,6 +189,45 @@ ul {
     overflow: visible !important;
     height: auto !important;
   }
+}
+
+.cm-scroller {
+  display: -webkit-box !important
+}
+
+.cm-changedText {
+  background: none !important;
+}
+
+.cm-merge-b .cm-changedLine {
+  background-color: rgb(236 252 230) !important;
+}
+
+.cm-merge-a .cm-changedLine {
+  background-color: rgb(250 230 230) !important;
+}
+
+/* Base folder look: reserve 2px at left so layout is stable */
+#tree .folder {
+  border-left: 3px solid transparent;
+  margin-left: -10px;
+}
+
+/* Safety: if something ever toggles this, neutralize it visually */
+#tree .folder.active {
+  background: transparent !important;
+}
+
+#tree .folder-text {
+  border-left: 3px solid transparent;
+  padding-left: 4px;
+  line-height: 16px;
+  display: inline-block;
+}
+
+#tree .folder-text.changed-path {
+  border-radius: 3px;
+  border-left-color: rgb(30, 144, 255); /* blue */
 }
 
 /* --------------- Index main page Myst editor style END ---------------- */
@@ -747,7 +765,11 @@ aside.danger>header::before {
 /* ------------------- Left Panel File Tree Extension UI elements START ------------------ */
 
 .icon-margin {
-  margin-right: 6px;
+  margin-right: 4px;
+  display: inline-block;
+  vertical-align: middle;
+  height: 18px;
+  width: 14px;
 }
 
 .move-modal {
@@ -842,6 +864,12 @@ aside.danger>header::before {
   gap: 8px;
 }
 
+.confirm-modal-message {
+  margin: 10px 0 16px;
+  font-size: 14px;
+  color: #333;
+}
+
 .btn-green {
   padding: 6px 8px;
   border: 1px dashed rgb(92, 184, 92);
@@ -870,41 +898,141 @@ aside.danger>header::before {
 
 
 /* ------------------- GitDiff Extension UI elements START ------------------ */
-
-/* File tree panel */
+/* ─── File tree panel ─────────────────────────── */
 #tree-panel {
   min-height: 100px;
   height: 100%;
   overflow-y: auto;
 }
 
-/* Git panel container */
+/* ─── Git panel container ─────────────────────── */
 #gitPanel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 50px;
+  gap: 12px;
+  padding: 0.5rem 0 0.5rem 0.8rem;
+  border-top: 1px solid #ccc;
   background-color: #fff;
-  border-left: 1px solid #ccc;
-  padding: 0.5rem;
+  flex-wrap: nowrap;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
 }
 
-/* Resizer */
-#resizer-horizontal {
-  height: 5px;
-  cursor: row-resize;
-  background: #ddd;
-  display: none;
+/* Each half (left / right) */
+#gitPanel > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0; /* prevent overflow */
 }
 
-/* Commit details text area */
+/* ─── Toggle styles ───────────────────────────── */
+.toggle-wrapper {
+  display: inline-block;
+  width: 42px;
+  height: 22px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  border-radius: 26px;
+  transition: background-color 0.3s;
+}
+
+.toggle-slider:before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.toggle-input:checked + .toggle-slider {
+  background-color: rgb(132 208 229);
+}
+
+.toggle-input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* ─── Git panel left content toggle ───────────── */
+#gitPanel .hiddenGitLeftPanel {
+  display: none !important;
+}
+
+#gitPanel .showedGitLeftpanel {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ─── Dropdown groups ─────────────────────────── */
+#gitPanel .git-dropdown-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Labels (dropdown only, not toggle) */
+#gitPanel .git-dropdown-group label{
+  font-weight: 500;
+  margin-right: 4px;
+  white-space: nowrap;
+  color: #333;
+}
+
+/* Dropdowns */
+#gitPanel .git-dropdown-group select {
+  flex: 1;
+  min-width: 120px;
+  max-width: 220px;
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* ─── Commit details ──────────────────────────── */
+#gitPanel pre#commitDetails,
 #commit-details {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: #f9f9f9;
+  margin-top: 6px;
+  padding: 10px;
+  background-color: #f9f9f9;
   border: 1px solid #ddd;
   border-radius: 4px;
   white-space: pre-wrap;
+  font-family: inherit;
+  font-size: inherit;
+  color: #333;
 }
 
+/* ─── Diff container & editor ─────────────────── */
 .GitDiffContainer {
-  display: grid;
+  display: flex;
   grid-auto-flow: column;
   grid-template-rows: max-content;
   width: 100%;
@@ -919,6 +1047,75 @@ aside.danger>header::before {
   overscroll-behavior: contain;
   display: block;
 }
+
+/* ─── Misc ────────────────────────────────────── */
+#resizer-horizontal {
+  height: 5px;
+  cursor: row-resize;
+  background: #ddd;
+  display: none;
+}
+
+#current_file_label {
+  font-weight: 500;
+  color: #333;
+}
+
+
+/* ===== FILE & FOLDER STATES ===== */
+.file.active {
+  background-color: var(--active-bg, #dfe9fb);
+}
+
+.folder .folder-text {
+  cursor: pointer;
+}
+
+.changed-path {
+  border-left: 3px solid rgb(0, 122, 255);
+  padding-left: 4px;
+}
+
+/* ===== DIFF STATUS COLORS ===== */
+.diff-added {
+  color: rgb(30, 144, 255);
+  /*color: rgb(80, 173, 72);*/
+}
+.diff-deleted {
+  color: rgb(30, 144, 255);
+  /*color: rgb(233, 1, 1);*/
+}
+.diff-modified {
+  color: rgb(30, 144, 255);
+  /*color: rgb(233, 128, 15);*/
+}
+
+/* ===== ICONS ===== */
+.icon-margin svg circle {
+  stroke-width: 2px;
+}
+
+.diff-icon.diff-added circle {
+  fill: rgb(80, 173, 72);
+}
+.diff-icon.diff-deleted circle {
+  fill: rgb(233, 1, 1);
+}
+
+.diff-icon.diff-modified circle {
+  fill: rgb(233, 128, 15);
+}
+
+/* Special case: inner circle in modified icon */
+.diff-icon.diff-modified circle.inner {
+  fill: white;
+}
+
+.diff-icon path {
+  stroke: white;
+  stroke-width: 2px;
+}
+
 
 /* ------------------- GitDiff Extension UI elements END ------------------ */
 
