@@ -40,6 +40,8 @@ import { ollamaExtension } from "./ollamaAIQuery";
 import { aiRephraseExtension } from "./aiRephrase";
 import { harperExtension } from "./harperExtension";
 import { renameExtension } from "./renameImage";
+import { mystExtension } from "./markChangedLines";
+
 
 
 const getRelativeCursorLocation = (view) => {
@@ -153,6 +155,11 @@ export class ExtensionBuilder {
 
   useImageRename() {
     this.extensions.push(...renameExtension);
+    return this;
+  }
+
+  useMarkChangedLines(){
+    this.extensions.push(mystExtension);
     return this;
   }
 

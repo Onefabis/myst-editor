@@ -10,6 +10,8 @@ import { openImagePicker } from "./projectImagePicker.js";
 import { waitForEditorReady, saveCurrentEditorContent, bindFocusBlurHandlers, setLastSavedTimestamp } from "./saveEditorText.js"
 
 import MystEditor, { defaultButtons, autosaveEnabled } from '../../MystEditor.jsx';
+import { showLatestCommitDiff, revertFileChanges, pluginReady, pluginInstance } from "../../extensions/markChangedLines.js";
+
 
 export let mystEditorInstance = null;
 const editorPanel = document.getElementById('editor-panel');
@@ -84,6 +86,7 @@ export async function loadFile(filename) {
       title: title,
       additionalStyles: sheet,
       includeButtons: defaultButtons.concat([
+        { text: "🧹 Revert", action: () => revertFileChanges(mystEditorInstance) },
         { text: "💾 Save", action: () => saveCurrentEditorContent(true) },
         { text: "🗃️ Image", action: () => openImagePicker() },
         { text: "Clear", action: () => txFormat.clearLineSymbols() },
@@ -94,18 +97,60 @@ export async function loadFile(filename) {
       spellcheckOpts: false,
       syncScroll: true,
     }, newContainer);
-
-    // If git diff buton is pressed, launch setupGitPanel with top menu that allow to select branch and commit
-    window._mystEditor = mystEditorInstance;
-    mystEditorInstance.options.mode.subscribe((newMode) => {
-      // console.log("Mode changed:", newMode);
-      if (newMode === "Gitdiff") {
-        setupGitPanel();
-      }
-    });
+    
     const view = await waitForEditorReady();
     bindFocusBlurHandlers(view);
-    
+
+    // Wait for plugin to be ready before setting up mode subscription
+    await pluginReady;
+    // console.log("Plugin ready, pluginInstance:", pluginInstance);
+
+    // Always re-inject merge view when file loads for non-Gitdiff modes
+    if (["Both", "Source", "Inline"].includes(mystEditorInstance.options.mode.v)) {
+      showLatestCommitDiff(mystEditorInstance);
+    }
+
+    window._mystEditor = mystEditorInstance;
+
+    // Set up mode change subscription with more robust handling
+    mystEditorInstance.options.mode.subscribe((newMode) => {
+      // console.log("Mode subscription triggered, newMode:", newMode);
+      
+      requestAnimationFrame(async () => {
+        if (["Both", "Source", "Inline"].includes(newMode)) {
+          // console.log("Switching to regular mode:", newMode);
+          
+          // Wait for the editor to be ready with the new mode
+          await new Promise(resolve => setTimeout(resolve, 150));
+          
+          // Try multiple approaches to ensure merge injection works
+          if (pluginInstance) {
+            // console.log("Using plugin instance for merge injection");
+            pluginInstance.handleModeChange(newMode, mystEditorInstance);
+          } else {
+            // console.log("Plugin not ready, calling showLatestCommitDiff directly");
+            showLatestCommitDiff(mystEditorInstance);
+          }
+          
+        } else if (newMode === "Gitdiff") {
+          // console.log("Switching to Gitdiff mode");
+          
+          // Clear merge view if plugin is available
+          if (pluginInstance) {
+            pluginInstance.clearMergeView(mystEditorInstance);
+          } else {
+            // Fallback: clear merge compartment directly
+            if (mystEditorInstance.editorView?.v) {
+              mystEditorInstance.editorView.v.dispatch({
+                effects: mergeCompartment.reconfigure([]),
+              });
+            }
+          }
+          
+          setupGitPanel();
+        }
+      });
+    });
   });
 
   localStorage.setItem('lastOpened', filename);
@@ -122,13 +167,9 @@ export function insertImageMarkdown(path) {
     alert("Editor is not ready yet.");
     return;
   }
-
-  // const state = view.v;
   console.log(view);
   const { state } = view.v;
   const { from, to } = state.selection.main; // selection range
-  // const start = view.v.state.selection;
-  // const end = view.v.contentDOM.editContext.selectionEnd;
    view.v.dispatch({
     changes: { from, to, insert: imgSyntax },
     selection: { anchor: from + imgSyntax.length } // cursor after insert

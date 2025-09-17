@@ -468,10 +468,13 @@ async def git_diff_tree_get(commit_left: str = Query(...), commit_right: str = Q
 @app.get("/api/git-head")
 async def git_head():
     """
-    Return the HEAD commit hash of the current branch.
+    Return the HEAD commit hash and active branch of the current repo.
     """
     try:
-        return {"head": repo.head.commit.hexsha}
+        return {
+            "head": repo.head.commit.hexsha,
+            "active_branch": repo.active_branch.name if not repo.head.is_detached else None
+        }
     except Exception as e:
         return {"error": str(e)}
 

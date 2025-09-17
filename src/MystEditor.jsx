@@ -19,6 +19,7 @@ import { createLogger, Logger } from "./logger";
 import { fetchGitTree } from "./pfx_override/js/leftPanelFileTree.js"
 
 
+
 const EditorParent = styled.div`
   font-family: "Lato";
   width: 100%;
@@ -151,9 +152,23 @@ const MystEditor = () => {
   // Initialize the signal with saved state
   const savedLeft = localStorage.getItem("gitLeftToggle");
 
+  const [headBranch, setHeadBranch] = useState(null);
+
   const showLeft = useSignal(savedLeft === null ? true : savedLeft === "true");
   // track first render to suppress auto-calls
   const firstRender = useRef(true);
+
+  useEffect(() => {
+    fetch("/api/git-head")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.active_branch) {
+          setHeadBranch(data.active_branch);
+        }
+      })
+      .catch((err) => console.error("Failed to load HEAD branch", err));
+  }, []);
+
 
   useSignalEffect(() => {
     localStorage.setItem("gitLeftToggle", showLeft.value.toString());
@@ -272,7 +287,10 @@ const MystEditor = () => {
                 </div>
 
                 <div className={showLeft.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
-                  <span id="current_file_label">HEAD Commit</span>
+                  <span id="current_file_label">
+                    HEAD Commit {headBranch ? `Branch: ${headBranch}` : ""}
+                  </span>
+                  {/*<span id="current_file_label">HEAD Commit</span>*/}
                 </div>
 
               </GitHalf>
@@ -281,9 +299,26 @@ const MystEditor = () => {
 
             <MystWrapper className="myst-editor-wrapper" fullscreen={fullscreen.value}>
               {options.mode.value === "Gitdiff" ? (
-                <FlexWrapper className="flex-wrapper">
-                  <Gitdiff />
-                </FlexWrapper>
+                <>
+                  <FlexWrapper className="flex-wrapper">
+                    <Gitdiff />
+                  </FlexWrapper>
+                  <FlexWrapper id="preview-wrapper" className="flex-wrapper">
+                    <Preview
+                      className="myst-preview"
+                      ref={preview}
+                      mode={options.mode.value}
+                      onClick={(ev) => {
+                        if (options.onPreviewClick.value?.(ev)) return;
+                        syncCheckboxes(ev, text.lineMap, editorView.value);
+                        if (options.syncScroll.value && options.mode.value == "Both")
+                          handlePreviewClickToScroll(ev, text.lineMap, preview, editorView.value);
+                      }}
+                    >
+                      <PreviewFocusHighlight className="cm-previewFocus" />
+                    </Preview>
+                  </FlexWrapper>
+                </>
               ) : (
                 <>
                   <FlexWrapper id="editor-wrapper" className="flex-wrapper">

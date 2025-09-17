@@ -516,7 +516,7 @@ class TreeAPI {
 // ========================= MAIN FUNCTIONS =========================
 
 export async function fetchLocalTree(loadfile=true) {
-  console.log("tree fetched");
+  // console.log("tree fetched");
   const commitHash = await TreeAPI.getHeadCommit();
   const baseTree = await TreeAPI.getTree();
   const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
@@ -531,9 +531,9 @@ export async function fetchLocalTree(loadfile=true) {
 
   const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
   TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
-  console.log(diffMap);
-  console.log(baseTree);
-  console.log(changedFolders);
+  // console.log(diffMap);
+  // console.log(baseTree);
+  // console.log(changedFolders);
 
   
   const currentPath = localStorage.getItem('currentPath');

@@ -1078,16 +1078,16 @@ aside.danger>header::before {
 
 /* ===== DIFF STATUS COLORS ===== */
 .diff-added {
-  color: rgb(30, 144, 255);
-  /*color: rgb(80, 173, 72);*/
+  /*color: rgb(30, 144, 255);*/
+  color: rgb(80, 173, 72);
 }
 .diff-deleted {
-  color: rgb(30, 144, 255);
-  /*color: rgb(233, 1, 1);*/
+  /*color: rgb(30, 144, 255);*/
+  color: rgb(233, 1, 1);
 }
 .diff-modified {
-  color: rgb(30, 144, 255);
-  /*color: rgb(233, 128, 15);*/
+  /*color: rgb(30, 144, 255);*/
+  color: rgb(233, 128, 15);
 }
 
 /* ===== ICONS ===== */
@@ -1115,6 +1115,20 @@ aside.danger>header::before {
   stroke: white;
   stroke-width: 2px;
 }
+
+
+/* More specific selectors to override transparent selection */
+.cm-editor .cm-line .cm-insertedLine::selection,
+.cm-editor .cm-line .cm-insertedLine ::selection, 
+.cm-editor .cm-line .cm-insertedLine *::selection, 
+.cm-line .cm-insertedLine .cm-selectionBackground, 
+.cm-editor:not(.cm-focused) .cm-selectionBackground, 
+.cm-editor.cm-focused .cm-selectionBackground, 
+.cm-line .cm-insertedLine::selection,
+.cm-line .cm-insertedLine ::selection {
+  background-color: rgb(204, 216, 239) !important;
+}
+
 
 
 /* ------------------- GitDiff Extension UI elements END ------------------ */

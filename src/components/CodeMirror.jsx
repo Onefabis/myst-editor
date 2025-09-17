@@ -1,6 +1,6 @@
 import { useContext, useRef } from "preact/hooks";
 import { EditorView } from "codemirror";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import styled from "styled-components";
 import { ExtensionBuilder, skipAndFoldAll } from "../extensions";
 import { YCommentsParent } from "./Comment";
@@ -275,6 +275,10 @@ const CodeEditor = styled.div`
   }
 `;
 
+
+export const mergeCompartment = new Compartment();
+
+
 const CodeMirror = () => {
   const { editorView, options, collab, userSettings, linter, text, headings, error, suggestMode } = useContext(MystState);
   const logger = useContext(Logger);
@@ -338,6 +342,7 @@ const CodeMirror = () => {
       extensions: ExtensionBuilder.basicSetup()
         .useMarkdown(options.transforms.value)
         .if(options.mode.value !== "Inline", (b) => b.useLineNumbers())
+        .useCompartment(mergeCompartment, [])
         .useCompartment(userExtensionsCompartment, [])
         .useSpellcheck(options.spellcheckOpts.value)
         .if(options.collaboration.value.enabled, (b) => {
@@ -368,6 +373,7 @@ const CodeMirror = () => {
         .useOllamaAIQuery()
         .useImageRename()
         .useAiRephrase()
+        .useMarkChangedLines()
         .useHarperGrammarChecker()
         .if(options.cmDarkTheme.value, (b) => b.useCmDarkTheme())
         .useCriticMarkup()

@@ -1,101 +1,109 @@
 /* empty css                          */
-import { s as p, M as f, d as h, a as y, o as g, c as w, b as S, e as v, f as x, g as I, w as b, h as B } from "./MystEditor-BKoq1aQr.js";
-let a = null;
+import { s as y, M as w, d as v, r as S, a as x, o as I, c as B, b, e as C, f as E, w as T, g as F, p as W, h as f, i as l, j as P } from "./MystEditor-DiDQWUXg.js";
+let e = null;
 document.getElementById("editor-panel");
-const d = document.getElementById("sidebar"), E = document.getElementById("resizer"), m = localStorage.getItem("sidebarWidth");
-m && (d.style.width = m + "px");
-E.onmousedown = function(e) {
-  e.preventDefault();
-  const o = e.clientX, s = d.offsetWidth;
-  document.onmousemove = function(i) {
-    const t = s + (i.clientX - o);
-    t >= 250 && t <= 600 && (d.style.width = t + "px", localStorage.setItem("sidebarWidth", t));
+const u = document.getElementById("sidebar"), k = document.getElementById("resizer"), h = localStorage.getItem("sidebarWidth");
+h && (u.style.width = h + "px");
+k.onmousedown = function(o) {
+  o.preventDefault();
+  const n = o.clientX, i = u.offsetWidth;
+  document.onmousemove = function(a) {
+    const t = i + (a.clientX - n);
+    t >= 250 && t <= 600 && (u.style.width = t + "px", localStorage.setItem("sidebarWidth", t));
   }, document.onmouseup = function() {
     document.onmousemove = null, document.onmouseup = null;
   };
 };
-function T(e) {
-  return e.replace(/\\/g, "/");
+function H(o) {
+  return o.replace(/\\/g, "/");
 }
-async function F(e) {
-  const o = await fetch(`/api/file?path=${encodeURIComponent(T(e))}`);
-  if (o.status === 404) {
+async function R(o) {
+  const n = await fetch(`/api/file?path=${encodeURIComponent(H(o))}`);
+  if (n.status === 404) {
     console.warn("Last opened file not found."), localStorage.removeItem("lastOpened");
     return;
   }
-  if (!o.ok) {
-    alert(`File loading error: ${o.statusText}`);
+  if (!n.ok) {
+    alert(`File loading error: ${n.statusText}`);
     return;
   }
-  const s = await o.json();
-  p(s.last_modified);
-  const i = document.getElementById("myst"), t = document.createElement("div");
-  t.id = "myst", t.style.flexGrow = "1", t.style.border = "1px solid #ccc", t.style.marginBottom = "0.5rem", t.style.height = "80vh", i.replaceWith(t), localStorage.setItem("currentPath", e);
-  const n = new CSSStyleSheet(), l = await (await fetch("../PFXStyleOverride.css")).text();
-  await n.replace(l), document.adoptedStyleSheets = [...document.adoptedStyleSheets, n];
-  const c = e.split("\\").pop().split("/").pop();
+  const i = await n.json();
+  y(i.last_modified);
+  const a = document.getElementById("myst"), t = document.createElement("div");
+  t.id = "myst", t.style.flexGrow = "1", t.style.border = "1px solid #ccc", t.style.marginBottom = "0.5rem", t.style.height = "80vh", a.replaceWith(t), localStorage.setItem("currentPath", o);
+  const s = new CSSStyleSheet(), r = await (await fetch("../PFXStyleOverride.css")).text();
+  await s.replace(r), document.adoptedStyleSheets = [...document.adoptedStyleSheets, s];
+  const c = o.split("\\").pop().split("/").pop();
   requestAnimationFrame(async () => {
-    a = f({
+    e = w({
       templatelist: "linkedtemplatelist.json",
-      initialText: s.content,
+      initialText: i.content,
       title: c,
-      additionalStyles: n,
-      includeButtons: h.concat([{
+      additionalStyles: s,
+      includeButtons: v.concat([{
+        text: "🧹 Revert",
+        action: () => S(e)
+      }, {
         text: "💾 Save",
-        action: () => y(!0)
+        action: () => x(!0)
       }, {
         text: "🗃️ Image",
-        action: () => g()
+        action: () => I()
       }, {
         text: "Clear",
-        action: () => w()
+        action: () => B()
       }, {
         text: "H1",
-        action: () => S()
+        action: () => b()
       }, {
         text: "H2",
-        action: () => v()
+        action: () => C()
       }, {
         text: "B",
-        action: () => x()
+        action: () => E()
       }]),
       spellcheckOpts: !1,
       syncScroll: !0
-    }, t), window._mystEditor = a, a.options.mode.subscribe((u) => {
-      u === "Gitdiff" && I();
+    }, t);
+    const d = await T();
+    F(d), await W, ["Both", "Source", "Inline"].includes(e.options.mode.v) && f(e), window._mystEditor = e, e.options.mode.subscribe((m) => {
+      requestAnimationFrame(async () => {
+        var p;
+        ["Both", "Source", "Inline"].includes(m) ? (await new Promise((g) => setTimeout(g, 150)), l ? l.handleModeChange(m, e) : f(e)) : m === "Gitdiff" && (l ? l.clearMergeView(e) : (p = e.editorView) != null && p.v && e.editorView.v.dispatch({
+          effects: mergeCompartment.reconfigure([])
+        }), P());
+      });
     });
-    const r = await b();
-    B(r);
-  }), localStorage.setItem("lastOpened", e);
+  }), localStorage.setItem("lastOpened", o);
 }
-function k(e) {
-  const o = e.split("/").pop() || "", s = o.lastIndexOf("."), t = `![${s > -1 ? o.substring(0, s) : o}](/${e})`, n = a == null ? void 0 : a.editorView;
-  if (!n) {
+function V(o) {
+  const n = o.split("/").pop() || "", i = n.lastIndexOf("."), t = `![${i > -1 ? n.substring(0, i) : n}](/${o})`, s = e == null ? void 0 : e.editorView;
+  if (!s) {
     alert("Editor is not ready yet.");
     return;
   }
-  console.log(n);
+  console.log(s);
   const {
-    state: l
-  } = n.v, {
+    state: r
+  } = s.v, {
     from: c,
-    to: r
-  } = l.selection.main;
-  n.v.dispatch({
+    to: d
+  } = r.selection.main;
+  s.v.dispatch({
     changes: {
       from: c,
-      to: r,
+      to: d,
       insert: t
     },
     selection: {
       anchor: c + t.length
     }
     // cursor after insert
-  }), n.v.focus();
+  }), s.v.focus();
 }
 export {
-  k as insertImageMarkdown,
-  F as loadFile,
-  a as mystEditorInstance
+  V as insertImageMarkdown,
+  R as loadFile,
+  e as mystEditorInstance
 };
 //# sourceMappingURL=MainOverride.js.map
