@@ -301,15 +301,15 @@ export const EditorTopbar = ({ alert, buttons }) => {
   const { options, editorView, collab, suggestMode } = useContext(MystState);
   const titleHtml = useComputed(() => purify.sanitize(renderMdLinks(options.title.value)));
 
-  const gitCommitDiff = localStorage.getItem("gitLeftToggle");
-  const showLeft = useSignal(gitCommitDiff === null ? true : gitCommitDiff === "true");
+  const gitCommitDiff = localStorage.getItem("gitLeftListToggle");
+  const showLeftCommitList = useSignal(gitCommitDiff === null ? true : gitCommitDiff === "true");
 
   // track first render to suppress auto-calls
   const firstRender = useRef(true);
 
   useSignalEffect(() => {
     // save to localStorage
-    localStorage.setItem("gitLeftToggle", showLeft.value.toString());
+    localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
 
     if (firstRender.current) {
       firstRender.current = false;
@@ -319,9 +319,9 @@ export const EditorTopbar = ({ alert, buttons }) => {
     // only run after user toggles
     if (options.mode.value === "Gitdiff") {
       if (window.reloadGitdiff) {
-        window.reloadGitdiff(showLeft.value ? "commits" : "local");
+        window.reloadGitdiff(showLeftCommitList.value ? "commits" : "local");
       }
-      fetchGitTree(showLeft.value);
+      fetchGitTree(showLeftCommitList.value);
     }
   });
 
@@ -401,13 +401,21 @@ export const EditorTopbar = ({ alert, buttons }) => {
     )
   );
 
-  const buttonsLeft = useMemo(() => 
-    buttons.map((b) => ({ ...b, icon: b.icon || icons[b.id] }))
-           .filter((b) => b.icon), 
+  const buttonsLeft = useMemo(
+    () =>
+      buttons
+        .map((b) => ({
+          ...b,
+          icon: b.icon || icons[b.id],
+        }))
+        .filter((b) => b.icon),
     [buttons]
   );
 
-  const textButtons = useMemo(() => buttons.filter((b) => b.text), [buttons]);
+  const textButtons = useMemo(
+    () => buttons.filter((b) => b.text),
+    [buttons]
+  );
 
   return (
     <Topbar id="topbar">
@@ -417,6 +425,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
             <div key={button.id}>
               <TopbarButton
                 className="icon"
+                style={{ display: button.visible === false ? "none" : undefined }}
                 active={button.active?.({ suggestMode })}
                 type="button"
                 title={button.tooltip}
@@ -441,7 +450,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
         {textButtons.length > 0 && (
           <div className="btns">
             {textButtons.map((b) => (
-              <DefaultButton key={b.id} type="button" onClick={b.action}>
+              <DefaultButton key={b.id} type="button" onClick={b.action} style={{ display: b.visible === false ? "none" : undefined }}>
                 {b.text}
               </DefaultButton>
             ))}

@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+from collections import defaultdict
 from fastapi import FastAPI, File, Form, UploadFile, Request, Query
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -489,11 +490,13 @@ async def git_diff_working_tree(commit: str = Query(...)):
     """
     Compare the working tree against a given commit.
     Returns a list of changed files with statuses (M/A/D/R).
+    Includes both tracked changes and untracked files.
     """
     try:
-        # equivalent to: git diff --name-status <commit>
-        diff_output = repo.git.diff("--name-status", commit, DOCS_DIR)
         result = []
+        
+        # Get tracked file changes: git diff --name-status <commit>
+        diff_output = repo.git.diff("--name-status", commit, DOCS_DIR)
         for line in diff_output.splitlines():
             parts = line.split("\t")
             if not parts:
@@ -514,9 +517,71 @@ async def git_diff_working_tree(commit: str = Query(...)):
                     "new_path": path if status != "D" else None,
                     "status": status
                 })
+        
+        # Get untracked files (new files not in git)
+        untracked_files = repo.git.ls_files("--others", "--exclude-standard", DOCS_DIR).splitlines()
+        for file_path in untracked_files:
+            # Only include .md files
+            if file_path.endswith('.md'):
+                result.append({
+                    "old_path": None,
+                    "new_path": file_path,
+                    "status": "A"  # Mark untracked files as "Added"
+                })
+        
         return result
     except Exception as e:
         return {"error": str(e)}
+
+
+# Return intersection file tree for two selected commits
+# Add this new endpoint to your FastAPI backend
+@app.get("/api/tree-union")
+async def get_tree_union(commit_left: str = Query(...), commit_right: str = Query(...)):
+    try:
+        # --- Get all .md files from both commits ---
+        def get_md_files(commit_obj):
+            files = set()
+            try:
+                docs_tree = commit_obj.tree / DOCS_DIR
+                for item in docs_tree.traverse():
+                    if item.type == 'blob' and item.path.endswith('.md'):
+                        rel_path = os.path.relpath(item.path, DOCS_DIR).replace("\\", "/")
+                        files.add(rel_path)
+            except KeyError:
+                pass
+            return files
+
+        left_files = get_md_files(repo.commit(commit_left))
+        right_files = get_md_files(repo.commit(commit_right))
+        
+        # Union of files from both commits only (no untracked files for commit vs commit comparison)
+        md_union = left_files | right_files
+
+        # --- Get local tree ---
+        local_tree = scan_dir(BASE_DIR, BASE_DIR, [".md"])
+
+        # --- Filter local tree recursively ---
+        def filter_tree(nodes):
+            result = []
+            for node in nodes:
+                if node['type'] == 'file':
+                    if node['path'] in md_union:
+                        result.append(node)
+                elif node['type'] == 'folder':
+                    filtered_children = filter_tree(node.get('children', []))
+                    if filtered_children:
+                        node['children'] = filtered_children
+                        result.append(node)
+            return result
+
+        filtered_local_tree = filter_tree(local_tree)
+        return filtered_local_tree
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # Mount frontend

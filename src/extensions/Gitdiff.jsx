@@ -84,8 +84,8 @@ const Gitdiff = () => {
         const commitRight = getEl("commitDropdownRight");
 
         const filename = getFilename();
-        // const gitCommitToggle = localStorage.getItem("gitLeftToggle") || true;
-        const gitCommitToggle = localStorage.getItem("gitLeftToggle") === "true";
+        // const gitCommitToggle = localStorage.getItem("gitLeftListToggle") || true;
+        const gitCommitToggle = localStorage.getItem("gitLeftListToggle") === "true";
         const mode = modeArg || (gitCommitToggle ? "commits" : "local") || "commits";
 
         if (!filename) {

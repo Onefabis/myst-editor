@@ -26,9 +26,9 @@ export const predefinedButtons = {
   templateManager: { id: "templates", tooltip: "Templates", dropdown: Templates },
   copyHtml: { id: "copy-html", tooltip: "Copy document as HTML" },
   fullscreen: { id: "fullscreen", tooltip: "Fullscreen" },
-  refresh: { id: "refresh", tooltip: "Refresh issue links" },
+  refresh: { id: "refresh", visible: false, tooltip: "Refresh issue links" },
   settings: { id: "settings", tooltip: "Editor settings", dropdown: Settings },
-  suggestMode: { id: "suggest-mode", tooltip: "Toggle suggest mode", active: (state) => state.suggestMode.value },
+  suggestMode: { id: "suggest-mode", visible: false, tooltip: "Toggle suggest mode", active: (state) => state.suggestMode.value },
 };
 
 export const defaultButtons = [

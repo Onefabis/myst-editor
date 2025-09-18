@@ -36,7 +36,7 @@ const GIT_STATUS = {
 };
 
 const CONFIG = {
-  ignoredFolders: ["_static", "_templates"],
+  ignoredFolders: ["_static", "_templates", ".obsidian"],
   treeRoot: 'docs/',
   maxDropdownWaitAttempts: 50,
   dropdownWaitInterval: 100
@@ -468,6 +468,13 @@ class TreeAPI {
     return head;
   }
 
+  static async getUnionTree(commitLeft, commitRight) {
+    const response = await fetch(
+      `/api/tree-union?commit_left=${encodeURIComponent(commitLeft)}&commit_right=${encodeURIComponent(commitRight)}`
+    );
+    return response.json();
+  }
+
   static async getTree(commit = null) {
     const url = commit ? `/api/tree?commit=${encodeURIComponent(commit)}` : '/api/tree';
     const response = await fetch(url);
@@ -516,26 +523,17 @@ class TreeAPI {
 // ========================= MAIN FUNCTIONS =========================
 
 export async function fetchLocalTree(loadfile=true) {
-  // console.log("tree fetched");
   const commitHash = await TreeAPI.getHeadCommit();
   const baseTree = await TreeAPI.getTree();
   const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
 
-  const rawDiffMap = GitDiffManager.buildDiffMap(diffs);
-  
-  // Force all changes to "M" (as in original code)
-  const diffMap = {};
-  for (const key in rawDiffMap) {
-    diffMap[key] = GIT_STATUS.MODIFIED;
-  }
+  // Filter out deleted files and keep original git statuses
+  const filteredDiffs = diffs.filter(diff => diff.status !== GIT_STATUS.DELETED);
+  const diffMap = GitDiffManager.buildDiffMap(filteredDiffs);
 
   const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
   TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
-  // console.log(diffMap);
-  // console.log(baseTree);
-  // console.log(changedFolders);
 
-  
   const currentPath = localStorage.getItem('currentPath');
   if (loadfile){
     loadFile(normalizePath(currentPath));
@@ -548,11 +546,12 @@ export async function fetchGitTree(gitCommit) {
   if (!dropdowns) return;
 
   if (gitCommit) {
-    // Commit vs commit comparison
+    // Commit vs commit comparison - show all files that exist in EITHER commit
     const leftCommit = dropdowns.left.value;
     const rightCommit = dropdowns.right.value;
     
-    const baseTree = await TreeAPI.getTree(rightCommit);
+    // Get tree with all files from both commits (union)
+    const baseTree = await TreeAPI.getUnionTree(leftCommit, rightCommit);
     let diffMap = {};
     
     if (leftCommit !== rightCommit) {

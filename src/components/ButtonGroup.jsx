@@ -11,6 +11,11 @@ const GroupContainer = styled.div`
     border-radius: var(--border-radius) 0 0 var(--border-radius);
   }
 
+  & > button:last-child {
+    border-right: 1px solid var(--border) !important;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+  }
+
   .btn-dropdown {
     right: 20px;
   }
@@ -98,7 +103,7 @@ const ButtonGroup = ({ buttons, clickedId, mainButtonsNum = buttons.value.length
           {typeof button.icon == "function" ? <button.icon /> : <img src={button.icon} />}
         </RadioButton>
       ))}
-      <div>
+      {/*<div>
         <RadioButton className="icon radio-icon more" active={selectedIndex.value >= mainButtonsNum}>
           <MoreIcon />
         </RadioButton>
@@ -123,7 +128,7 @@ const ButtonGroup = ({ buttons, clickedId, mainButtonsNum = buttons.value.length
             </div>
           </div>
         </div>
-      </div>
+      </div>*/}
     </GroupContainer>
   );
 };

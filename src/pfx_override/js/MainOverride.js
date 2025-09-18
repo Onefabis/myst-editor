@@ -72,7 +72,6 @@ export async function loadFile(filename) {
   newContainer.style.height = "80vh";
   old.replaceWith(newContainer);
   localStorage.setItem('currentPath', filename);
-
   const sheet = new CSSStyleSheet();
   const css = await (await fetch('../PFXStyleOverride.css')).text();
   await sheet.replace(css);
@@ -86,55 +85,39 @@ export async function loadFile(filename) {
       title: title,
       additionalStyles: sheet,
       includeButtons: defaultButtons.concat([
-        { text: "🧹 Revert", action: () => revertFileChanges(mystEditorInstance) },
-        { text: "💾 Save", action: () => saveCurrentEditorContent(true) },
-        { text: "🗃️ Image", action: () => openImagePicker() },
-        { text: "Clear", action: () => txFormat.clearLineSymbols() },
-        { text: "H1", action: () => txFormat.convertToH1() },
-        { text: "H2", action: () => txFormat.convertToH2() },
-        { text: "B", action: () => txFormat.convertToBold() }
+        { id: "revert", text: "🧹 Revert", visible: false, action: () => revertFileChanges(mystEditorInstance) },
+        { text: "💾 Save", visible: true, action: () => saveCurrentEditorContent(true) },
+        { text: "🗃️ Image", visible: true, action: () => openImagePicker() },
+        { text: "Clear", visible: true, action: () => txFormat.clearLineSymbols() },
+        { text: "H1", visible: true, action: () => txFormat.convertToH1() },
+        { text: "H2", visible: true, action: () => txFormat.convertToH2() },
+        { text: "B",  visible: true, action: () => txFormat.convertToBold() }
       ]),
       spellcheckOpts: false,
       syncScroll: true,
     }, newContainer);
-    
     const view = await waitForEditorReady();
     bindFocusBlurHandlers(view);
-
     // Wait for plugin to be ready before setting up mode subscription
     await pluginReady;
-    // console.log("Plugin ready, pluginInstance:", pluginInstance);
-
     // Always re-inject merge view when file loads for non-Gitdiff modes
     if (["Both", "Source", "Inline"].includes(mystEditorInstance.options.mode.v)) {
       showLatestCommitDiff(mystEditorInstance);
     }
-
     window._mystEditor = mystEditorInstance;
-
     // Set up mode change subscription with more robust handling
     mystEditorInstance.options.mode.subscribe((newMode) => {
-      // console.log("Mode subscription triggered, newMode:", newMode);
-      
       requestAnimationFrame(async () => {
         if (["Both", "Source", "Inline"].includes(newMode)) {
-          // console.log("Switching to regular mode:", newMode);
-          
           // Wait for the editor to be ready with the new mode
           await new Promise(resolve => setTimeout(resolve, 150));
-          
           // Try multiple approaches to ensure merge injection works
           if (pluginInstance) {
-            // console.log("Using plugin instance for merge injection");
             pluginInstance.handleModeChange(newMode, mystEditorInstance);
           } else {
-            // console.log("Plugin not ready, calling showLatestCommitDiff directly");
             showLatestCommitDiff(mystEditorInstance);
           }
-          
         } else if (newMode === "Gitdiff") {
-          // console.log("Switching to Gitdiff mode");
-          
           // Clear merge view if plugin is available
           if (pluginInstance) {
             pluginInstance.clearMergeView(mystEditorInstance);
@@ -146,7 +129,6 @@ export async function loadFile(filename) {
               });
             }
           }
-          
           setupGitPanel();
         }
       });

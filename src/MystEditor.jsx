@@ -40,8 +40,8 @@ const EditorParent = styled.div`
         return "#resolved-wrapper { display: none }";
       case "Resolved":
         return "#preview-wrapper { display: none };";
-      case "Outline":
-        return "#preview-wrapper { display: none };";
+      // case "Outline":
+      //   return "#preview-wrapper { display: none };";
       case "Inline":
         return "#preview-wrapper { display: none }";
       default:
@@ -150,11 +150,11 @@ const MystEditor = () => {
 
   // Git panel elements style START
   // Initialize the signal with saved state
-  const savedLeft = localStorage.getItem("gitLeftToggle");
+  const savedLeft = localStorage.getItem("gitLeftListToggle");
 
   const [headBranch, setHeadBranch] = useState(null);
 
-  const showLeft = useSignal(savedLeft === null ? true : savedLeft === "true");
+  const showLeftCommitList = useSignal(savedLeft === null ? true : savedLeft === "true");
   // track first render to suppress auto-calls
   const firstRender = useRef(true);
 
@@ -171,7 +171,7 @@ const MystEditor = () => {
 
 
   useSignalEffect(() => {
-    localStorage.setItem("gitLeftToggle", showLeft.value.toString());
+    localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
 
     if (firstRender.current) {
       // skip first change triggered on page load
@@ -181,10 +181,10 @@ const MystEditor = () => {
 
     // user actually changed the toggle
     if (window.reloadGitdiff) {
-      window.reloadGitdiff(showLeft.value ? "commits" : "local");
+      window.reloadGitdiff(showLeftCommitList.value ? "commits" : "local");
     }
-    fetchGitTree(showLeft.value);
-  }, [showLeft]);
+    fetchGitTree(showLeftCommitList.value);
+  }, [showLeftCommitList]);
 
   const fullscreen = useSignal(false);
   useSignalEffect(() => hideBodyScrollIf(fullscreen.value));
@@ -222,6 +222,7 @@ const MystEditor = () => {
       options.includeButtons.value.map((b) => ({
         ...b,
         action: b.action || buttonActions[b.id],
+        visible: b.visible !== false // default true
       })),
     [options.includeButtons.value, buttonActions],
   );
@@ -246,16 +247,16 @@ const MystEditor = () => {
 
                   <ToggleInput className="toggle-input" 
                     type="checkbox"
-                    checked={showLeft.value}
+                    checked={showLeftCommitList.value}
                     onChange={() => {
-                      showLeft.value = !showLeft.value;
+                      showLeftCommitList.value = !showLeftCommitList.value;
                     }}
                   />
                   <Slider className="toggle-slider" />
                 </ToggleWrapper>
 
                 {/* Left dropdowns always exist, toggle visibility */}
-                <div className={showLeft.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
+                <div className={showLeftCommitList.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
                   <div className="git-dropdown-group">
                     <label htmlFor="branchDropdownLeft">Branch:</label>
                     <select id="branchDropdownLeft"></select>
@@ -268,25 +269,25 @@ const MystEditor = () => {
                 </div>
 
                 {/* Current file text always exists */}
-                <div className={showLeft.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
+                <div className={showLeftCommitList.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
                   <span id="current_file_label">Current file</span>
                 </div>
               </GitHalf>
 
               <GitHalf>
                 {/*<div className="git-dropdown-group">*/}
-                <div  className={showLeft.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
+                <div  className={showLeftCommitList.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
                   <label htmlFor="branchDropdownRight">Branch:</label>
                   <select id="branchDropdownRight"></select>
                 </div>
 
                 {/*<div className="git-dropdown-group">*/}
-                <div  className={showLeft.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
+                <div  className={showLeftCommitList.value ? "showedGitLeftpanel" : "hiddenGitLeftPanel"}>
                   <label htmlFor="commitDropdownRight">Commit:</label>
                   <select id="commitDropdownRight"></select>
                 </div>
 
-                <div className={showLeft.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
+                <div className={showLeftCommitList.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
                   <span id="current_file_label">
                     HEAD Commit {headBranch ? `Branch: ${headBranch}` : ""}
                   </span>
@@ -357,11 +358,11 @@ const MystEditor = () => {
                   </FlexWrapper>
                 )}
 
-              {options.mode.value === "Outline" && (
-                <FlexWrapper className="flex-wrapper">
+              
+                <FlexWrapper className="flex-wrapper" id="table-of-contents">
                   <TableOfContents />
                 </FlexWrapper>
-              )}
+          
             </MystWrapper>
 
           </EditorParent>

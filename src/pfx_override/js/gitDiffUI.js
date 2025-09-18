@@ -74,7 +74,7 @@ function setupCommitChangeHandler(commitDropdown) {
   commitDropdown.addEventListener("change", () => {
     const selected = commitDropdown.options[commitDropdown.selectedIndex];
     if (!selected) return;
-    const mode = localStorage.getItem("gitLeftToggle") || true;
+    const mode = localStorage.getItem("gitLeftListToggle") || true;
     if (mode){
       if (window.reloadGitdiff) window.reloadGitdiff(mode);
     }
@@ -105,9 +105,9 @@ function waitForShadowElement(hostSelector, id, timeout = 5000) {
   });
 }
 
-// Apply gitLeftToggle
+// Apply gitLeftListToggle
 function applyGitToggle() {
-  const toggle = localStorage.getItem("gitLeftToggle");
+  const toggle = localStorage.getItem("gitLeftListToggle");
   fetchGitTree(toggle === "true");
 }
 
@@ -154,7 +154,7 @@ export async function setupGitPanel() {
   branchRight.onchange = () => updateCommits(branchRight.value, commitRight, data);
 
   // Only trigger once after restoration
-  const mode = localStorage.getItem("gitLeftToggle") || true;
+  const mode = localStorage.getItem("gitLeftListToggle") || true;
   if (window.reloadGitdiff) window.reloadGitdiff(mode ? "commits" : "local" );
   applyGitToggle();
 }

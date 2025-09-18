@@ -175,6 +175,12 @@ ul {
         text-decoration-thickness: 1.5px;
       }
 
+#table-of-contents {
+  width: 10px;
+  display: block;
+  flex: none;
+}
+
 @media print {
   #sidebar, #editor-wrapper, #resizer, .myst-main-editor {
     display: none !important;

@@ -1,99 +1,166 @@
-import { useContext } from "preact/hooks";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import styled from "styled-components";
 import { MystState } from "../mystState";
 import { EditorView } from "codemirror";
 import { useSignalEffect } from "@preact/signals";
 
 const Wrapper = styled.div`
-  background-color: var(--panel-bg);
-  padding: 20px 0;
-  box-sizing: border-box;
-  height: 100%;
-  border: 1px solid var(--border);
-  box-shadow: inset 0px 0px 4px var(--box-shadow);
-  border-radius: var(--border-radius);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  position: fixed;
+  top: 50%;
+  right: 23px;
+  transform: translateY(-50%);
+  width: 22px; /* collapsed width */
+  min-height: 20% !important;
+  border-radius: 10px;
+  border-left: 0px;
+  box-shadow: none;
+  overflow: hidden;
+  padding: 10px 5px;
+  transition: width 0.4s ease, max-height 0.4s ease;
+  cursor: pointer;
 
-  & > h1 {
-    font-size: 20px;
-    padding-left: 100px;
-    margin-bottom: 0;
+  &.expanded {
+    width: 230px; /* expanded width */
+    max-height: 96%;
+    background-color: var(--panel-bg);
+    border-left: 1px solid var(--border);
+    box-shadow: inset 0px 0px 4px var(--box-shadow);
   }
-`;
 
-const VerticalSparator = styled.hr`
-  border: none;
-  height: 1px;
-  background-color: var(--border);
-  margin-top: 20px;
-  margin-bottom: 0;
+  &.scrollable {
+    overflow: auto; /* applied only after transition ends */
+  }
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 3px;
+  }
 `;
 
 const HeadingList = styled.div`
-  margin-left: 100px;
-  margin-top: 20px;
-
   ul {
     list-style: none;
+    padding: 0;
+    margin: 0;
   }
 
-  & > ul {
-    padding-left: 0;
-  }
+  li {
+    margin: 0 0 0 4px;
+    position: relative;
 
-  li > span {
-    font-weight: bold;
-    font-size: 18px;
-    line-height: 150%;
-    user-select: none;
-
-    &:hover {
-      text-decoration: underline;
-      cursor: pointer;
+    /* Line for collapsed state */
+    &::before {
+      content: '';
+      display: block;
+      height: 3px;
+      background-color: var(--border);
+      width: 100%;
+      flex-shrink: 0;
+      transition: width 0.4s ease, opacity 0.4s ease;
     }
+
+    span {
+      margin-left: 5px;
+      white-space: nowrap;
+      font-weight: ${(props) => (props.level === 1 ? "bold" : "normal")};
+      font-size: ${(props) => 20 - props.level * 2}px;
+      line-height: 1.4;
+      cursor: pointer;
+      user-select: none;
+      max-width: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-width 0.4s ease, opacity 0.4s ease;
+    }
+  }
+
+  /* When expanded, show text and hide line */
+  ${Wrapper}.expanded & li span {
+    max-width: 200px; /* enough to show text */
+    opacity: 1;
+  }
+
+  ${Wrapper}.expanded & li::before {
+    width: 0;
+    opacity: 0;
+  }
+
+  ul ul {
+    padding-left: 0px; /* nested indentation */
   }
 `;
 
-function Heading({ heading }) {
-  let children;
-  if (heading.children.length > 0) {
-    children = (
-      <ul>
-        {heading.children.map((c) => (
-          <Heading key={c.pos} heading={c} />
-        ))}
-      </ul>
-    );
-  }
-
+function Heading({ heading, level = 1 }) {
   return (
-    <li>
+    <li level={level}>
       <span title="Go to heading" data-heading-pos={heading.pos}>
         {heading.text}
       </span>
-      {children}
+      {heading.children.length > 0 && (
+        <ul>
+          {heading.children.map((c) => (
+            <Heading heading={c} key={c.pos} level={level + 1} />
+          ))}
+        </ul>
+      )}
     </li>
   );
 }
 
 export const TableOfContents = () => {
   const { headings, editorView } = useContext(MystState);
+  const [expanded, setExpanded] = useState(false);
+  const [scrollable, setScrollable] = useState(false);
+  const wrapperRef = useRef(null);
 
-  useSignalEffect(() => console.log(headings.value));
+  const hasHeadings = headings.value.length > 0;
+
+  // useSignalEffect(() => console.log(headings.value));
 
   function handleClick(ev) {
     const posAttr = ev.target?.dataset?.headingPos;
     if (!posAttr) return;
     const pos = parseInt(posAttr, 10);
-    editorView.value.dispatch({ selection: { anchor: pos, head: pos }, effects: EditorView.scrollIntoView(pos, { y: "start" }) });
+    editorView.value.dispatch({
+      selection: { anchor: pos, head: pos },
+      effects: EditorView.scrollIntoView(pos, { y: "start" }),
+    });
   }
 
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    const handleTransitionEnd = (e) => {
+      if (expanded && (e.propertyName === "width" || e.propertyName === "max-height")) {
+        setScrollable(true); // enable scroll after animation finishes
+      }
+    };
+
+    el.addEventListener("transitionend", handleTransitionEnd);
+    return () => el.removeEventListener("transitionend", handleTransitionEnd);
+  }, [expanded]);
+
   return (
-    <Wrapper>
-      <h1>Table of Contents</h1>
-      <VerticalSparator />
-      <HeadingList onClick={handleClick}>
+    <Wrapper
+      ref={wrapperRef}
+      onClick={handleClick}
+      onMouseEnter={() => {
+        if (hasHeadings) {
+          setExpanded(true);
+          setScrollable(false);
+        }
+      }}
+      onMouseLeave={() => {
+        setExpanded(false);
+        setScrollable(false);
+      }}
+      className={`${expanded ? "expanded" : ""} ${scrollable ? "scrollable" : ""}`}
+    >
+      <HeadingList>
         <ul>
           {headings.value.map((h) => (
             <Heading heading={h} key={h.pos} />
