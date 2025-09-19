@@ -1,10 +1,10 @@
-import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates } from "./leftPanelFileTree.js";
+import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates, treeState } from "./leftPanelFileTree.js";
 import { loadFile, insertImageMarkdown } from "./MainOverride.js";
 
 // ----------------------- Move To Dialog ----------------------- //
 
 /* Opens the "Move To" dialog for relocating files or folders.
-Allows restructuring of the project’s file/folder hierarchy on a raw "doc" (markdown) folder.
+Allows restructuring of the project's file/folder hierarchy on a raw "doc" (markdown) folder.
 This structure doesn't reflect the final Sphinx navigation tree, because it's driven by "toctree" defined inside key markdown files.
 Read Sphinx docs here - https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#table-of-contents
  */
@@ -76,6 +76,17 @@ function openMoveToDialog(itemPath) {
       if (currentPath === itemPath) {
         localStorage.setItem('currentPath', newPath);
       }
+      
+      // Update selected element if it was moved
+      const selectedElement = treeState.getSelectedElement();
+      if (selectedElement && selectedElement.path === itemPath) {
+        treeState.setSelectedElement({
+          path: newPath,
+          name: selectedElement.name,
+          type: selectedElement.type
+        });
+      }
+      
       fetchLocalTree();
     }
     modal.remove();
@@ -89,25 +100,37 @@ function openMoveToDialog(itemPath) {
 // ----------------------- Toolbar Button Actions START ----------------------- //
 
 document.getElementById("move").onclick = () => {
-  const selectedEl = document.querySelector(".file.active, .folder.active");
-  if (!selectedEl) {
+  const selectedElement = treeState.getSelectedElement();
+  
+  if (!selectedElement) {
     alert("Select a file or folder to move.");
     return;
   }
-  const path = selectedEl.title;
-  const name = path.split('/').pop();
+  
+  const name = selectedElement.name;
   if (ignoredFolders.includes(name)) {
     alert(`Cannot move protected folder: ${name}`);
     return;
   }
-  openMoveToDialog(path);
+  
+  openMoveToDialog(selectedElement.path);
 };
 
 document.getElementById("new-file").onclick = async () => {
+  const selectedElement = treeState.getSelectedElement();
+  let targetFolder = '';
+
+  if (selectedElement && selectedElement.type === 'folder') {
+    targetFolder = selectedElement.path; // use selected folder
+  } else if (activeFolderPath) {
+    targetFolder = activeFolderPath; // fallback
+  }
+
   const name = prompt('Enter new file name (without ".md")');
   if (!name || name.trim() === '') return;
   const fullName = name.endsWith('.md') ? name : `${name}.md`;
-  const path = activeFolderPath ? `${activeFolderPath}/${fullName}` : fullName;
+  const path = targetFolder ? `${targetFolder}/${fullName}` : fullName;
+
   fetch('/api/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -119,9 +142,19 @@ document.getElementById("new-file").onclick = async () => {
 };
 
 document.getElementById("new-folder").onclick = async () => {
+  const selectedElement = treeState.getSelectedElement();
+  let targetFolder = '';
+
+  if (selectedElement && selectedElement.type === 'folder') {
+    targetFolder = selectedElement.path;
+  } else if (activeFolderPath) {
+    targetFolder = activeFolderPath;
+  }
+
   const name = prompt('Enter new folder name (e.g.: newfolder)');
   if (!name) return;
-  const path = activeFolderPath ? `${activeFolderPath}/${name}` : name;
+  const path = targetFolder ? `${targetFolder}/${name}` : name;
+
   fetch('/api/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -129,35 +162,46 @@ document.getElementById("new-folder").onclick = async () => {
   }).then(() => fetchLocalTree());
 };
 
+
 document.getElementById("delete").onclick = async () => {
-  const selectedEl = document.querySelector(".file.active, .folder.active");
-  if (!selectedEl) {
+  const selectedElement = treeState.getSelectedElement();
+  
+  if (!selectedElement) {
     alert("Select a file or folder to delete.");
     return;
   }
-  const path = selectedEl.title;
-  const name = path.split('/').pop();
+
+  const path = selectedElement.path;
+  const name = selectedElement.name;
+  
   if (ignoredFolders.includes(name)) {
     alert(`Cannot delete protected folder: ${name}`);
     return;
   }
-  const isFolder = selectedEl.classList.contains("folder");
+  
+  const isFolder = selectedElement.type === 'folder';
   const confirmText = isFolder
     ? `Are you sure you want to delete the folder "${path}" and all its contents?`
     : `Are you sure you want to delete the file "${path}"?`;
+    
   if (!confirm(confirmText)) return;
+  
   try {
     const res = await fetch('/api/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     });
+    
     if (!res.ok) {
       const error = await res.text();
       alert(`Error while deleting: ${error}`);
       return;
     }
+    
     clearActiveStates();
+    treeState.clearSelectedElement(); // Clear the selection after deletion
+    
     let currentPath = localStorage.getItem('currentPath') || "";
     if (currentPath) {
       if (isFolder && currentPath.startsWith(path + '/')) {
@@ -174,6 +218,7 @@ document.getElementById("delete").onclick = async () => {
         if (editor) editor.innerHTML = "";
       }
     }
+    
     fetchLocalTree();
   } catch (err) {
     alert(`Error while deleting: ${err.message}`);
@@ -181,17 +226,21 @@ document.getElementById("delete").onclick = async () => {
 };
 
 document.getElementById("rename").onclick = async () => {
-  const selectedEl = document.querySelector(".file.active, .folder-text.active");
-  if (!selectedEl) {
+  const selectedElement = treeState.getSelectedElement();
+  
+  if (!selectedElement) {
     alert("Select a file or folder to rename.");
     return;
   }
-  const path = selectedEl.title;
-  const name = path.split('/').pop();
+
+  const path = selectedElement.path;
+  const name = selectedElement.name;
+  
   if (ignoredFolders.includes(name)) {
     alert(`Cannot rename protected folder: ${name}`);
     return;
   }
+
   const oldPath = path.replace(/\\/g, "/");
   const segments = oldPath.split("/");
   const oldName = segments.pop();
@@ -200,22 +249,35 @@ document.getElementById("rename").onclick = async () => {
   const displayName = oldName.endsWith(".md") ? oldName.replace(/\.md$/, "") : oldName;
   const inputName = prompt("Enter new name:", displayName);
   if (!inputName || inputName.trim() === "" || inputName === displayName) return;
+
   const newName = oldName.endsWith(".md") && !inputName.endsWith(".md")
     ? `${inputName}.md` : inputName;
   const newPath = dirPath ? `${dirPath}/${newName}` : newName;
+
   const res = await fetch("/api/rename", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ oldPath, newPath }),
+    body: JSON.stringify({ oldPath, newPath, action: "check" }),
   });
+
   if (!res.ok) {
-    alert("Rename error.");
+    const error = await res.json();
+    alert("Rename error: " + (error.error || "Unknown"));
     return;
   }
+
   let currentPath = localStorage.getItem('currentPath') || "";
   if (currentPath === oldPath) {
     localStorage.setItem("currentPath", newPath);
   }
+  
+  // Update the selected element to reflect the new path/name
+  treeState.setSelectedElement({
+    path: newPath,
+    name: newName,
+    type: selectedElement.type
+  });
+  
   fetchLocalTree();
 };
 
@@ -315,8 +377,13 @@ function showUploadImageModal(file, currentPath) {
 
     async function checkCollision(actionType) {
       const newName = uploadImageModal.input.value.trim() + extension;
+
+      // Wrap original Blob into a new File with the new name
+      const renamedFile = new File([file], newName, { type: file.type });
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", renamedFile); // use renamed file
+      // formData.append("file", file);
       formData.append("path", currentPath);
       formData.append("action", actionType);
 
@@ -350,4 +417,3 @@ function showUploadImageModal(file, currentPath) {
     };
   });
 }
-

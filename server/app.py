@@ -380,36 +380,81 @@ async def search_file(req: FileRequest):
     commits = {}
     target_file = f"{DOCS_DIR}/{req.filename.replace('\\', '/')}" if req.filename else None
 
-    for branch in repo.branches:
-        branch_name = branch.name
-        branches.append(branch_name)
-        commits[branch_name] = []
+    try:
+        # Handle case where repo has no branches
+        if not repo.branches:
+            return {
+                "branches": [],
+                "commits": {},
+                "active_branch": None,
+                "head_commit": None,
+            }
 
-        for idx, c in enumerate(repo.iter_commits(branch_name)):
-            file_exists = True
-            if target_file:
-                try:
-                    _ = c.tree / target_file
-                except KeyError:
-                    file_exists = False
+        # Process branches
+        for branch in repo.branches:
+            try:
+                branch_name = branch.name
+                branches.append(branch_name)
+                commits[branch_name] = []
 
-            commits[branch_name].append({
-                "hash": c.hexsha,
-                "summary": c.summary,
-                "message": c.message,
-                "index": idx + 1,  # chronological index (newest = 1)
-                "file_exists": file_exists
-            })
+                # Handle case where branch has no commits
+                branch_commits = list(repo.iter_commits(branch_name))
+                if not branch_commits:
+                    continue
 
-    active_branch = repo.active_branch.name if not repo.head.is_detached else None
-    head_commit = repo.head.commit.hexsha
+                for idx, c in enumerate(branch_commits):
+                    file_exists = True
+                    if target_file:
+                        try:
+                            _ = c.tree / target_file
+                        except KeyError:
+                            file_exists = False
+                        except Exception:
+                            file_exists = False
 
-    return {
-        "branches": sorted(set(branches)),
-        "commits": commits,
-        "active_branch": active_branch,
-        "head_commit": head_commit,
-    }
+                    commits[branch_name].append({
+                        "hash": c.hexsha,
+                        "summary": c.summary,
+                        "message": c.message,
+                        "index": idx + 1,  # chronological index (newest = 1)
+                        "file_exists": file_exists
+                    })
+            except Exception as e:
+                print(f"Error processing branch {branch_name}: {e}")
+                continue
+
+        # Handle active branch safely
+        active_branch = None
+        head_commit = None
+        
+        try:
+            if not repo.head.is_detached and repo.active_branch:
+                active_branch = repo.active_branch.name
+        except Exception:
+            pass
+
+        try:
+            if repo.head.commit:
+                head_commit = repo.head.commit.hexsha
+        except Exception:
+            pass
+
+        return {
+            "branches": sorted(set(branches)),
+            "commits": commits,
+            "active_branch": active_branch,
+            "head_commit": head_commit,
+        }
+        
+    except Exception as e:
+        print(f"Error in search_file: {e}")
+        # Return safe defaults on any error
+        return {
+            "branches": [],
+            "commits": {},
+            "active_branch": None,
+            "head_commit": None,
+        }
     
 
 class DiffRequest(BaseModel):

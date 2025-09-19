@@ -5,17 +5,31 @@ export function updateCommits(selectedBranch, commitDropdown, gitData, savedComm
   if (!selectedBranch || !commitDropdown || !gitData) return;
 
   try {
+    // Handle missing commits object or branch
+    if (!gitData.commits || typeof gitData.commits !== 'object') {
+      console.warn("Git data missing commits object");
+      commitDropdown.innerHTML = "";
+      return;
+    }
+
     const commitsForBranch = gitData.commits[selectedBranch] || [];
     const total = commitsForBranch.length;
+    
+    // Handle empty commits array
+    if (total === 0) {
+      commitDropdown.innerHTML = '<option value="">No commits available</option>';
+      return;
+    }
+
     const commitItems = commitsForBranch.map(c => ({
-      value: c.hash,
-      label: (c.summary || c.message || c).split("\n")[0],
-      message: c.message,
-      index: total - c.index + 1,
-      file_exists: c.file_exists,
+      value: c.hash || '',
+      label: (c.summary || c.message || c).toString().split("\n")[0],
+      message: c.message || '',
+      index: total - (c.index || 0) + 1,
+      file_exists: c.file_exists !== false, // default to true if undefined
     }));
 
-    const headCommit = gitData.head_commit;
+    const headCommit = gitData.head_commit || null;
     populateDropdown(commitDropdown, commitItems, null, headCommit);
 
     if (savedCommit) {
@@ -30,8 +44,8 @@ export function updateCommits(selectedBranch, commitDropdown, gitData, savedComm
       }
     }
   } catch (err) {
-    console.error("Failed to update commits:", err);
-    commitDropdown.innerHTML = "";
+    // console.error("Failed to update commits:", err);
+    commitDropdown.innerHTML = '<option value="">Commits list is empty</option>';
   }
 }
 
@@ -111,7 +125,7 @@ function applyGitToggle() {
   fetchGitTree(toggle === "true");
 }
 
-// Main setup
+// Enhanced setupGitPanel with better error handling
 export async function setupGitPanel() {
   const branchLeft = await waitForShadowElement('#myst', 'branchDropdownLeft');
   const commitLeft = await waitForShadowElement('#myst', 'commitDropdownLeft');
@@ -123,38 +137,97 @@ export async function setupGitPanel() {
     return;
   }
 
-  // Persist dropdown changes
-  const persist = (id, el) => el.addEventListener("change", () => localStorage.setItem(id, el.value));
-  persist("branchDropdownLeft", branchLeft);
-  persist("commitDropdownLeft", commitLeft);
-  persist("branchDropdownRight", branchRight);
-  persist("commitDropdownRight", commitRight);
+  try {
+    const data = await fetchGitData();
+    
+    // Handle empty or invalid data
+    if (!data || !Array.isArray(data.branches)) {
+      console.error("Invalid git data received:", data);
+      // Set empty options for all dropdowns
+      [branchLeft, branchRight].forEach(dropdown => {
+        dropdown.innerHTML = '<option value="">No branches available</option>';
+      });
+      [commitLeft, commitRight].forEach(dropdown => {
+        if (dropdown) dropdown.innerHTML = '<option value="">No commits available</option>';
+      });
+      return;
+    }
 
-  const data = await fetchGitData();
+    // Persist dropdown changes
+    const persist = (id, el) => {
+      if (el) {
+        el.addEventListener("change", () => localStorage.setItem(id, el.value));
+      }
+    };
+    persist("branchDropdownLeft", branchLeft);
+    persist("commitDropdownLeft", commitLeft);
+    persist("branchDropdownRight", branchRight);
+    persist("commitDropdownRight", commitRight);
 
-  // Populate branches
-  const branchItems = data.branches.map((b,i) => ({ value:b, label:b, index:data.branches.length-i }));
-  populateDropdown(branchLeft, branchItems, data.active_branch);
-  populateDropdown(branchRight, branchItems, data.active_branch);
+    // Handle empty branches
+    if (data.branches.length === 0) {
+      [branchLeft, branchRight].forEach(dropdown => {
+        dropdown.innerHTML = '<option value="">No branches available</option>';
+      });
+      [commitLeft, commitRight].forEach(dropdown => {
+        if (dropdown) dropdown.innerHTML = '<option value="">No commits available</option>';
+      });
+      return;
+    }
 
-  // Restore saved branch & commit
-  const savedBranchLeft  = localStorage.getItem("branchDropdownLeft");
-  const savedBranchRight = localStorage.getItem("branchDropdownRight");
-  const savedCommitLeft  = localStorage.getItem("commitDropdownLeft");
-  const savedCommitRight = localStorage.getItem("commitDropdownRight");
+    // Populate branches
+    const branchItems = data.branches.map((b, i) => ({ 
+      value: b, 
+      label: b, 
+      index: data.branches.length - i 
+    }));
+    populateDropdown(branchLeft, branchItems, data.active_branch);
+    populateDropdown(branchRight, branchItems, data.active_branch);
 
-  if (savedBranchLeft)  branchLeft.value  = savedBranchLeft;
-  if (savedBranchRight) branchRight.value = savedBranchRight;
+    // Restore saved branch & commit
+    const savedBranchLeft = localStorage.getItem("branchDropdownLeft");
+    const savedBranchRight = localStorage.getItem("branchDropdownRight");
+    const savedCommitLeft = localStorage.getItem("commitDropdownLeft");
+    const savedCommitRight = localStorage.getItem("commitDropdownRight");
 
-  updateCommits(branchLeft.value, commitLeft, data, savedCommitLeft, true);
-  updateCommits(branchRight.value, commitRight, data, savedCommitRight, true);
+    if (savedBranchLeft && data.branches.includes(savedBranchLeft)) {
+      branchLeft.value = savedBranchLeft;
+    }
+    if (savedBranchRight && data.branches.includes(savedBranchRight)) {
+      branchRight.value = savedBranchRight;
+    }
 
-  // Branch change events
-  branchLeft.onchange  = () => updateCommits(branchLeft.value, commitLeft, data);
-  branchRight.onchange = () => updateCommits(branchRight.value, commitRight, data);
+    // Update commits with error handling
+    if (commitLeft) {
+      updateCommits(branchLeft.value, commitLeft, data, savedCommitLeft, true);
+    }
+    if (commitRight) {
+      updateCommits(branchRight.value, commitRight, data, savedCommitRight, true);
+    }
 
-  // Only trigger once after restoration
-  const mode = localStorage.getItem("gitLeftListToggle") || true;
-  if (window.reloadGitdiff) window.reloadGitdiff(mode ? "commits" : "local" );
-  applyGitToggle();
+    // Branch change events
+    branchLeft.onchange = () => {
+      if (commitLeft) updateCommits(branchLeft.value, commitLeft, data);
+    };
+    branchRight.onchange = () => {
+      if (commitRight) updateCommits(branchRight.value, commitRight, data);
+    };
+
+    // Only trigger once after restoration
+    const mode = localStorage.getItem("gitLeftListToggle") || true;
+    if (window.reloadGitdiff) {
+      window.reloadGitdiff(mode ? "commits" : "local");
+    }
+    applyGitToggle();
+    
+  } catch (error) {
+    console.error("Error setting up git panel:", error);
+    // Set error messages in dropdowns
+    [branchLeft, branchRight].forEach(dropdown => {
+      dropdown.innerHTML = '<option value="">Branches not exists</option>';
+    });
+    [commitLeft, commitRight].forEach(dropdown => {
+      if (dropdown) dropdown.innerHTML = '<option value="">Commits not exists</option>';
+    });
+  }
 }

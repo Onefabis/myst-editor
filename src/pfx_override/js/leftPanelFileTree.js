@@ -48,6 +48,7 @@ class FileTreeState {
   constructor() {
     this.openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
     this.activeFolderPath = '';
+    this.selectedElement = null; // Store the selected element info
   }
 
   addOpenFolder(path) {
@@ -75,9 +76,54 @@ class FileTreeState {
   getActiveFolderPath() {
     return this.activeFolderPath;
   }
+
+  // New methods for selected element management
+  setSelectedElement(element) {
+    this.selectedElement = element;
+    // Store in localStorage for persistence across page reloads if needed
+    if (element) {
+      localStorage.setItem('selectedElement', JSON.stringify({
+        path: element.path,
+        name: element.name,
+        type: element.type,
+        timestamp: Date.now() // To detect stale selections
+      }));
+    } else {
+      localStorage.removeItem('selectedElement');
+    }
+  }
+
+  getSelectedElement() {
+    // First check memory
+    if (this.selectedElement) {
+      return this.selectedElement;
+    }
+    
+    // Fall back to localStorage if available
+    const stored = localStorage.getItem('selectedElement');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        // Check if selection is not too old (optional, prevents stale selections)
+        if (Date.now() - parsed.timestamp < 300000) { // 5 minutes
+          this.selectedElement = parsed;
+          return parsed;
+        }
+      } catch (e) {
+        localStorage.removeItem('selectedElement');
+      }
+    }
+    
+    return null;
+  }
+
+  clearSelectedElement() {
+    this.selectedElement = null;
+    localStorage.removeItem('selectedElement');
+  }
 }
 
-const treeState = new FileTreeState();
+export const treeState = new FileTreeState();
 
 // ========================= UTILITY FUNCTIONS =========================
 
@@ -222,7 +268,7 @@ class GitDiffManager {
   }
 }
 
-// ========================= TREE RENDERING =========================
+// ========================= UPDATED TREE RENDERING =========================
 
 class TreeRenderer {
   static setFolderIcon(icon, isOpen, gitDiffActive, status) {
@@ -255,21 +301,32 @@ class TreeRenderer {
 
     title.className = 'folder';
     title.title = node.path;
+    title.dataset.elementPath = node.path;
+    title.dataset.elementType = 'folder';
+    title.dataset.elementName = node.name;
     title.appendChild(icon);
     title.appendChild(textSpan);
 
+    // Highlight selected folder
+    const selected = treeState.getSelectedElement();
+    if (selected && selected.path === node.path && selected.type === 'folder') {
+        title.classList.add('selected');
+    }
+
     if (gitDiffActive && changedFolders.has(node.path)) {
-      textSpan.classList.add('changed-path');
+        textSpan.classList.add('changed-path');
     }
 
     if (gitDiffActive) {
-      GitDiffManager.applyDiffStatus(textSpan, diffMap[node.path]);
+        GitDiffManager.applyDiffStatus(textSpan, diffMap[node.path]);
     }
 
     return { li, title, icon, textSpan };
   }
 
+
   static createFileElement(node, gitDiffActive, diffMap) {
+
     const li = document.createElement('li');
     const title = document.createElement('span');
     const icon = document.createElement('span');
@@ -279,8 +336,16 @@ class TreeRenderer {
 
     title.className = 'file';
     title.title = node.path;
+    title.dataset.elementPath = node.path; // Store path for identification
+    title.dataset.elementType = 'file';
+    title.dataset.elementName = node.name;
     title.textContent = node.name.endsWith('.md') ? node.name.replace(/\.md$/, '') : node.name;
     title.prepend(icon);
+
+    const selected = treeState.getSelectedElement();
+    if (selected && selected.path === node.path && selected.type === 'file') {
+        title.classList.add('selected');
+    }
 
     if (gitDiffActive) {
       GitDiffManager.applyDiffStatus(title, diffMap[node.path]);
@@ -303,10 +368,21 @@ class TreeRenderer {
     return { li, title, icon };
   }
 
-  static async handleFileClick(node) {
+  static async handleFileClick(node, titleElement) {
     clearActiveStates();
-    const title = event.target;
-    title.classList.add('active');
+    titleElement.classList.add('active');
+
+    titleElement.classList.add('selected');
+    document.querySelectorAll('.folder, .file').forEach(el => {
+        if (el !== titleElement) el.classList.remove('selected');
+    });
+
+    // Store selected element info
+    treeState.setSelectedElement({
+      path: node.path,
+      name: node.name,
+      type: 'file'
+    });
 
     const newPath = normalizePath(node.path);
     const currentPath = localStorage.getItem('currentPath');
@@ -319,12 +395,23 @@ class TreeRenderer {
     loadFile(newPath);
   }
 
-  static handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, event) {
+  static handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, event, titleElement) {
     event.stopPropagation();
 
     clearActiveStates();
-    const title = event.target;
-    title.classList.add('active');
+    titleElement.classList.add('active');
+
+    titleElement.classList.add('selected');
+    document.querySelectorAll('.folder, .file').forEach(el => {
+        if (el !== titleElement) el.classList.remove('selected');
+    });
+    
+    // Store selected element info
+    treeState.setSelectedElement({
+      path: node.path,
+      name: node.name,
+      type: 'folder'
+    });
     
     treeState.setActiveFolderPath(node.path);
     const subtreeContainer = li.querySelector('.subtree');
@@ -367,7 +454,7 @@ class TreeRenderer {
 
         const { li, title, icon } = this.createFolderElement(node, gitDiffActive, diffMap, changedFolders);
         
-        title.onclick = (e) => this.handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, e);
+        title.onclick = (e) => this.handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, e, title);
 
         const subtreeContainer = document.createElement('div');
         subtreeContainer.className = 'subtree';
@@ -386,7 +473,7 @@ class TreeRenderer {
         
         title.onclick = async (e) => {
           e.stopPropagation();
-          await this.handleFileClick(node);
+          await this.handleFileClick(node, title);
         };
 
         li.appendChild(title);
@@ -401,6 +488,7 @@ class TreeRenderer {
       if (!e.target.closest('span.file') && !e.target.closest('span.folder')) {
         clearActiveStates();
         treeState.setActiveFolderPath('');
+        treeState.clearSelectedElement(); // Clear selection when clicking empty space
       }
     });
   }
@@ -528,7 +616,9 @@ export async function fetchLocalTree(loadfile=true) {
   const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
 
   // Filter out deleted files and keep original git statuses
-  const filteredDiffs = diffs.filter(diff => diff.status !== GIT_STATUS.DELETED);
+  // Handle case where git diff fails (e.g., newly initialized repo with no commits)
+  const safeDiffs = Array.isArray(diffs) ? diffs : [];
+  const filteredDiffs = safeDiffs.filter(diff => diff.status !== GIT_STATUS.DELETED);
   const diffMap = GitDiffManager.buildDiffMap(filteredDiffs);
 
   const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);

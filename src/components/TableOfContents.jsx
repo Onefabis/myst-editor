@@ -29,6 +29,7 @@ const Wrapper = styled.div`
 
   &.scrollable {
     overflow: auto; /* applied only after transition ends */
+    scrollbar-width: thin;
   }
 
   &::-webkit-scrollbar {

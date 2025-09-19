@@ -83,10 +83,6 @@ ul {
   background-color: #ddd;
 }
 
-.active {
-  background-color: #cce5ff;
-}
-
 .controls {
     display: flex;
     height: 35px;
@@ -220,8 +216,9 @@ ul {
 }
 
 /* Safety: if something ever toggles this, neutralize it visually */
-#tree .folder.active {
-  background: transparent !important;
+#tree .folder.selected {
+  background-color: var(--active-bg, #dfe9fb) !important;
+  /*background: transparent !important;*/
 }
 
 #tree .folder-text {
@@ -811,6 +808,11 @@ aside.danger>header::before {
   font-weight: bold;
 }
 
+.selected {
+  background-color: rgba(0, 120, 215, 0.2);
+  border-radius: 4px;
+}
+
 .upload-modal {
   position: fixed;
   inset: 0;
@@ -1069,7 +1071,7 @@ aside.danger>header::before {
 
 
 /* ===== FILE & FOLDER STATES ===== */
-.file.active {
+.file.selected {
   background-color: var(--active-bg, #dfe9fb);
 }
 
