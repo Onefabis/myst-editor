@@ -11,6 +11,7 @@ const Wrapper = styled.div`
   transform: translateY(-50%);
   width: 22px; /* collapsed width */
   min-height: 20% !important;
+  max-height: 80% !important;
   border-radius: 10px;
   border-left: 0px;
   box-shadow: none;
