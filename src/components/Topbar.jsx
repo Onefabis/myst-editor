@@ -7,7 +7,7 @@ import ButtonGroup from "./ButtonGroup";
 import Avatars from "./Avatars";
 import { MystState } from "../mystState";
 import { useComputed, useSignal, useSignalEffect } from "@preact/signals";
-import { fetchLocalTree, fetchGitTree } from "../pfx_override/js/leftPanelFileTree.js"
+import { fetchLocalTree, fetchGitTree, fetchGitCommitTree } from "../pfx_override/js/leftPanelFileTree.js"
 
 const renderMdLinks = (title) =>
   [...(title || "").matchAll(/\[(.+)\]\(([^\s]+)\)/g)].reduce(
@@ -228,6 +228,12 @@ const GitdiffIcon = () => (
   </svg>
 );
 
+const GitCommitIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="2.118 4.199 46.134 46.134" width="22px" height="22px" fill="currentColor">
+    <path d="M 48.252 27.266 C 48.252 40.006 37.925 50.333 25.185 50.333 C 12.445 50.333 2.118 40.006 2.118 27.266 C 2.118 14.526 12.445 4.199 25.185 4.199 C 37.925 4.199 48.252 14.526 48.252 27.266 Z M 14.465 27.183 C 14.465 31.989 17.643 36.052 22.013 37.386 L 22.013 43.228 C 22.013 44.882 23.353 46.222 25.007 46.222 L 25.419 46.222 C 27.072 46.222 28.413 44.882 28.413 43.228 L 28.413 37.336 C 32.699 35.952 35.799 31.929 35.799 27.183 C 35.799 22.437 32.699 18.414 28.413 17.03 L 28.413 10.816 C 28.413 9.162 27.072 7.822 25.419 7.822 L 25.007 7.822 C 23.353 7.822 22.013 9.162 22.013 10.816 L 22.013 16.98 C 17.643 18.314 14.465 22.377 14.465 27.183 Z M 30.224 27.422 C 30.224 30.146 28.015 32.355 25.291 32.355 C 22.566 32.355 20.357 30.146 20.357 27.422 C 20.357 24.697 22.566 22.488 25.291 22.488 C 28.015 22.488 30.224 24.697 30.224 27.422 Z" style="stroke: rgb(0, 0, 0);" id="object-0" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -7.105427357601002e-15)"/>
+  </svg>
+);
+
 const DiffIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="16" viewBox="0 0 24 16" fill="none">
     <path d="M21.23 11.0801H10.29" stroke-width="1.75" stroke="currentColor" />
@@ -308,6 +314,9 @@ export const EditorTopbar = ({ alert, buttons }) => {
   const firstRender = useRef(true);
 
   useSignalEffect(() => {
+    if (options.mode.value === "GitCommit") {
+      fetchGitCommitTree();
+    }
     // save to localStorage
     localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
 
@@ -323,6 +332,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
       }
       fetchGitTree(showLeftCommitList.value);
     }
+
   });
 
   const editorModeButtons = useComputed(() => {
@@ -370,6 +380,14 @@ export const EditorTopbar = ({ alert, buttons }) => {
           options.mode.value = "Gitdiff"; 
         }, 
         icon: GitdiffIcon 
+      },
+      { 
+        id: "gitcommit", 
+        tooltip: "Git Commit", 
+        action: () => { 
+          options.mode.value = "GitCommit"; 
+        }, 
+        icon: GitCommitIcon 
       },
       { 
         id: "outline", 
@@ -456,7 +474,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
             ))}
           </div>
         )}
-        <ButtonGroup buttons={editorModeButtons} clickedId={clickedId.value} mainButtonsNum={5} /> 
+        <ButtonGroup buttons={editorModeButtons} clickedId={clickedId.value} mainButtonsNum={6} /> 
       </div>
     </Topbar>
   );

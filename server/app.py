@@ -579,7 +579,7 @@ async def git_diff_working_tree(commit: str = Query(...)):
         return {"error": str(e)}
 
 
-# Return intersection file tree for two selected commits
+# Return union file tree for two selected commits
 # Add this new endpoint to your FastAPI backend
 @app.get("/api/tree-union")
 async def get_tree_union(commit_left: str = Query(...), commit_right: str = Query(...)):
@@ -627,6 +627,114 @@ async def get_tree_union(commit_left: str = Query(...), commit_right: str = Quer
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/tree-local-diff")
+async def get_tree_local_diff():
+    """
+    Return a *filtered local tree* that contains ONLY files that are
+    modified (M) or added (A) in the working tree compared to HEAD.
+    - Excludes deleted (D) and renamed (R) entries.
+    - Returns: { tree: [...filtered tree nodes...], diffs: [...git-style diffs...] }
+    """
+    try:
+        result = []
+        changed_trimmed = set()
+
+        # Try to get HEAD commit safely
+        try:
+            head_commit = repo.head.commit.hexsha
+        except Exception:
+            head_commit = None
+
+        # 1) Get tracked changes compared to HEAD using same approach as git_diff_working_tree
+        if head_commit:
+            diff_output = repo.git.diff("--name-status", head_commit, DOCS_DIR)
+            for line in diff_output.splitlines():
+                parts = line.split("\t")
+                if not parts:
+                    continue
+
+                status = parts[0]  # e.g. "M", "A", "D", or "R100"
+                # Skip renames and deletes per requirement
+                if status.startswith("R"):
+                    continue
+                if status not in ("M", "A", "D"):
+                    continue
+
+                # Typical lines: "M\tdocs/path/to/file.md" or "A\tdocs/newfile.md"
+                path = parts[1] if len(parts) > 1 else None
+                if not path:
+                    continue
+                if not path.endswith(".md"):
+                    continue
+
+                # Only keep M and A (explicitly ignore D)
+                if status not in ("M", "A"):
+                    continue
+
+                old_path = path if status != "A" else None
+                new_path = path if status != "D" else None
+
+                result.append({"old_path": old_path, "new_path": new_path, "status": status})
+
+                # For filtering tree we need trimmed path (without "docs/" prefix)
+                p = new_path or old_path
+                if p is None:
+                    continue
+                # Normalize slashes and drop "docs/" prefix if present
+                p = p.replace("\\", "/")
+                prefix = DOCS_DIR.rstrip("/") + "/"
+                if p.startswith(prefix):
+                    p = p[len(prefix):]
+                changed_trimmed.add(p)
+
+        # 2) Add untracked files (ls-files --others) -> treat as Added
+        try:
+            untracked = repo.git.ls_files("--others", "--exclude-standard", DOCS_DIR).splitlines()
+            for file_path in untracked:
+                if not file_path.endswith(".md"):
+                    continue
+                result.append({"old_path": None, "new_path": file_path, "status": "A"})
+                p = file_path.replace("\\", "/")
+                prefix = DOCS_DIR.rstrip("/") + "/"
+                if p.startswith(prefix):
+                    p = p[len(prefix):]
+                changed_trimmed.add(p)
+        except Exception:
+            # If ls_files fails for some reason, just continue — we still return tracked changes
+            pass
+
+        # 3) Build local tree and filter it so only modified/added files and their folders remain
+        local_tree = scan_dir(BASE_DIR, BASE_DIR, [".md"])
+
+        def filter_tree(nodes):
+            filtered = []
+            for node in nodes:
+                if node["type"] == "file":
+                    if node["path"] in changed_trimmed:
+                        # copy shallow to avoid mutating original
+                        filtered.append({"type": node["type"], "name": node["name"], "path": node["path"]})
+                elif node["type"] == "folder":
+                    children = filter_tree(node.get("children", []))
+                    if children:
+                        filtered.append({
+                            "type": "folder",
+                            "name": node["name"],
+                            "path": node["path"],
+                            "children": children
+                        })
+            return filtered
+
+        filtered_local_tree = filter_tree(local_tree)
+        return {"tree": filtered_local_tree, "diffs": result}
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 
 
 # Mount frontend

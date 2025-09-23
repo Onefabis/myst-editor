@@ -10,6 +10,10 @@ menu.id = "custom-menu";
 menu.style.position = "fixed"; // Ensures positioning is relative to the viewport
 menu.style.display = "none";   // Hidden by default
 menu.innerHTML = `
+  <div class="item" id="copy_text">📋 Copy</div>
+  <div class="item" id="cut_text">✂️ Cut</div>
+  <div class="item" id="paste_text">📥 Paste</div>
+  <hr style="margin: 4px 0;">
   <div class="item" id="rename_image">✏️ Rename Image</div>
   <div class="item" id="excalidraw_image">🖼️ Excalidraw Image</div>
   <div class="item" style="display: flex; align-items: center; gap: 4px;">
@@ -78,6 +82,55 @@ document.addEventListener("click", () => {
   menu.style.display = "none";
 });
 
+
+// ------------------------- Default text editing START ---------------------------- //
+
+// --------- Clipboard actions ---------
+function execClipboardCommand(view, command) {
+  if (!view) return alert("Editor not ready");
+  const shadowDoc = view.v.dom.ownerDocument;
+
+  view.v.focus();
+  try {
+    const success = shadowDoc.execCommand(command);
+    if (!success) {
+      console.warn(`${command} not supported in this context`);
+    }
+  } catch (err) {
+    console.error(`Failed to execute ${command}:`, err);
+  }
+}
+
+document.getElementById("copy_text").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  execClipboardCommand(view, "copy");
+});
+
+document.getElementById("cut_text").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  execClipboardCommand(view, "cut");
+});
+
+document.getElementById("paste_text").addEventListener("click", async () => {
+  const view = mystEditorInstance?.editorView;
+  if (!view) return alert("Editor not ready");
+  view.v.dom.focus();
+
+  // Try modern Clipboard API
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) {
+      view.v.dispatch({
+        changes: { from: view.v.state.selection.main.from, to: view.v.state.selection.main.to, insert: text }
+      });
+    }
+  } catch (err) {
+    console.warn("Clipboard API failed, falling back to execCommand:", err);
+    execClipboardCommand("paste");
+  }
+});
+
+// ------------------------- Default text editing END ---------------------------- //
 
 // ------------------------- Excalidraw image editing START ---------------------------- //
 

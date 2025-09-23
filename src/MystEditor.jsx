@@ -28,7 +28,8 @@ const EditorParent = styled.div`
   ${(props) => {
     switch (props.mode) {
       case "Gitdiff":
-        // return ``;
+        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
+      case "GitCommit":
         return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
       case "Preview":
         return "#editor-wrapper { display: none }";

@@ -1,120 +1,117 @@
 /* empty css                          */
-import { M as p, d as f, r as h, s as v, o as y, c as g, a as w, b as x, e as S } from "./MystEditor-Dm9C1cX3.js";
-let n = null;
+import { s as g, M as y, d as w, r as S, a as x, o as b, c as I, b as B, e as C, f as E, w as T, g as F, p as W, h as f, i as r, j as P } from "./MystEditor-DollMqoU.js";
+let t = null;
 document.getElementById("editor-panel");
-const u = document.getElementById("sidebar"), b = document.getElementById("resizer"), m = localStorage.getItem("sidebarWidth");
-m && (u.style.width = m + "px");
-b.onmousedown = function(e) {
-  e.preventDefault();
-  const o = e.clientX, s = u.offsetWidth;
-  document.onmousemove = function(i) {
-    const t = s + (i.clientX - o);
-    t >= 250 && t <= 600 && (u.style.width = t + "px", localStorage.setItem("sidebarWidth", t));
+const m = document.getElementById("sidebar"), k = document.getElementById("resizer"), h = localStorage.getItem("sidebarWidth");
+h && (m.style.width = h + "px");
+k.onmousedown = function(o) {
+  o.preventDefault();
+  const n = o.clientX, s = m.offsetWidth;
+  document.onmousemove = function(a) {
+    const e = s + (a.clientX - n);
+    e >= 250 && e <= 600 && (m.style.width = e + "px", localStorage.setItem("sidebarWidth", e));
   }, document.onmouseup = function() {
     document.onmousemove = null, document.onmouseup = null;
   };
 };
-function I(e) {
-  return e.replace(/\\/g, "/");
+function H(o) {
+  return o.replace(/\\/g, "/");
 }
-function B(e, o = null) {
-  var s;
-  try {
-    if ((s = n == null ? void 0 : n.editorView) != null && s.v && !n.editorView.v.isDestroyed)
-      return e(n.editorView.v);
-  } catch (i) {
-    console.warn("Safe editor access failed:", i);
-  }
-  return o;
-}
-async function E(e) {
-  var a;
-  const o = await fetch(`/api/file?path=${encodeURIComponent(I(e))}`);
-  if (o.status === 404) {
+async function R(o) {
+  const n = await fetch(`/api/file?path=${encodeURIComponent(H(o))}`);
+  if (n.status === 404) {
     console.warn("Last opened file not found."), localStorage.removeItem("lastOpened");
     return;
   }
-  if (!o.ok) {
-    alert(`File loading error: ${o.statusText}`);
+  if (!n.ok) {
+    alert(`File loading error: ${n.statusText}`);
     return;
   }
-  const s = await o.json();
-  if ((a = n == null ? void 0 : n.editorView) != null && a.v) {
-    try {
-      n.editorView.v.destroy();
-    } catch (l) {
-      console.warn("Error destroying old editor:", l);
-    }
-    n = null;
-  }
-  const i = document.getElementById("myst"), t = document.createElement("div");
-  t.id = "myst", t.style.flexGrow = "1", t.style.border = "1px solid #ccc", t.style.marginBottom = "0.5rem", t.style.height = "80vh", i.replaceWith(t), localStorage.setItem("currentPath", e);
-  const c = new CSSStyleSheet(), r = await (await fetch("../PFXStyleOverride.css")).text();
-  await c.replace(r), document.adoptedStyleSheets = [...document.adoptedStyleSheets, c];
-  const d = e.split("\\").pop().split("/").pop();
-  await new Promise((l) => setTimeout(l, 50)), n = p({
-    templatelist: "linkedtemplatelist.json",
-    initialText: s.content,
-    title: d,
-    additionalStyles: c,
-    includeButtons: f.concat([{
-      id: "revert",
-      text: "🧹 Revert",
-      visible: !1,
-      action: () => h()
-    }, {
-      text: "💾 Save",
-      visible: !0,
-      action: () => v(!0)
-    }, {
-      text: "🗃️ Image",
-      visible: !0,
-      action: () => y()
-    }, {
-      text: "Clear",
-      visible: !0,
-      action: () => g()
-    }, {
-      text: "H1",
-      visible: !0,
-      action: () => w()
-    }, {
-      text: "H2",
-      visible: !0,
-      action: () => x()
-    }, {
-      text: "B",
-      visible: !0,
-      action: () => S()
-    }]),
-    spellcheckOpts: !1,
-    syncScroll: !0
-  }, t), localStorage.setItem("lastOpened", e);
+  const s = await n.json();
+  g(s.last_modified);
+  const a = document.getElementById("myst"), e = document.createElement("div");
+  e.id = "myst", e.style.flexGrow = "1", e.style.border = "1px solid #ccc", e.style.marginBottom = "0.5rem", e.style.height = "80vh", a.replaceWith(e), localStorage.setItem("currentPath", o);
+  const i = new CSSStyleSheet(), c = await (await fetch("../PFXStyleOverride.css")).text();
+  await i.replace(c), document.adoptedStyleSheets = [...document.adoptedStyleSheets, i];
+  const l = o.split("\\").pop().split("/").pop();
+  requestAnimationFrame(async () => {
+    t = y({
+      templatelist: "linkedtemplatelist.json",
+      initialText: s.content,
+      title: l,
+      additionalStyles: i,
+      includeButtons: w.concat([{
+        id: "revert",
+        text: "🧹 Revert",
+        visible: !1,
+        action: () => S()
+      }, {
+        text: "💾 Save",
+        visible: !0,
+        action: () => x(!0)
+      }, {
+        text: "🗃️ Image",
+        visible: !0,
+        action: () => b()
+      }, {
+        text: "Clear",
+        visible: !0,
+        action: () => I()
+      }, {
+        text: "H1",
+        visible: !0,
+        action: () => B()
+      }, {
+        text: "H2",
+        visible: !0,
+        action: () => C()
+      }, {
+        text: "B",
+        visible: !0,
+        action: () => E()
+      }]),
+      spellcheckOpts: !1,
+      syncScroll: !0
+    }, e);
+    const d = await T();
+    F(d), await W, ["Both", "Source", "Inline"].includes(t.options.mode.v) && f(t), window._mystEditor = t, t.options.mode.subscribe((u) => {
+      requestAnimationFrame(async () => {
+        var p;
+        ["Both", "Source", "Inline"].includes(u) ? (await new Promise((v) => setTimeout(v, 150)), r ? r.handleModeChange(u, t) : f(t)) : u === "Gitdiff" && (r ? r.clearMergeView(t) : (p = t.editorView) != null && p.v && t.editorView.v.dispatch({
+          effects: mergeCompartment.reconfigure([])
+        }), P());
+      });
+    });
+  }), localStorage.setItem("lastOpened", o);
 }
-function W(e) {
-  const o = e.split("/").pop() || "", s = o.lastIndexOf("."), t = `![${s > -1 ? o.substring(0, s) : o}](/${e})`;
-  B((r) => {
-    const {
-      state: d
-    } = r, {
-      from: a,
-      to: l
-    } = d.selection.main;
-    return r.dispatch({
-      changes: {
-        from: a,
-        to: l,
-        insert: t
-      },
-      selection: {
-        anchor: a + t.length
-      }
-    }), r.focus(), !0;
-  }) || alert("Editor is not ready yet.");
+function V(o) {
+  const n = o.split("/").pop() || "", s = n.lastIndexOf("."), e = `![${s > -1 ? n.substring(0, s) : n}](/${o})`, i = t == null ? void 0 : t.editorView;
+  if (!i) {
+    alert("Editor is not ready yet.");
+    return;
+  }
+  console.log(i);
+  const {
+    state: c
+  } = i.v, {
+    from: l,
+    to: d
+  } = c.selection.main;
+  i.v.dispatch({
+    changes: {
+      from: l,
+      to: d,
+      insert: e
+    },
+    selection: {
+      anchor: l + e.length
+    }
+    // cursor after insert
+  }), i.v.focus();
 }
 export {
-  W as insertImageMarkdown,
-  E as loadFile,
-  n as mystEditorInstance
+  V as insertImageMarkdown,
+  R as loadFile,
+  t as mystEditorInstance
 };
 //# sourceMappingURL=MainOverride.js.map

@@ -1,6 +1,10 @@
 import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates, treeState } from "./leftPanelFileTree.js";
 import { loadFile, insertImageMarkdown } from "./MainOverride.js";
 
+const CONFIG = {
+  ignoredFolders: ["_static", "_templates", ".obsidian"],
+};
+
 // ----------------------- Move To Dialog ----------------------- //
 
 /* Opens the "Move To" dialog for relocating files or folders.
@@ -39,6 +43,7 @@ function openMoveToDialog(itemPath) {
     const ul = document.createElement("ul");
     for (const node of nodes) {
       if (node.type !== "folder") continue;
+      if (CONFIG.ignoredFolders.includes(node.name)) continue;
       const li = document.createElement("li");
       const btn = document.createElement("div");
       btn.textContent = "📁 " + node.name;
