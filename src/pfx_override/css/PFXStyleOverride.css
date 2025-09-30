@@ -54,6 +54,7 @@ body {
 
 #resizer {
   width: 5px;
+  min-width: 5px;
   cursor: ew-resize;
   background: #ccc;
   user-select: none;

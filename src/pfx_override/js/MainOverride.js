@@ -34,6 +34,7 @@ resizer.onmousedown = function (e) {
     const newWidth = startWidth + (e.clientX - startX);
     if (newWidth >= 250 && newWidth <= 600) {
       sidebar.style.width = newWidth + 'px';
+      sidebar.style.minWidth = newWidth + 'px';
       localStorage.setItem('sidebarWidth', newWidth);
     }
   };

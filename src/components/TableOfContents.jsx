@@ -113,14 +113,17 @@ function Heading({ heading, level = 1 }) {
 }
 
 export const TableOfContents = () => {
-  const { headings, editorView } = useContext(MystState);
+  const { headings, editorView, options } = useContext(MystState);
   const [expanded, setExpanded] = useState(false);
   const [scrollable, setScrollable] = useState(false);
   const wrapperRef = useRef(null);
 
   const hasHeadings = headings.value.length > 0;
 
-  // useSignalEffect(() => console.log(headings.value));
+  // Don't render if in excluded modes
+  if (["Gitdiff", "GitCommit", "Preview"].includes(options.mode.value)) {
+    return null;
+  }
 
   function handleClick(ev) {
     const posAttr = ev.target?.dataset?.headingPos;

@@ -1,15 +1,15 @@
 /* empty css                          */
-import { s as g, M as y, d as w, r as S, a as x, o as b, c as I, b as B, e as C, f as E, w as T, g as F, p as W, h as f, i as r, j as P } from "./MystEditor-DollMqoU.js";
+import { s as g, M as y, d as w, r as S, a as x, o as b, c as I, b as B, e as C, f as E, w as T, g as F, p as W, h as f, i as r, j as P } from "./MystEditor-DK2V0BhE.js";
 let t = null;
 document.getElementById("editor-panel");
-const m = document.getElementById("sidebar"), k = document.getElementById("resizer"), h = localStorage.getItem("sidebarWidth");
-h && (m.style.width = h + "px");
+const c = document.getElementById("sidebar"), k = document.getElementById("resizer"), h = localStorage.getItem("sidebarWidth");
+h && (c.style.width = h + "px");
 k.onmousedown = function(o) {
   o.preventDefault();
-  const n = o.clientX, s = m.offsetWidth;
+  const n = o.clientX, s = c.offsetWidth;
   document.onmousemove = function(a) {
     const e = s + (a.clientX - n);
-    e >= 250 && e <= 600 && (m.style.width = e + "px", localStorage.setItem("sidebarWidth", e));
+    e >= 250 && e <= 600 && (c.style.width = e + "px", c.style.minWidth = e + "px", localStorage.setItem("sidebarWidth", e));
   }, document.onmouseup = function() {
     document.onmousemove = null, document.onmouseup = null;
   };
@@ -31,8 +31,8 @@ async function R(o) {
   g(s.last_modified);
   const a = document.getElementById("myst"), e = document.createElement("div");
   e.id = "myst", e.style.flexGrow = "1", e.style.border = "1px solid #ccc", e.style.marginBottom = "0.5rem", e.style.height = "80vh", a.replaceWith(e), localStorage.setItem("currentPath", o);
-  const i = new CSSStyleSheet(), c = await (await fetch("../PFXStyleOverride.css")).text();
-  await i.replace(c), document.adoptedStyleSheets = [...document.adoptedStyleSheets, i];
+  const i = new CSSStyleSheet(), d = await (await fetch("../PFXStyleOverride.css")).text();
+  await i.replace(d), document.adoptedStyleSheets = [...document.adoptedStyleSheets, i];
   const l = o.split("\\").pop().split("/").pop();
   requestAnimationFrame(async () => {
     t = y({
@@ -73,11 +73,11 @@ async function R(o) {
       spellcheckOpts: !1,
       syncScroll: !0
     }, e);
-    const d = await T();
-    F(d), await W, ["Both", "Source", "Inline"].includes(t.options.mode.v) && f(t), window._mystEditor = t, t.options.mode.subscribe((u) => {
+    const u = await T();
+    F(u), await W, ["Both", "Source", "Inline"].includes(t.options.mode.v) && f(t), window._mystEditor = t, t.options.mode.subscribe((m) => {
       requestAnimationFrame(async () => {
         var p;
-        ["Both", "Source", "Inline"].includes(u) ? (await new Promise((v) => setTimeout(v, 150)), r ? r.handleModeChange(u, t) : f(t)) : u === "Gitdiff" && (r ? r.clearMergeView(t) : (p = t.editorView) != null && p.v && t.editorView.v.dispatch({
+        ["Both", "Source", "Inline"].includes(m) ? (await new Promise((v) => setTimeout(v, 150)), r ? r.handleModeChange(m, t) : f(t)) : m === "Gitdiff" && (r ? r.clearMergeView(t) : (p = t.editorView) != null && p.v && t.editorView.v.dispatch({
           effects: mergeCompartment.reconfigure([])
         }), P());
       });
@@ -92,15 +92,15 @@ function V(o) {
   }
   console.log(i);
   const {
-    state: c
+    state: d
   } = i.v, {
     from: l,
-    to: d
-  } = c.selection.main;
+    to: u
+  } = d.selection.main;
   i.v.dispatch({
     changes: {
       from: l,
-      to: d,
+      to: u,
       insert: e
     },
     selection: {

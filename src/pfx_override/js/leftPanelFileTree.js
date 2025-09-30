@@ -667,22 +667,30 @@ export async function fetchGitCommitTree() {
   const resp = await fetch("/api/tree-local-diff");
   const data = await resp.json();
 
-  // Safety guards
   const tree = Array.isArray(data?.tree) ? data.tree : [];
   const diffs = Array.isArray(data?.diffs) ? data.diffs : [];
 
-  // Helpful debug info (leave during test; remove later if you like)
-  // console.log("fetchGitCommitTree -> tree", tree);
-  // console.log("fetchGitCommitTree -> diffs", diffs);
+  const container = document.getElementById("tree");
+  container.innerHTML = ""; // clear old content
+
+  if (tree.length === 0) {
+    // No changes: show a simple message node
+    const msg = document.createElement("div");
+    msg.className = "no-changes-message text-gray-500 italic p-2";
+    msg.textContent = "No local changes — working directory matches latest commit.";
+    container.appendChild(msg);
+    return; // nothing else to render
+  }
 
   const diffMap = GitDiffManager.buildDiffMap(diffs);
   const changedFolders = GitDiffManager.computeChangedFolders(tree, diffMap);
 
-  TreeRenderer.renderTree(tree, document.getElementById("tree"), true, diffMap, changedFolders);
+  TreeRenderer.renderTree(tree, container, true, diffMap, changedFolders);
 
   const currentPath = localStorage.getItem("currentPath");
   restoreActiveFile(normalizePath(currentPath));
 }
+
 
 
 
