@@ -19,6 +19,7 @@ import {
   HighlightStyle,
 } from "@codemirror/language";
 import { syncPreviewWithCursor } from "./syncDualPane";
+// import { tocScrollSpy } from "../components/TableOfContents";
 import { cursorIndicator } from "./cursorIndicator";
 import { yaml, yamlFrontmatter } from "@codemirror/lang-yaml";
 import { ySync } from "./collab";
@@ -41,7 +42,6 @@ import { aiRephraseExtension } from "./aiRephrase";
 import { harperExtension } from "./harperExtension";
 import { renameExtension } from "./renameImage";
 import { mystExtension } from "./markChangedLines";
-
 
 
 const getRelativeCursorLocation = (view) => {

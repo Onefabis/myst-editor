@@ -7,13 +7,9 @@ const GroupContainer = styled.div`
   display: flex;
 
   & > button:first-child {
-    border-left: 1px solid var(--border) !important;
-    border-radius: var(--border-radius) 0 0 var(--border-radius);
   }
 
   & > button:last-child {
-    border-right: 1px solid var(--border) !important;
-    border-radius: 0 var(--border-radius) var(--border-radius) 0;
   }
 
   .btn-dropdown {

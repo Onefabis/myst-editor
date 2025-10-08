@@ -31,6 +31,8 @@ document.addEventListener("contextmenu", (e) => {
 
   const isInGitEditor = path.some(el => el.classList?.contains("gitDiffEditor"));
 
+  const isCommitWrapper = path.some(el => el.id?.startsWith("commit-wrapper"));
+
   const isInExcalidraw = path.some(el =>
     typeof el.id === "string" && el.id.startsWith("excalidraw")
   );
@@ -45,7 +47,7 @@ document.addEventListener("contextmenu", (e) => {
     typeof el.id === "string" && el.id === "ollama-ai-reprhase-settings"
   );
 
-  if (isInMystMainEditor && !isInExcalidraw && !isInOllamaAI && !isInAIRephrase && !isInGitEditor) {
+  if (isInMystMainEditor && !isInExcalidraw && !isInOllamaAI && !isInAIRephrase && !isInGitEditor && !isCommitWrapper) {
     e.preventDefault();
 
     // Show temporarily to measure size
@@ -184,7 +186,7 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
     }
 
     const result = await res.json();
-    console.log("📦 Backend response:", result);
+    console.log("Backend response:", result);
 
     let savedPath = result.savedPath || result.newPath;
 
@@ -195,7 +197,7 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
       if (mdIndex !== -1) {
         pathParts.splice(mdIndex, 1);
         savedPath = pathParts.join("/");
-        console.log("🧼 Cleaned path:", savedPath);
+        console.log("Cleaned path:", savedPath);
       }
     }
 

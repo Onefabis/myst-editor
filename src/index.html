@@ -11,26 +11,144 @@
     <link rel="icon" href="data:," />
   </head>
   <body>
+
+    <!-- SVG ICONS -->
+
+    <!-- Hidden SVG symbol definitions -->
+
+    <!-- New file svg icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="icon-new-file" viewBox="1 -1 26 25">
+        <path d="M20 8h-6c-.6 0-1-.4-1-1V1h2v5h5v2z"></path>
+        <path d="M20 24H4c-.6 0-1-.4-1-1V1c0-.6.4-1 1-1h10c.3 0 .5.1.7.3l6 6c.2.2.3.4.3.7v16c0 .6-.4 1-1 1zM5 22h14V7.4L13.6 2H5v20z"></path>
+      </symbol>
+    </svg>
+
+    <!-- New folder svg icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="icon-new-folder" viewBox="0 0 550 500">
+        <path d="M 334.523 312.468 L 334.523 327.495 C 334.523 333.57 329.598 338.495 323.523 338.495 L 274.513 338.495 L 274.513 387.505 C 274.513 393.58 269.588 398.505 263.513 398.505 L 248.486 398.505 C 242.411 398.505 237.486 393.58 237.486 387.505 L 237.486 338.495 L 188.476 338.495 C 182.401 338.495 177.476 333.57 177.476 327.495 L 177.476 312.468 C 177.476 306.393 182.401 301.468 188.476 301.468 L 237.486 301.468 L 237.486 252.458 C 237.486 246.383 242.411 241.458 248.486 241.458 L 263.513 241.458 C 269.588 241.458 274.513 246.383 274.513 252.458 L 274.513 301.468 L 323.523 301.468 C 329.598 301.468 334.523 306.393 334.523 312.468 Z"></path>
+        <path d="M490.667,85.333H237.185l-26.104-52.207C207.467,25.899,200.08,21.333,192,21.333H21.333C9.551,21.333,0,30.885,0,42.667 v426.667c0,11.782,9.551,21.333,21.333,21.333h469.333c11.782,0,21.333-9.551,21.333-21.333V170.667v-64 C512,94.885,502.449,85.333,490.667,85.333z M469.333,128v21.333H269.185L258.518,128H469.333z M42.667,448V64h136.149 l26.104,52.207l32,64C240.533,187.435,247.92,192,256,192h213.333v256H42.667z"></path>
+      </symbol>
+    </svg>
+
+    <!-- Delete file/folder svg icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="icon-trashbin" viewBox="0 0 65 65">
+        <path d="M56.228,9.125h-13.04V4.836C43.188,2.17,41.019,0,38.353,0h-12.58c-2.666,0-4.835,2.17-4.835,4.836v4.289H7.897 c-2.666,0-4.835,2.17-4.835,4.836v6.289c0,1.105,0.896,2,2,2h5.25v37.041c0,2.666,2.169,4.834,4.835,4.834h34.58 c2.666,0,4.835-2.168,4.835-4.834V22.25h4.5c1.104,0,2-0.895,2-2v-6.289C61.062,11.295,58.894,9.125,56.228,9.125z M24.938,4.836 C24.938,4.375,25.312,4,25.772,4h12.58c0.46,0,0.835,0.375,0.835,0.836v4.289h-14.25V4.836z M50.562,59.291 c0,0.461-0.375,0.834-0.835,0.834h-34.58c-0.46,0-0.835-0.373-0.835-0.834V22.25h36.25V59.291z M57.062,18.25h-4.5h-40.25h-5.25 v-4.289c0-0.461,0.375-0.836,0.835-0.836h15.04h18.25h15.04c0.46,0,0.835,0.375,0.835,0.836V18.25z"></path>
+      </symbol>
+    </svg>
+
+    <!-- Rename file/folder svg icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="icon-rename" viewBox="0 0 25 26">
+      <path d="M11.75 2C11.3358 2 11 2.33579 11 2.75C11 3.16421 11.3358 3.5 11.75 3.5H13.25V24.5H11.75C11.3358 24.5 11 24.8358 11 25.25C11 25.6642 11.3358 26 11.75 26H16.25C16.6642 26 17 25.6642 17 25.25C17 24.8358 16.6642 24.5 16.25 24.5H14.75V3.5H16.25C16.6642 3.5 17 3.16421 17 2.75C17 2.33579 16.6642 2 16.25 2H11.75Z"/>
+      <path d="M6.25 6.01958H12.25V7.51958H6.25C5.2835 7.51958 4.5 8.30308 4.5 9.26958V18.7696C4.5 19.7361 5.2835 20.5196 6.25 20.5196H12.25V22.0196H6.25C4.45507 22.0196 3 20.5645 3 18.7696V9.26958C3 7.47465 4.45507 6.01958 6.25 6.01958Z"/>
+      <path d="M21.75 20.5196H15.75V22.0196H21.75C23.5449 22.0196 25 20.5645 25 18.7696V9.26958C25 7.47465 23.5449 6.01958 21.75 6.01958H15.75V7.51958H21.75C22.7165 7.51958 23.5 8.30308 23.5 9.26958V18.7696C23.5 19.7361 22.7165 20.5196 21.75 20.5196Z"/>
+    </svg>
+
+    <!-- Move to folder svg icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="icon-moveto" viewBox="0 0 30 30">
+        <polygon points="18 13 16.59 14.41 19.17 17 10 17 10 19 19.17 19 16.59 21.59 18 23 23 18 18 13"/>
+        <path d="M11.1716,6l3.4142,3.4142L15.1716,10H28V26H4V6h7.1716m0-2H4A2,2,0,0,0,2,6V26a2,2,0,0,0,2,2H28a2,2,0,0,0,2-2V10a2,2,0,0,0-2-2H16L12.5858,4.5858A2,2,0,0,0,11.1716,4Z"/>
+      </symbol>
+    </svg>
+
+    <!-- Upload image svg icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="icon-upload-image" viewBox="0 -2 30 30">
+       <path d="M579.732,681.7 L583,677.74 L583,691.998 C583,692.552 583.447,693 584,693 C584.553,693 585,692.552 585,691.998 L585,677.702 L588.299,681.7 C588.69,682.095 589.326,682.095 589.719,681.7 C590.11,681.307 590.11,680.668 589.719,680.274 L584.776,674.283 C584.566,674.073 584.289,673.983 584.016,673.998 C583.742,673.983 583.465,674.073 583.256,674.283 L578.313,680.274 C577.921,680.668 577.921,681.307 578.313,681.7 C578.705,682.095 579.341,682.095 579.732,681.7 L579.732,681.7 Z M598,690 C597.447,690 597,690.448 597,691 L597,698 L571,698 L571,691 C571,690.448 570.553,690 570,690 C569.447,690 569,690.448 569,691 L569,699 C569,699.553 569.447,700 570,700 L598,700 C598.553,700 599,699.553 599,699 L599,691 C599,690.448 598.553,690 598,690 L598,690 Z" transform="translate(-569.000000, -674.000000)" />
+      </symbol>
+    </svg>
+
+    <!-- Commit files svg icon -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="icon-commit-files" viewBox="0 0 80 80" width="22px" height="22px" fill="currentColor">
+        <path d="M 48.252 27.266 C 48.252 40.006 37.925 50.333 25.185 50.333 C 12.445 50.333 2.118 40.006 2.118 27.266 C 2.118 14.526 12.445 4.199 25.185 4.199 C 37.925 4.199 48.252 14.526 48.252 27.266 Z M 14.465 27.183 C 14.465 31.989 17.643 36.052 22.013 37.386 L 22.013 43.228 C 22.013 44.882 23.353 46.222 25.007 46.222 L 25.419 46.222 C 27.072 46.222 28.413 44.882 28.413 43.228 L 28.413 37.336 C 32.699 35.952 35.799 31.929 35.799 27.183 C 35.799 22.437 32.699 18.414 28.413 17.03 L 28.413 10.816 C 28.413 9.162 27.072 7.822 25.419 7.822 L 25.007 7.822 C 23.353 7.822 22.013 9.162 22.013 10.816 L 22.013 16.98 C 17.643 18.314 14.465 22.377 14.465 27.183 Z M 30.224 27.422 C 30.224 30.146 28.015 32.355 25.291 32.355 C 22.566 32.355 20.357 30.146 20.357 27.422 C 20.357 24.697 22.566 22.488 25.291 22.488 C 28.015 22.488 30.224 24.697 30.224 27.422 Z" style="stroke: rgb(0, 0, 0);" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -7.105427357601002e-15, -7.105427357601002e-15)"/>
+      </symbol>
+    </svg>
+    
     <div id="container">
-    <div id="sidebar">
-      <div id="tree-panel">
-        <div class="controls">
-          <div class="controls_row" >
-            <button id="new-file" title="File">📄</button>
-            <button id="new-folder" title="Folder">📁</button>
-            <button id="delete" title="Delete">🗑️</button>
-            <button id="rename" title="Rename">✏️</button>
-            <button id="move" title="Move">👉🏻</button>
-            <button id="upload-image" title="Upload">📤</button>
+      <div id="sidebar">
+        <div id="tree-panel">
+          <div class="controls">
+            <div class="controls_row" >
+              <button id="new-file" title="Add file">
+                <span>
+                  <svg width="14" height="14">
+                    <use href="#icon-new-file"></use>
+                  </svg>
+                </span>
+              </button>
+              <button id="new-folder" title="Add folder">
+                <span>
+                  <svg width="14" height="14">
+                    <use href="#icon-new-folder"></use>
+                  </svg>
+                </span>
+              </button>
+              <button id="delete" title="Delete">
+                <span>
+                  <svg width="14" height="14">
+                    <use href="#icon-trashbin"></use>
+                  </svg>
+                </span>
+              </button>
+              <button id="rename" title="Rename">
+                <span>
+                  <svg width="14" height="14">
+                    <use href="#icon-rename"></use>
+                  </svg>
+                </span>
+              </button>
+              <button id="move" title="Move to folder">
+                <span>
+                  <svg width="14" height="14">
+                    <use href="#icon-moveto"></use>
+                  </svg>
+                </span>
+              </button>
+              <button id="upload-image" title="Upload image">
+                <span>
+                  <svg width="14" height="14">
+                    <use href="#icon-upload-image"></use>
+                  </svg>
+                </span>
+              </button>
+            </div>
+            <div class="commit_view_buttons">
+              <button id="commit-files" title="Commit">
+                <div>
+                  <svg width="14" height="14">
+                    <use href="#icon-commit-files"></use>
+                  </svg>
+                  <span>Commit</span>
+                </div>
+              </button>
+              <input
+                id="commit-message"
+                type="text"
+                class="commit-message-input"
+                placeholder="Commit message (optional)"
+              />
+            </div>
+          </div>
+          <div id="tree_container">
+            <div id="tree">
+            </div>
+            <div id="commit-no-changes-message">
+              <span>
+                No local changes! <br>Working directory <br>matches latest commit.
+              </span>
+            </div>
           </div>
         </div>
-        <div id="tree"></div>
       </div>
-    </div>
-    <div id="resizer"></div>
-    <div id="editor-panel" class="printable">
-      <div id="myst"></div>
-    </div>
+      <div id="resizer"></div>
+      <div id="editor-panel" class="printable">
+        <div id="myst"></div>
+      </div>
   </div>
   </body>
 </html>

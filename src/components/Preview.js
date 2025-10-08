@@ -336,15 +336,30 @@ const Preview = styled.div`
   padding: 20px;
   box-sizing: border-box;
   height: 100%;
-  border: 1px solid var(--border);
-  box-shadow: inset 0px 0px 4px var(--box-shadow);
   border-radius: var(--border-radius);
   vertical-align: top;
   word-wrap: break-word;
   position: relative;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    width: 7px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #00000024;
+    border-radius: 9999px; 
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 9999px; 
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
 
   ${MdStyles}
 

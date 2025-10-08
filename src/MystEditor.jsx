@@ -28,23 +28,23 @@ const EditorParent = styled.div`
   ${(props) => {
     switch (props.mode) {
       case "Gitdiff":
-        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
+        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }; #commit-wrapper { display: none };";
       case "GitCommit":
-        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
+        return "#editor-wrapper { display: none }; #preview-wrapper { display: none };";
       case "Preview":
-        return "#editor-wrapper { display: none }";
+        return "#editor-wrapper { display: none }; #commit-wrapper { display: none };";
       case "Source":
-        return "#preview-wrapper { display: none }";
+        return "#preview-wrapper { display: none }; #commit-wrapper { display: none };";
       case "Diff":
-        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }";
+        return "#editor-wrapper { display: none }; #preview-wrapper { display: none }; #commit-wrapper { display: none };";
       case "Both":
-        return "#resolved-wrapper { display: none }";
+        return "#resolved-wrapper { display: none }; #commit-wrapper { display: none };";
       case "Resolved":
-        return "#preview-wrapper { display: none };";
+        return "#preview-wrapper { display: none }; #commit-wrapper { display: none };";
       // case "Outline":
       //   return "#preview-wrapper { display: none };";
       case "Inline":
-        return "#preview-wrapper { display: none }";
+        return "#preview-wrapper { display: none }; #commit-wrapper { display: none };";
       default:
         return ``;
     }
@@ -142,6 +142,25 @@ const FlexWrapper = styled.div`
     min-height: 500px;
   }
 `;
+
+const GitCommitWrapper = styled.div`
+  background: var(--editor-bg);
+  font-size: 14px;
+  resize: none;
+  border: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  width: 100%;
+  scrollbar-width: thin;
+  overflow: auto;
+  overscroll-behavior: contain;
+  position: relative;
+  display: flex;
+  border-radius: 6px;
+  flex-direction: column;
+`;
+
+  
 
 const hideBodyScrollIf = (val) => (document.documentElement.style.overflow = val ? "hidden" : "visible");
 
@@ -365,13 +384,11 @@ const MystEditor = () => {
                       <PreviewFocusHighlight className="cm-previewFocus" />
                     </Preview>
                   </FlexWrapper>
+                  {options.mode.value === "GitCommit" && (
+                    <GitCommitWrapper id="commit-wrapper">
+                    </GitCommitWrapper>
+                  )}
                 </>
-              )}
-
-              {options.mode.value === "Diff" && (
-                <FlexWrapper className="flex-wrapper">
-                  <Diff />
-                </FlexWrapper>
               )}
 
               {options.mode.value == "Resolved" &&
@@ -389,6 +406,12 @@ const MystEditor = () => {
                 </FlexWrapper>
           
             </MystWrapper>
+           {options.mode.value === "Diff" && (
+              <MystWrapper className="flex-wrapper">
+                <Diff />
+              </MystWrapper>
+            )}
+            
 
           </EditorParent>
         </ErrorBoundary>

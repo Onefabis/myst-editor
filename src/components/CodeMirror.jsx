@@ -14,23 +14,39 @@ import { Logger } from "../logger";
 const CodeEditor = styled.div`
   border-radius: var(--border-radius);
   background: ${(props) => (props.$mode != "Inline" ? "var(--editor-bg)" : "var(--panel-bg)")};
-  font-family: monospace;
-  font-size: 14px;
   resize: none;
   border: 0;
   padding: 20px;
   box-sizing: border-box;
   height: 100%;
   width: 100%;
-  scrollbar-width: thin;
   overflow-y: auto;
   overscroll-behavior: contain;
   position: relative;
-  box-shadow: inset 0px 0px 4px var(--box-shadow);
 
-  .cm-editor .cm-gutters {
+  &::-webkit-scrollbar {
+    width: 7px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: #00000024;
+    border-radius: 9999px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 9999px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  .cm-editor  {
     background-color: ${(props) => (props.$mode != "Inline" ? "var(--editor-bg)" : "var(--panel-bg)")};
-    border-right: 1px solid var(--border);
+  }
+
+  .cm-gutters {
   }
 
   .comment-gutter-icon {
@@ -217,9 +233,8 @@ const CodeEditor = styled.div`
   .cm-inline-mono,
   .cm-inline-mono *,
   .cm-line > *:has(> .cm-inline-mono) {
-    font-family: monospace !important;
     line-height: 1.3em !important;
-    font-size: 14px !important;
+    font-size: 16px !important;
     display: inline-block !important;
   }
 

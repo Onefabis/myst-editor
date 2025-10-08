@@ -4,6 +4,7 @@ import { saveCurrentEditorContent, setLastSavedTimestamp } from './saveEditorTex
 import { autosaveEnabled } from '../../MystEditor.jsx';
 import { useContext } from "preact/hooks";
 import { MystState } from "../../mystState.js";
+import { logFilePaths } from "../../extensions/gitCommit";
 
 // ========================= CONSTANTS =========================
 
@@ -395,6 +396,46 @@ class TreeRenderer {
     loadFile(newPath);
   }
 
+  static async scrollCommitWrapperToFile(node, titleElement) {
+    clearActiveStates();
+    titleElement.classList.add('active');
+
+    titleElement.classList.add('selected');
+    document.querySelectorAll('.folder, .file').forEach(el => {
+        if (el !== titleElement) el.classList.remove('selected');
+    });
+
+    // Store selected element info
+    treeState.setSelectedElement({
+      path: node.path,
+      name: node.name,
+      type: 'file'
+    });
+
+
+    const mystHost = document.getElementById("myst");
+    if (!mystHost?.shadowRoot) return;
+
+    const commitWrapper = mystHost.shadowRoot.getElementById("commit-wrapper");
+    if (!commitWrapper) return;
+
+    // Find the container whose title matches the file path
+    const targetDiv = Array.from(commitWrapper.children).find(container => {
+      const titleDiv = container.querySelector("div:first-child");
+      return titleDiv?.textContent === node.name || titleDiv?.textContent === node.path;
+    });
+
+    if (targetDiv) {
+      const offset = 20; // positive = leave space above
+      // Compute the element's top relative to the scrollable container
+      const containerTop = commitWrapper.getBoundingClientRect().top;
+      const targetTop = targetDiv.getBoundingClientRect().top;
+      const scrollOffset = targetTop - containerTop + commitWrapper.scrollTop - offset;
+
+      commitWrapper.scrollTo({ top: scrollOffset, behavior: "smooth" });
+    }
+  }
+
   static handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, event, titleElement) {
     event.stopPropagation();
 
@@ -473,7 +514,19 @@ class TreeRenderer {
         
         title.onclick = async (e) => {
           e.stopPropagation();
-          await this.handleFileClick(node, title);
+          // await this.handleFileClick(node, title);
+
+          const mystHost = document.getElementById("myst");
+          const commitWrapper = mystHost?.shadowRoot?.getElementById("commit-wrapper");
+
+          if (commitWrapper) {
+            // Scroll to the correct div inside commit-wrapper
+            await TreeRenderer.scrollCommitWrapperToFile(node, title);
+          } else {
+            // Fallback: normal file click handling
+            await TreeRenderer.handleFileClick(node, title);
+          }
+
         };
 
         li.appendChild(title);
@@ -615,6 +668,11 @@ export async function fetchLocalTree(loadfile=true) {
   const baseTree = await TreeAPI.getTree();
   const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
 
+  const tree_div = document.getElementById("tree");
+  tree_div.style.display = "flex"; 
+  const commit_message = document.getElementById("commit-no-changes-message");
+  commit_message.style.display = "none";
+
   // Filter out deleted files and keep original git statuses
   // Handle case where git diff fails (e.g., newly initialized repo with no commits)
   const safeDiffs = Array.isArray(diffs) ? diffs : [];
@@ -622,7 +680,7 @@ export async function fetchLocalTree(loadfile=true) {
   const diffMap = GitDiffManager.buildDiffMap(filteredDiffs);
 
   const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
-  TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
+  TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
 
   const currentPath = localStorage.getItem('currentPath');
   if (loadfile){
@@ -635,6 +693,11 @@ export async function fetchGitTree(gitCommit) {
   const dropdowns = await TreeAPI.waitForDropdowns();
   if (!dropdowns) return;
 
+  const tree_div = document.getElementById("tree");
+  tree_div.style.display = "flex"; 
+  const commit_message = document.getElementById("commit-no-changes-message");
+  commit_message.style.display = "none";
+
   if (gitCommit) {
     // Commit vs commit comparison - show all files that exist in EITHER commit
     const leftCommit = dropdowns.left.value;
@@ -645,12 +708,12 @@ export async function fetchGitTree(gitCommit) {
     let diffMap = {};
     
     if (leftCommit !== rightCommit) {
-      const diffs = await TreeAPI.getDiff('tree', { left: rightCommit, right: leftCommit });
+      const diffs = await TreeAPI.getDiff('tree', { left: leftCommit, right: rightCommit });
       diffMap = GitDiffManager.buildDiffMap(diffs);
     }
     
     const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
-    TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
+    TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
   } else {
     // Working tree vs HEAD comparison
     const commitHash = await TreeAPI.getHeadCommit();
@@ -659,7 +722,7 @@ export async function fetchGitTree(gitCommit) {
     const diffMap = GitDiffManager.buildDiffMap(diffs);
     const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
     
-    TreeRenderer.renderTree(baseTree, document.getElementById("tree"), true, diffMap, changedFolders);
+    TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
   }
 }
 
@@ -667,31 +730,29 @@ export async function fetchGitCommitTree() {
   const resp = await fetch("/api/tree-local-diff");
   const data = await resp.json();
 
+
   const tree = Array.isArray(data?.tree) ? data.tree : [];
   const diffs = Array.isArray(data?.diffs) ? data.diffs : [];
-
-  const container = document.getElementById("tree");
-  container.innerHTML = ""; // clear old content
-
+  const tree_div = document.getElementById("tree");
+  const commit_message = document.getElementById("commit-no-changes-message");
   if (tree.length === 0) {
-    // No changes: show a simple message node
-    const msg = document.createElement("div");
-    msg.className = "no-changes-message text-gray-500 italic p-2";
-    msg.textContent = "No local changes — working directory matches latest commit.";
-    container.appendChild(msg);
-    return; // nothing else to render
+    commit_message.style.display = "flex";
+    tree_div.style.display = "none"; 
+  } else {
+    commit_message.style.display = "none";
+    tree_div.style.display = "flex"; 
   }
 
   const diffMap = GitDiffManager.buildDiffMap(diffs);
   const changedFolders = GitDiffManager.computeChangedFolders(tree, diffMap);
 
-  TreeRenderer.renderTree(tree, container, true, diffMap, changedFolders);
+  TreeRenderer.renderTree(tree, tree_div, true, diffMap, changedFolders);
 
   const currentPath = localStorage.getItem("currentPath");
   restoreActiveFile(normalizePath(currentPath));
+
+  logFilePaths();
 }
-
-
 
 
 // ========================= EXPORTS =========================

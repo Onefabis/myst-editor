@@ -160,20 +160,24 @@ const Gitdiff = () => {
 
           const result = await res.json();
           const leftContentFromGit = result.left_content ?? "// Failed left commit";
-          const rightContent = result.right_content ?? "// Failed right commit";
+          const rightContentFromGit = result.right_content ?? "// Failed right commit";
 
-          const leftIdx = parseIndexFromOption(commitLeft?.selectedOptions?.[0]);
-          const rightIdx = parseIndexFromOption(commitRight?.selectedOptions?.[0]);
+          // const leftIdx = parseIndexFromOption(commitLeft?.selectedOptions?.[0]);
+          // const rightIdx = parseIndexFromOption(commitRight?.selectedOptions?.[0]);
 
-          if (leftIdx > rightIdx) {
-            aDoc = rightContent;
-            bDoc = leftContentFromGit;
-            newerSide = "left";
-          } else {
-            aDoc = leftContentFromGit;
-            bDoc = rightContent;
-            newerSide = "right";
-          }
+          // if (leftIdx > rightIdx) {
+          //   aDoc = rightContentFromGit;
+          //   bDoc = leftContentFromGit;
+          //   newerSide = "left";
+          // } else {
+          //   aDoc = leftContentFromGit;
+          //   bDoc = rightContentFromGit;
+          //   newerSide = "right";
+          // }
+
+          aDoc = leftContentFromGit;
+          bDoc = rightContentFromGit;
+
         }
 
         // Init MergeView
@@ -194,13 +198,16 @@ const Gitdiff = () => {
               leftRef.current.appendChild(mergeView.current.b.dom);
               rightRef.current.appendChild(mergeView.current.a.dom);
           } else {
-            if (newerSide === "left") {
-              leftRef.current.appendChild(mergeView.current.b.dom);
-              rightRef.current.appendChild(mergeView.current.a.dom);
-            } else {
-              leftRef.current.appendChild(mergeView.current.a.dom);
-              rightRef.current.appendChild(mergeView.current.b.dom);
-            }
+            // if (newerSide === "left") {
+            //   leftRef.current.appendChild(mergeView.current.b.dom);
+            //   rightRef.current.appendChild(mergeView.current.a.dom);
+            // } else {
+            //   leftRef.current.appendChild(mergeView.current.a.dom);
+            //   rightRef.current.appendChild(mergeView.current.b.dom);
+            // }
+
+            leftRef.current.appendChild(mergeView.current.a.dom);
+            rightRef.current.appendChild(mergeView.current.b.dom);
           }
           
         }
@@ -208,8 +215,6 @@ const Gitdiff = () => {
         console.error("[Gitdiff] reload error:", err);
       }
     };
-
-
 
     // Expose for external triggers
     window.reloadGitdiff = reloadGitdiff;

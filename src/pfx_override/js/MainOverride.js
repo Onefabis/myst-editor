@@ -87,12 +87,12 @@ export async function loadFile(filename) {
       additionalStyles: sheet,
       includeButtons: defaultButtons.concat([
         { id: "revert", text: "🧹 Revert", visible: false, action: () => revertFileChanges(mystEditorInstance) },
-        { text: "💾 Save", visible: true, action: () => saveCurrentEditorContent(true) },
-        { text: "🗃️ Image", visible: true, action: () => openImagePicker() },
-        { text: "Clear", visible: true, action: () => txFormat.clearLineSymbols() },
-        { text: "H1", visible: true, action: () => txFormat.convertToH1() },
-        { text: "H2", visible: true, action: () => txFormat.convertToH2() },
-        { text: "B",  visible: true, action: () => txFormat.convertToBold() }
+        { id: "save",  text: "💾 Save", visible: true, action: () => saveCurrentEditorContent(true) },
+        { id: "image", text: "🗃️ Image", visible: true, action: () => openImagePicker() },
+        { id: "clear_format", text: "Clear", visible: true, action: () => txFormat.clearLineSymbols() },
+        { id: "h1_format", text: "H1", visible: true, action: () => txFormat.convertToH1() },
+        { id: "h2_format", text: "H2", visible: true, action: () => txFormat.convertToH2() },
+        { id: "b_format", text: "B",  visible: true, action: () => txFormat.convertToBold() }
       ]),
       spellcheckOpts: false,
       syncScroll: true,

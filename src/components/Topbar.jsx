@@ -1,13 +1,13 @@
 import { styled } from "styled-components";
 import { useEffect, useContext, useMemo, useRef } from "preact/hooks";
-import { batch, computed, signal, effect } from "@preact/signals";
+import { useComputed, useSignal, useSignalEffect } from "@preact/signals";
 import purify from "dompurify";
 import { DefaultButton } from "./CommonUI";
 import ButtonGroup from "./ButtonGroup";
 import Avatars from "./Avatars";
 import { MystState } from "../mystState";
-import { useComputed, useSignal, useSignalEffect } from "@preact/signals";
-import { fetchLocalTree, fetchGitTree, fetchGitCommitTree } from "../pfx_override/js/leftPanelFileTree.js"
+import { fetchLocalTree, fetchGitTree, fetchGitCommitTree } from "../pfx_override/js/leftPanelFileTree.js";
+import { logFilePaths } from "../extensions/gitCommit";
 
 const renderMdLinks = (title) =>
   [...(title || "").matchAll(/\[(.+)\]\(([^\s]+)\)/g)].reduce(
@@ -53,9 +53,7 @@ const Topbar = styled.div`
   button:not(:disabled):not(view-menu):not(.radio-icon):hover {
     background-color: var(--button-bg-hover);
     border: 1px solid var(--button-bg-hover);
-    .inner-copy {
-      fill: var(--button-bg-hover);
-    }
+
   }
 
   .btn-dropdown {
@@ -113,6 +111,7 @@ export const TopbarButton = styled(DefaultButton)`
   }
 `;
 
+
 const FullscreenIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" fill="none">
     <path d="M20.35 1.78003L12.61 9.51003" stroke-width="1.75" stroke="currentColor" />
@@ -134,7 +133,7 @@ const SettingsIcon = () => (
 const CopyIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 20 22" fill="none">
     <path d="M13.99 1.04004H1.37V16.64H13.99V1.04004Z" stroke-width="1.75" stroke="currentColor" />
-    <path class="inner-copy" d="M18.63 5.51001H6.01001V21.11H18.63V5.51001Z" stroke-width="1.75" stroke="currentColor" fill="var(--button-bg)" />
+    <path class="inner-copy" d="M18.63 5.51001H6.01001V21.11H18.63V5.51001Z" stroke-width="1.75" stroke="currentColor" fill="var(--button-bg-hover)" />
   </svg>
 );
 
@@ -293,14 +292,15 @@ const SuggestIcon = () => (
   </svg>
 );
 
+
 const icons = {
   fullscreen: FullscreenIcon,
-  "copy-html": CopyIcon,
-  refresh: RefreshIcon,
+  // "copy-html": CopyIcon,
+  // refresh: RefreshIcon,
   "print-to-pdf": PrintPDFIcon,
   settings: SettingsIcon,
   templates: TemplatesIcon,
-  "suggest-mode": SuggestIcon,
+  // "suggest-mode": SuggestIcon,
 };
 
 export const EditorTopbar = ({ alert, buttons }) => {
@@ -310,110 +310,47 @@ export const EditorTopbar = ({ alert, buttons }) => {
   const gitCommitDiff = localStorage.getItem("gitLeftListToggle");
   const showLeftCommitList = useSignal(gitCommitDiff === null ? true : gitCommitDiff === "true");
 
-  // track first render to suppress auto-calls
   const firstRender = useRef(true);
 
   useSignalEffect(() => {
     if (options.mode.value === "GitCommit") {
       fetchGitCommitTree();
     }
-    // save to localStorage
+
     localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
 
     if (firstRender.current) {
       firstRender.current = false;
-      return; // skip fetchGitTree at initial render
+      return;
     }
 
-    // only run after user toggles
     if (options.mode.value === "Gitdiff") {
       if (window.reloadGitdiff) {
         window.reloadGitdiff(showLeftCommitList.value ? "commits" : "local");
       }
       fetchGitTree(showLeftCommitList.value);
     }
-
   });
 
   const editorModeButtons = useComputed(() => {
     const modeButtons = [
-      { 
-        id: "source", 
-        tooltip: "Source", 
-        action: () => { 
-          options.mode.value = "Source"; 
-          fetchLocalTree(false);
-        }, 
-        icon: SourceIcon 
-      },
-      { 
-        id: "preview", 
-        tooltip: "Preview", 
-        action: () => { 
-          options.mode.value = "Preview"; 
-          fetchLocalTree(false);
-        }, 
-        icon: PreviewIcon 
-      },
-      { 
-        id: "both", 
-        tooltip: "Dual Pane", 
-        action: () => { 
-          options.mode.value = "Both"; 
-          fetchLocalTree(false);
-        }, 
-        icon: BothIcon 
-      },
-      { 
-        id: "inline", 
-        tooltip: "Inline Preview", 
-        action: () => { 
-          options.mode.value = "Inline"; 
-          fetchLocalTree(false);
-        }, 
-        icon: InlinePreviewIcon 
-      },
-      { 
-        id: "gitdiff", 
-        tooltip: "Git Diff", 
-        action: () => { 
-          options.mode.value = "Gitdiff"; 
-        }, 
-        icon: GitdiffIcon 
-      },
-      { 
-        id: "gitcommit", 
-        tooltip: "Git Commit", 
-        action: () => { 
-          options.mode.value = "GitCommit"; 
-        }, 
-        icon: GitCommitIcon 
-      },
-      { 
-        id: "outline", 
-        text: "Table of Contents", 
-        action: () => { 
-          options.mode.value = "Outline"; 
-        }, 
-        icon: TocIcon 
-      },
+      { id: "source", tooltip: "Source", action: () => { options.mode.value = "Source"; fetchLocalTree(false); }, icon: SourceIcon },
+      { id: "preview", tooltip: "Preview", action: () => { options.mode.value = "Preview"; fetchLocalTree(false); }, icon: PreviewIcon },
+      { id: "both", tooltip: "Dual Pane", action: () => { options.mode.value = "Both"; fetchLocalTree(false); }, icon: BothIcon },
+      { id: "inline", tooltip: "Inline Preview", action: () => { options.mode.value = "Inline"; fetchLocalTree(false); }, icon: InlinePreviewIcon },
+      { id: "gitdiff", tooltip: "Git Diff", action: () => { options.mode.value = "Gitdiff"; }, icon: GitdiffIcon },
+      { id: "gitcommit", tooltip: "Git Commit", action: () => { options.mode.value = "GitCommit"; }, icon: GitCommitIcon },
+      { id: "outline", text: "Table of Contents", action: () => { options.mode.value = "Outline"; }, icon: TocIcon },
     ];
 
     if (options.collaboration.value.resolvingCommentsEnabled) {
-      modeButtons.push({ 
-        id: "resolved", 
-        text: "Resolved", 
-        action: () => { 
-          options.mode.value = "Resolved"; 
-        }, 
-        icon: ResolvedIcon 
-      });
+      modeButtons.push({ id: "resolved", text: "Resolved", action: () => { options.mode.value = "Resolved"; }, icon: ResolvedIcon });
     }
 
     return modeButtons;
   });
 
-  const clickedId = useComputed(() => 
+  const clickedId = useComputed(() =>
     editorModeButtons.value.findIndex(
       (b) => b.id[0].toUpperCase() + b.id.slice(1) === options.mode.value
     )
@@ -430,25 +367,69 @@ export const EditorTopbar = ({ alert, buttons }) => {
     [buttons]
   );
 
-  const textButtons = useMemo(
-    () => buttons.filter((b) => b.text),
-    [buttons]
-  );
+  const textButtons = useMemo(() => buttons.filter((b) => b.text), [buttons]);
+
+  // const firstSideRef = useRef(null);
+  // const secondSideRef = useRef(null);
+  const targetButtonIds = ["revert", "save", "image", "clear_format", "h1_format", "h2_format", "b_format"];
+
+  useEffect(() => {
+    // if (firstSideRef.current) {
+    //   const buttonsInsideFirstRef = firstSideRef.current.querySelectorAll("button");
+    //   buttonsInsideFirstRef.forEach((btn) => {
+    //     btn.disabled = options.mode.value === "GitCommit";
+    //   });
+    // }
+
+    const includeButtons = options.includeButtons?.value;
+    if (includeButtons && includeButtons.length) {
+      let changed = false;
+      const gitCommitIsActive = options.mode.value === "GitCommit";
+
+      const cotrolButtonRow = document.querySelector(".controls_row");
+      const commitButtonRow = document.querySelector(".commit_view_buttons");
+      if (gitCommitIsActive===true){
+        cotrolButtonRow.style.display = "none";
+        cotrolButtonRow.style.pointerEvents = "none"; 
+        commitButtonRow.style.display = "flex";
+        commitButtonRow.style.pointerEvents = "auto";
+      } else {
+        cotrolButtonRow.style.display = "flex";
+        cotrolButtonRow.style.pointerEvents = "auto";
+        commitButtonRow.style.display = "none";
+        commitButtonRow.style.pointerEvents = "none";
+      }
+
+      targetButtonIds.forEach((id) => {
+        const btn = includeButtons.find((b) => b.id === id);
+        if (btn) {
+          if (btn.disabled !== gitCommitIsActive) {
+            btn.disabled = gitCommitIsActive;
+            changed = true;
+          }
+        }
+      });
+
+      if (changed) {
+        options.includeButtons.value = [...includeButtons];
+      }
+    }
+  }, [options.mode.value]);
 
   return (
     <Topbar id="topbar">
-      <div className="side">
+      <div className="side" style={{ display: options.mode.value === "GitCommit" ? "none" : "flex" }}> {/* ref={firstSideRef}> */}
         <div className="btns">
           {buttonsLeft.map((button) => (
             <div key={button.id}>
               <TopbarButton
                 className="icon"
-                style={{ display: button.visible === false ? "none" : undefined }}
                 active={button.active?.({ suggestMode })}
                 type="button"
                 title={button.tooltip}
                 name={button.id}
                 onClick={button.action}
+                disabled={button.disabled}
               >
                 {typeof button.icon == "function" ? <button.icon /> : <img src={button.icon} />}
               </TopbarButton>
@@ -463,20 +444,71 @@ export const EditorTopbar = ({ alert, buttons }) => {
         {alert.value && <Alert className="topbar-alert"> {alert} </Alert>}
         <Title id="document-title" dangerouslySetInnerHTML={{ __html: titleHtml.value }} />
       </div>
+      <div className="side" style={{ display: options.mode.value === "GitCommit" ? "flex" : "none" }}>
+        <div className="btns">
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              defaultChecked={true}
+              onChange={(e) => {
+                const root = document.getElementById("myst")?.shadowRoot;
+                if (!root) return;
+
+                const commitWrapper = root.querySelector("#commit-wrapper");
+                if (!commitWrapper) return;
+
+                const allCheckboxes = commitWrapper.querySelectorAll("input.commit_file_checkbox");
+                allCheckboxes.forEach((cb) => (cb.checked = e.target.checked));
+              }}
+              ref={(el) => {
+                if (!el) return;
+                const root = document.getElementById("myst")?.shadowRoot;
+                if (!root) return;
+                const commitWrapper = root.querySelector("#commit-wrapper");
+                if (!commitWrapper) return;
+                const allCheckboxes = commitWrapper.querySelectorAll("input.commit_file_checkbox");
+                allCheckboxes.forEach((cb) => (cb.checked = el.checked));
+              }}
+              style={{
+                width: "12px",
+                height: "12px",
+                margin: "2px 0 0 2px", 
+                accentColor: "#000",
+              }}
+            />
+            Select all
+          </label>
+        </div>
+      </div>
       <div className="side">
         {collab.value && <Avatars />}
         {textButtons.length > 0 && (
           <div className="btns">
             {textButtons.map((b) => (
-              <DefaultButton key={b.id} type="button" onClick={b.action} style={{ display: b.visible === false ? "none" : undefined }}>
+              <DefaultButton
+                key={b.id}
+                type="button"
+                onClick={b.action}
+                disabled={b.disabled}
+                style={{
+                  opacity: b.disabled ? 0.0 : 1,
+                }}
+              >
                 {b.text}
               </DefaultButton>
             ))}
           </div>
         )}
-        <ButtonGroup buttons={editorModeButtons} clickedId={clickedId.value} mainButtonsNum={6} /> 
+        <ButtonGroup buttons={editorModeButtons} clickedId={clickedId.value} mainButtonsNum={6} />
       </div>
     </Topbar>
   );
 };
-

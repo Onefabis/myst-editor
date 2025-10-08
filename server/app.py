@@ -2,7 +2,7 @@ import os
 import re
 import shutil
 from collections import defaultdict
-from fastapi import FastAPI, File, Form, UploadFile, Request, Query
+from fastapi import FastAPI, File, Form, UploadFile, Request, Query, Body
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -492,7 +492,7 @@ async def git_diff_tree_get(commit_left: str = Query(...), commit_right: str = Q
     commit_left_obj = repo.commit(commit_left)
     commit_right_obj = repo.commit(commit_right)
 
-    diffs = commit_left_obj.diff(commit_right_obj, paths=DOCS_DIR)
+    diffs = commit_right_obj.diff(commit_left_obj, paths=DOCS_DIR)
 
     result = []
     for d in diffs:
@@ -735,6 +735,66 @@ async def get_tree_local_diff():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# @app.post("/api/git-commit-all")
+# async def git_commit_all(payload: dict = Body(...)):
+#     """
+#     Stage all changes and commit to the current branch (HEAD branch).
+#     Uses custom commit message if provided.
+#     """
+#     try:
+#         message = payload.get("message", "").strip() or ""  # empty allowed
+
+#         # Stage everything (tracked, untracked, deleted)
+#         repo.git.add(A=True)
+
+#         # Commit with provided message (empty if not given)
+#         new_commit = repo.index.commit(message)
+
+#         try:
+#             active_branch = repo.active_branch.name if not repo.head.is_detached else None
+#         except Exception:
+#             active_branch = None
+
+#         return {
+#             "status": "success",
+#             "commit": new_commit.hexsha,
+#             "summary": new_commit.summary or "(empty commit message)",
+#             "active_branch": active_branch,
+#         }
+
+#     except Exception as e:
+#         import traceback
+#         traceback.print_exc()
+#         return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/api/git-commit-all")
+async def git_commit_all(payload: dict = Body(...)):
+    message = payload.get("message", "").strip() or "(no message)"
+    files = payload.get("files", [])
+    try:
+        if files:
+            for f in files:
+                repo.git.add(os.path.join(DOCS_DIR, f))
+        else:
+            repo.git.add(all=True)
+        new_commit = repo.index.commit(message)
+        return {"status": "success", "commit": new_commit.hexsha, "summary": new_commit.summary}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+
+@app.post("/api/git-commit-selected")
+async def git_commit_selected(payload: dict = Body(...)):
+    files = payload.get("files", [])
+    message = payload.get("message", "").strip() or "(no message)"
+    try:
+        for f in files:
+            repo.git.add(os.path.join(DOCS_DIR, f))
+        new_commit = repo.index.commit(message)
+        return {"status": "success", "commit": new_commit.hexsha}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # Mount frontend

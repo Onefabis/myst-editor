@@ -13,7 +13,6 @@ export const DefaultButton = styled.button`
   justify-content: center;
   align-items: center;
   padding: 0;
-  transition: 0.4s ease;
   border-radius: var(--border-radius);
 
   &:focus {

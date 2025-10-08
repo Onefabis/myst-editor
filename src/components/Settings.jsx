@@ -47,7 +47,6 @@ const ToggleContainer = styled.span`
     width: 48px;
     height: 24px;
     border-radius: 12px;
-    transition: 0.4s;
     cursor: pointer;
     position: relative;
     background-color: var(--switch-bg);
