@@ -11,7 +11,6 @@ body {
 #sidebar {
   background: #f9f9f9;
   overflow-y: hidden;
-  border-right: 1px solid #ccc;
   min-width: 260px;
   max-width: 600px;
   width: 300px;
@@ -28,6 +27,10 @@ body {
   border-radius: 7px;
   background: rgb(255 255 255);
   flex-direction: column;
+}
+
+#tree_container.commit-override {
+  border-radius: 7px 0 0 7px;
 }
 
 #tree_container span.file,
@@ -57,17 +60,29 @@ body {
   width: 2px;
   min-width: 2px;
   cursor: ew-resize;
-  background: #cccccc;
+  background: #e7e7e7;
   -webkit-user-select: none;
   user-select: none;
 }
 
+#resizer div{
+  width: 50%;
+  /*height: 100%;*/
+  position: relative;
+  top: 45px;
+  background: #b9b9b9;
+}
+
 #editor-panel {
   flex-grow: 1;
-  padding: 0 2px;
+  padding: 0 3px;
   background: rgb(231 231 231);
   flex-direction: column;
   overflow: hidden;
+}
+
+#editor-panel.commit-override {
+  padding: 0 3px 0 0 !important;
 }
 
 ul {
@@ -132,14 +147,20 @@ ul {
 }
 
 .commit_view_buttons {
-  width: 100%;
-  height: 100%;
+  height: 93px;
+  padding: 8px 10px;
+  background: #e7e7e7;
   display: none;
   align-content: center;
   align-items: center;
-  justify-content: flex-start;
-  padding: 0 7px;
-  gap: 7px;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.commit_field_row {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
 }
 
 #commit-files {
@@ -153,7 +174,7 @@ ul {
   display: flex;
 }
 
-#commit-files svg{
+#commit-files svg, #refresh-branch svg, #git-pull svg, #git-push svg{
   width: 20px;
 }
 
@@ -165,6 +186,13 @@ ul {
 
 #commit-wrapper{
   padding: 14px !important;
+  background: #fff;
+  border-radius: 0 6px 6px 0 !important;
+}
+
+#git-push-pull {
+  display: flex;
+  gap: 9px;
 }
 
 .commit-message-input {
@@ -214,10 +242,18 @@ ul {
   border: none !important;
 }
 
-#container {
+#body_container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#main_editor_container {
   display: flex;
   width: 100%;
   height: 100vh;
+  overflow: hidden;
 }
 
 #custom-menu {
@@ -399,7 +435,7 @@ ul {
 }
 
 
-#document-title {
+#document-title, #active-branch-title {
   text-align: center;
   text-transform: uppercase;
   font-size: 12px;
@@ -998,6 +1034,11 @@ aside.danger>header::before {
   background: #e7e7e7;
 }
 
+/* Override style (must be more specific or loaded later) */
+#tree-panel.commit-override {
+  padding: 0px 0px 3px 3px !important;
+}
+
 /* ─── Git panel container ─────────────────────── */
 #gitPanel {
   display: flex;
@@ -1145,9 +1186,11 @@ aside.danger>header::before {
 #resizer-horizontal {
   height: 5px;
   cursor: row-resize;
-  background: #ddd;
+  background: rgb(231, 231, 231);
   display: none;
 }
+
+
 
 #current_file_label {
   font-weight: 500;
@@ -1241,6 +1284,10 @@ aside.danger>header::before {
   padding: 0 !important;
 }
 
+.cm-collapsedLines {
+  color: rgb(2 109 187) !important;
+  background: rgb(244 247 247);
+}
 
 
 /* ------------------- GitDiff Extension UI elements END ------------------ */
@@ -1452,3 +1499,92 @@ aside.danger>header::before {
 }
 
 /* ------------------- Image Picker Window END ----------------------------- */
+
+/* ---------------- Commit current state UI elements START ----------------- */
+
+/* Container for each file section */
+.commit-file-container {
+  display: flex;
+  flex-direction: column;
+  min-height: auto;
+  margin-bottom: 12px;
+}
+
+/* Header row */
+.commit-file-header {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 6px;
+  border: 1px solid rgb(195 195 195);
+  border-radius: 4px 4px 0 0;
+  background: rgb(235 235 235);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Rounded when collapsed */
+.commit-file-header.collapsed {
+  border-radius: 4px;
+}
+
+/* Left side of header: arrow + filename */
+.commit-file-header-left {
+  display: flex;
+  align-items: center;
+}
+
+/* Arrow icon */
+.commit-file-arrow {
+  margin-right: 6px;
+  transition: transform 0.2s ease;
+}
+.commit-file-arrow.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* Right side of header: collapse button + checkbox */
+.commit-file-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Collapse button */
+.collapse-btn {
+  width: 20px;
+  padding: 2px 0px 1px;
+  cursor: pointer;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.collapse-btn:hover {
+  background: #d3d3d3;
+}
+
+/* Checkbox */
+.commit_file_checkbox {
+  accent-color: #000;
+}
+
+/* Diff container */
+.commit-file-diff {
+  display: block;
+  min-height: 10px;
+  border-radius: 0 0 4px 4px;
+  border: 1px solid rgb(195 195 195);
+  border-top: none;
+  padding: 5px;
+}
+
+/* Hidden diff */
+.commit-file-diff.hidden {
+  display: none;
+}
+
+/* ---------------- Commit current state UI elements END --  --------------- */

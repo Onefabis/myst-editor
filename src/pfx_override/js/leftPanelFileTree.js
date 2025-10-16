@@ -734,13 +734,21 @@ export async function fetchGitCommitTree() {
   const tree = Array.isArray(data?.tree) ? data.tree : [];
   const diffs = Array.isArray(data?.diffs) ? data.diffs : [];
   const tree_div = document.getElementById("tree");
+  const host = document.querySelector("#myst");
+  if (!host?.shadowRoot) return;
+
+  const shadow = host.shadowRoot;
+  const select_all_for_commit = shadow.getElementById("select-all-for-commit");
+  
   const commit_message = document.getElementById("commit-no-changes-message");
   if (tree.length === 0) {
     commit_message.style.display = "flex";
     tree_div.style.display = "none"; 
+    select_all_for_commit.style.display = "none";
   } else {
     commit_message.style.display = "none";
     tree_div.style.display = "flex"; 
+    select_all_for_commit.style.display = "flex";
   }
 
   const diffMap = GitDiffManager.buildDiffMap(diffs);

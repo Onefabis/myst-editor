@@ -290,7 +290,7 @@ const MystEditor = () => {
 
                 {/* Current file text always exists */}
                 <div className={showLeftCommitList.value ? "hiddenGitLeftPanel" : "showedGitLeftpanel"}>
-                  <span id="current_file_label">Current file</span>
+                  <span id="current_file_label">Current state</span>
                 </div>
               </GitHalf>
 

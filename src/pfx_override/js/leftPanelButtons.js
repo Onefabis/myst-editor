@@ -334,52 +334,52 @@ document.getElementById("upload-image").onclick = () => {
   input.click();
 };
 
-document.getElementById("commit-files").onclick = async () => {
-  const msgInput = document.getElementById("commit-message");
-  const commitMsg = msgInput?.value?.trim() || "";
+// document.getElementById("commit-files").onclick = async () => {
+//   const msgInput = document.getElementById("commit-message");
+//   const commitMsg = msgInput?.value?.trim() || "";
 
-  const selected = (window.gitCommitCheckboxes || [])
-    .filter(cb => cb.checked)
-    .map(cb => cb.dataset.path);
+//   const selected = (window.gitCommitCheckboxes || [])
+//     .filter(cb => cb.checked)
+//     .map(cb => cb.dataset.path);
 
-  if (selected.length === 0) {
-    if (!confirm("No files selected — commit all modified and untracked files?")) return;
-  } else {
-    if (!confirm(`Commit only selected files? (${selected.length} total)`)) return;
-  }
+//   if (selected.length === 0) {
+//     if (!confirm("No files selected — commit all modified and untracked files?")) return;
+//   } else {
+//     if (!confirm(`Commit only selected files? (${selected.length} total)`)) return;
+//   }
 
-  try {
-    const res = await fetch("/api/git-commit-all", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: commitMsg, files: selected }),
-    });
+//   try {
+//     const res = await fetch("/api/git-commit-all", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({ message: commitMsg, files: selected }),
+//     });
 
-    const data = await res.json();
+//     const data = await res.json();
 
-    if (!res.ok) {
-      alert(`Commit failed: ${data.error || "Unknown error"}`);
-      return;
-    }
+//     if (!res.ok) {
+//       alert(`Commit failed: ${data.error || "Unknown error"}`);
+//       return;
+//     }
 
-    alert(
-      `Commit successful!\n` +
-      `Branch: ${data.active_branch || "(detached HEAD)"}\n` +
-      `Commit: ${data.commit}\n` +
-      `Message: ${data.summary}`
-    );
+//     alert(
+//       `Commit successful!\n` +
+//       `Branch: ${data.active_branch || "(detached HEAD)"}\n` +
+//       `Commit: ${data.commit}\n` +
+//       `Message: ${data.summary}`
+//     );
 
-    // Optional: clear message field after successful commit
-    if (msgInput) msgInput.value = "";
+//     // Optional: clear message field after successful commit
+//     if (msgInput) msgInput.value = "";
 
-    const tree_div = document.getElementById("tree");
-    tree_div.innerHTML = "";
-    fetchGitCommitTree();
+//     const tree_div = document.getElementById("tree");
+//     tree_div.innerHTML = "";
+//     fetchGitCommitTree();
 
-  } catch (err) {
-    alert(`Error: ${err.message}`);
-  }
-};
+//   } catch (err) {
+//     alert(`Error: ${err.message}`);
+//   }
+// };
 
 // ----------------------- Toolbar Button Actions END ----------------------- //
 

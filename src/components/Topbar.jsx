@@ -34,7 +34,6 @@ const Topbar = styled.div`
     display: flex;
     align-items: center;
     gap: 10px;
-    min-width: 0;
 
     &:last-child {
       flex-shrink: 0;
@@ -312,10 +311,15 @@ export const EditorTopbar = ({ alert, buttons }) => {
 
   const firstRender = useRef(true);
 
+  const activeBranch = useSignal("");
+
+
   useSignalEffect(() => {
     if (options.mode.value === "GitCommit") {
       fetchGitCommitTree();
-    }
+
+      
+    } 
 
     localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
 
@@ -368,19 +372,9 @@ export const EditorTopbar = ({ alert, buttons }) => {
   );
 
   const textButtons = useMemo(() => buttons.filter((b) => b.text), [buttons]);
-
-  // const firstSideRef = useRef(null);
-  // const secondSideRef = useRef(null);
   const targetButtonIds = ["revert", "save", "image", "clear_format", "h1_format", "h2_format", "b_format"];
 
   useEffect(() => {
-    // if (firstSideRef.current) {
-    //   const buttonsInsideFirstRef = firstSideRef.current.querySelectorAll("button");
-    //   buttonsInsideFirstRef.forEach((btn) => {
-    //     btn.disabled = options.mode.value === "GitCommit";
-    //   });
-    // }
-
     const includeButtons = options.includeButtons?.value;
     if (includeButtons && includeButtons.length) {
       let changed = false;
@@ -389,15 +383,53 @@ export const EditorTopbar = ({ alert, buttons }) => {
       const cotrolButtonRow = document.querySelector(".controls_row");
       const commitButtonRow = document.querySelector(".commit_view_buttons");
       if (gitCommitIsActive===true){
+
         cotrolButtonRow.style.display = "none";
         cotrolButtonRow.style.pointerEvents = "none"; 
         commitButtonRow.style.display = "flex";
         commitButtonRow.style.pointerEvents = "auto";
+
+        fetch("/search-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: "" }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.active_branch) {
+              activeBranch.value = data.active_branch;
+            } else {
+              activeBranch.value = "(no active branch)";
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to fetch active branch:", err);
+            activeBranch.value = "(unknown)";
+          });
+        document.getElementById("tree-panel").classList.add("commit-override");
+        document.getElementById("tree_container").classList.add("commit-override");
+        document.getElementById("editor-panel").classList.add("commit-override");
+        const root = document.getElementById("myst")?.shadowRoot;
+        if (!root) return;
+        const commitWrapper = root.querySelector("#commit-wrapper");
+        if (!commitWrapper) return;
+        commitWrapper.classList.add("commit-override");
+
       } else {
         cotrolButtonRow.style.display = "flex";
         cotrolButtonRow.style.pointerEvents = "auto";
         commitButtonRow.style.display = "none";
         commitButtonRow.style.pointerEvents = "none";
+
+        document.getElementById("tree-panel").classList.remove("commit-override");
+        document.getElementById("tree_container").classList.remove("commit-override");
+        document.getElementById("editor-panel").classList.remove("commit-override");
+        const root = document.getElementById("myst")?.shadowRoot;
+        if (!root) return;
+        const commitWrapper = root.querySelector("#commit-wrapper");
+        if (!commitWrapper) return;
+        commitWrapper.classList.remove("commit-override");
+      
       }
 
       targetButtonIds.forEach((id) => {
@@ -418,7 +450,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
 
   return (
     <Topbar id="topbar">
-      <div className="side" style={{ display: options.mode.value === "GitCommit" ? "none" : "flex" }}> {/* ref={firstSideRef}> */}
+      <div className="side" style={{ display: options.mode.value === "GitCommit" ? "none" : "flex" }}>
         <div className="btns">
           {buttonsLeft.map((button) => (
             <div key={button.id}>
@@ -444,8 +476,8 @@ export const EditorTopbar = ({ alert, buttons }) => {
         {alert.value && <Alert className="topbar-alert"> {alert} </Alert>}
         <Title id="document-title" dangerouslySetInnerHTML={{ __html: titleHtml.value }} />
       </div>
-      <div className="side" style={{ display: options.mode.value === "GitCommit" ? "flex" : "none" }}>
-        <div className="btns">
+      <div className="side" style={{ width: "100%", display: options.mode.value === "GitCommit" ? "flex" : "none" }}>
+        <div className="btns" id="select-all-for-commit">
           <label
             style={{
               display: "flex",
@@ -487,20 +519,23 @@ export const EditorTopbar = ({ alert, buttons }) => {
             Select all
           </label>
         </div>
+        <Title id="active-branch-title" style={{ width: "100%"}}>
+          Active branch: {activeBranch.value || "(loading...)"}
+        </Title>
       </div>
       <div className="side">
         {collab.value && <Avatars />}
         {textButtons.length > 0 && (
-          <div className="btns">
+          <div className="btns" style={{ display: options.mode.value === "GitCommit" ? "none" : "flex" }}>
             {textButtons.map((b) => (
               <DefaultButton
                 key={b.id}
                 type="button"
                 onClick={b.action}
                 disabled={b.disabled}
-                style={{
-                  opacity: b.disabled ? 0.0 : 1,
-                }}
+                // style={{
+                //   opacity: b.disabled ? 0.0 : 1,
+                // }}
               >
                 {b.text}
               </DefaultButton>

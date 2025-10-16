@@ -1,6 +1,42 @@
 import { MergeView } from "@codemirror/merge";
-import { EditorView, basicSetup } from "codemirror";
-import {EditorState} from "@codemirror/state"
+import { basicSetup } from "codemirror";
+import { EditorState } from "@codemirror/state";
+
+/**
+ * SVG Icons (return DOM elements)
+ */
+const CollapseMergeViewIcon = () => {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute(
+    "d",
+    "M7.41 18.59L8.83 20 12 16.83 15.17 20l1.41-1.41L12 14l-4.59 4.59zm9.18-13.18L15.17 4 12 7.17 8.83 4 7.41 5.41 12 10l4.59-4.59z"
+  );
+  path.setAttribute("fill", "currentColor");
+  svg.appendChild(path);
+  return svg;
+};
+
+const ExpandMergeViewIcon = () => {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute(
+    "d",
+    "M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z"
+  );
+  path.setAttribute("fill", "currentColor");
+  svg.appendChild(path);
+  return svg;
+};
+
 
 /**
  * Fetch helper
@@ -30,7 +66,6 @@ export async function logFilePaths() {
   if (!commitWrapper) return;
   commitWrapper.innerHTML = "";
 
-  // Store checkboxes globally
   window.gitCommitCheckboxes = [];
 
   let headCommit = null;
@@ -43,34 +78,22 @@ export async function logFilePaths() {
 
   for (const path of filePaths) {
     const container = document.createElement("div");
-    container.style.display = "flex";
-    container.style.flexDirection = "column";
-    container.style.minHeight = "auto";
-    container.style.marginBottom = "12px";
+    container.className = "commit-file-container";
 
     // Header
     const titleDiv = document.createElement("div");
-    titleDiv.style.cursor = "pointer";
-    titleDiv.style.fontWeight = "bold";
-    titleDiv.style.padding = "6px";
-    titleDiv.style.border = "1px solid rgb(195 195 195)";
-    titleDiv.style.borderRadius = "4px 4px 0 0";
-    titleDiv.style.background = "rgb(235 235 235)";
-    titleDiv.style.display = "flex";
-    titleDiv.style.alignItems = "center";
-    titleDiv.style.justifyContent = "space-between";
+    titleDiv.className = "commit-file-header";
 
     // Left: arrow + filename
     const leftGroup = document.createElement("div");
-    leftGroup.style.display = "flex";
-    leftGroup.style.alignItems = "center";
+    leftGroup.className = "commit-file-header-left";
 
     const arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    arrow.classList.add("commit-file-arrow");
     arrow.setAttribute("width", "12");
     arrow.setAttribute("height", "12");
     arrow.setAttribute("viewBox", "0 0 24 24");
-    arrow.style.marginRight = "6px";
-    arrow.style.transition = "transform 0.2s ease";
+
     const tickPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
     tickPath.setAttribute("d", "M6 9l6 6 6-6");
     tickPath.setAttribute("stroke", "#555");
@@ -86,33 +109,32 @@ export async function logFilePaths() {
     leftGroup.appendChild(arrow);
     leftGroup.appendChild(textSpan);
 
-    // Right: checkbox
+    // Right: collapse icon + checkbox
+    const rightGroup = document.createElement("div");
+    rightGroup.className = "commit-file-header-right";
+
+    const collapseBtn = document.createElement("button");
+    collapseBtn.type = "button";
+    collapseBtn.className = "collapse-btn";
+    collapseBtn.appendChild(CollapseMergeViewIcon());
+    collapseBtn.title = "Collapse identical lines";
+
     const checkbox = document.createElement("input");
     checkbox.classList.add("commit_file_checkbox");
     checkbox.type = "checkbox";
     checkbox.checked = true;
-    checkbox.style.marginLeft = "8px";
-    checkbox.style.accentColor = "#000";
-     // style={{
-     //            width: "12px",
-     //            height: "12px",
-     //            margin: "2px 0 0 2px", 
-     //            accentColor: "#000",
-     //          }}
     checkbox.dataset.path = path;
     window.gitCommitCheckboxes.push(checkbox);
 
-    titleDiv.appendChild(leftGroup);
-    titleDiv.appendChild(checkbox);
+    rightGroup.appendChild(collapseBtn);
+    rightGroup.appendChild(checkbox);
 
-    // Content (diff)
+    titleDiv.appendChild(leftGroup);
+    titleDiv.appendChild(rightGroup);
+
+    // Diff area
     const childDiv = document.createElement("div");
-    childDiv.style.display = "block";
-    childDiv.style.minHeight = "10px";
-    childDiv.style.borderRadius = "0 0 4px 4px";
-    childDiv.style.border = "1px solid rgb(195 195 195)";
-    childDiv.style.borderTop = "none";
-    childDiv.style.padding = "5px";
+    childDiv.className = "commit-file-diff";
 
     (async () => {
       let headContent = "";
@@ -139,24 +161,40 @@ export async function logFilePaths() {
         console.error(err);
       }
 
-      const mergeViewInstance = new MergeView({
-        a: { doc: headContent, extensions: [basicSetup, EditorState.readOnly.of(true)], editable: false },
-        b: { doc: localContent, extensions: [basicSetup, EditorState.readOnly.of(true)], editable: false },
-        orientation: "a-b",
-        root: commitWrapper.getRootNode(),
-        useReadonlyA: true,
-        useReadonlyB: true,
-      });
+      let isCollapsed = true;
 
-      childDiv.appendChild(mergeViewInstance.dom);
+      function buildMergeView() {
+        childDiv.innerHTML = "";
+        const mv = new MergeView({
+          a: { doc: headContent, extensions: [basicSetup, EditorState.readOnly.of(true)], editable: false },
+          b: { doc: localContent, extensions: [basicSetup, EditorState.readOnly.of(true)], editable: false },
+          orientation: "a-b",
+          collapseUnchanged: isCollapsed ? { margin: 3, minSize: 4 } : null,
+          root: commitWrapper.getRootNode(),
+          useReadonlyA: true,
+          useReadonlyB: true,
+        });
+        childDiv.appendChild(mv.dom);
+        return mv;
+      }
+
+      let mergeViewInstance = buildMergeView();
+
+      collapseBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        isCollapsed = !isCollapsed;
+        collapseBtn.innerHTML = "";
+        collapseBtn.appendChild(isCollapsed ? CollapseMergeViewIcon() : ExpandMergeViewIcon());
+        collapseBtn.title = isCollapsed ? "Collapse identical lines" : "Expand identical lines";
+        mergeViewInstance = buildMergeView();
+      });
     })();
 
     titleDiv.addEventListener("click", (e) => {
-      if (e.target === checkbox) return;
-      const isCollapsed = childDiv.style.display === "none";
-      childDiv.style.display = isCollapsed ? "block" : "none";
-      arrow.style.transform = isCollapsed ? "rotate(0deg)" : "rotate(-90deg)";
-      titleDiv.style.borderRadius = isCollapsed ? "4px 4px 0 0" : "4px";
+      if (e.composedPath().includes(checkbox)) return;
+      const hidden = childDiv.classList.toggle("hidden");
+      arrow.classList.toggle("collapsed", hidden);
+      titleDiv.classList.toggle("collapsed", hidden);
     });
 
     container.appendChild(titleDiv);
@@ -164,3 +202,4 @@ export async function logFilePaths() {
     commitWrapper.appendChild(container);
   }
 }
+

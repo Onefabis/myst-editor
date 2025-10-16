@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List
-from git import Repo
+from git import Repo, GitCommandError
 
 # ---------------------- CONFIG ----------------------
 DOCS_DIR = "docs"
@@ -735,64 +735,196 @@ async def get_tree_local_diff():
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# @app.post("/api/git-commit-all")
-# async def git_commit_all(payload: dict = Body(...)):
-#     """
-#     Stage all changes and commit to the current branch (HEAD branch).
-#     Uses custom commit message if provided.
-#     """
-#     try:
-#         message = payload.get("message", "").strip() or ""  # empty allowed
-
-#         # Stage everything (tracked, untracked, deleted)
-#         repo.git.add(A=True)
-
-#         # Commit with provided message (empty if not given)
-#         new_commit = repo.index.commit(message)
-
-#         try:
-#             active_branch = repo.active_branch.name if not repo.head.is_detached else None
-#         except Exception:
-#             active_branch = None
-
-#         return {
-#             "status": "success",
-#             "commit": new_commit.hexsha,
-#             "summary": new_commit.summary or "(empty commit message)",
-#             "active_branch": active_branch,
-#         }
-
-#     except Exception as e:
-#         import traceback
-#         traceback.print_exc()
-#         return JSONResponse({"error": str(e)}, status_code=500)
-
 @app.post("/api/git-commit-all")
 async def git_commit_all(payload: dict = Body(...)):
     message = payload.get("message", "").strip() or "(no message)"
     files = payload.get("files", [])
+
     try:
+        if repo.head.is_detached:
+            return JSONResponse({"error": "HEAD is detached — cannot commit."}, status_code=400)
+
+        active_branch = repo.active_branch.name
+
+        # Attempt to fetch latest from remote
+        try:
+            repo.remotes.origin.fetch()
+        except Exception as fetch_err:
+            print(f"Warning: could not fetch remote: {fetch_err}")
+
+        remote_ref = f"origin/{active_branch}"
+        local_commit = repo.commit(active_branch)
+
+        if remote_ref in repo.refs:
+            remote_commit = repo.commit(remote_ref)
+
+            # Determine relationship between local and remote
+            is_local_behind = repo.is_ancestor(local_commit, remote_commit)
+            is_remote_behind = repo.is_ancestor(remote_commit, local_commit)
+
+            if is_local_behind and not is_remote_behind:
+                # Local is strictly behind remote
+                return JSONResponse(
+                    {
+                        "error": "REMOTE_AHEAD",
+                        "detail": f"Your branch '{active_branch}' is behind the remote. Please pull before committing.",
+                    },
+                    status_code=409,
+                )
+
+            if not is_local_behind and not is_remote_behind:
+                # Branches have diverged (both have new commits)
+                return JSONResponse(
+                    {
+                        "error": "DIVERGED",
+                        "detail": f"Your branch '{active_branch}' has diverged from remote. Pull and resolve conflicts first.",
+                    },
+                    status_code=409,
+                )
+
+        # Stage changes
         if files:
             for f in files:
                 repo.git.add(os.path.join(DOCS_DIR, f))
         else:
             repo.git.add(all=True)
+
+        # Commit
         new_commit = repo.index.commit(message)
-        return {"status": "success", "commit": new_commit.hexsha, "summary": new_commit.summary}
+        return {
+            "status": "success",
+            "commit": new_commit.hexsha,
+            "summary": new_commit.summary,
+            "active_branch": active_branch,
+        }
+
+    except GitCommandError as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-
-
-@app.post("/api/git-commit-selected")
-async def git_commit_selected(payload: dict = Body(...)):
-    files = payload.get("files", [])
-    message = payload.get("message", "").strip() or "(no message)"
+@app.post("/api/git-sync")
+async def git_sync():
+    """
+    Perform a safe Git sync: pull (with rebase) + push.
+    Handles broken refs, merge conflicts, and ensures the remote matches local HEAD.
+    """
     try:
-        for f in files:
-            repo.git.add(os.path.join(DOCS_DIR, f))
-        new_commit = repo.index.commit(message)
-        return {"status": "success", "commit": new_commit.hexsha}
+        if repo.head.is_detached:
+            return JSONResponse({"error": "HEAD is detached — cannot sync."}, status_code=400)
+
+        active_branch = repo.active_branch.name
+        if not repo.remotes:
+            return JSONResponse({"error": "NO_REMOTE"}, status_code=400)
+
+        origin = repo.remotes.origin
+        git_dir = repo.git_dir
+
+        # --- Step 0: Cleanup broken refs & rebase leftovers ---
+        for bad_ref in ["ORIG_HEAD", "MERGE_HEAD"]:
+            bad_path = os.path.join(git_dir, bad_ref)
+            if os.path.exists(bad_path):
+                try:
+                    os.remove(bad_path)
+                    print(f"Removed broken ref: {bad_ref}")
+                except Exception:
+                    pass
+
+        if any(os.path.exists(os.path.join(git_dir, d)) for d in ["rebase-apply", "rebase-merge"]):
+            return JSONResponse(
+                {"error": "UNMERGED_FILES", "detail": "Rebase/merge in progress. Please resolve before syncing."},
+                status_code=409,
+            )
+
+        # --- Step 1: Fetch remote ---
+        origin.fetch()
+
+        # --- Step 2: Stash local changes if any ---
+        has_changes = repo.is_dirty(untracked_files=True)
+        if has_changes:
+            repo.git.stash("push", "-u", "-m", "auto-stash-before-sync")
+
+        # --- Step 3: Pull with rebase ---
+        try:
+            repo.git.pull("--rebase", "--autostash", "origin", active_branch)
+        except GitCommandError as e:
+            err_msg = str(e)
+            print("Pull error:", err_msg)
+            if "ORIG_HEAD" in err_msg and "cannot lock ref" in err_msg:
+                bad_ref = os.path.join(git_dir, "ORIG_HEAD")
+                if os.path.exists(bad_ref):
+                    os.remove(bad_ref)
+                    print("Fixed broken ORIG_HEAD — retrying pull...")
+                repo.git.pull("--rebase", "--autostash", "origin", active_branch)
+
+            if "CONFLICT" in err_msg or "could not apply" in err_msg:
+                return JSONResponse(
+                    {"error": "REBASE_CONFLICT", "detail": "Conflicts detected during rebase."},
+                    status_code=409,
+                )
+
+        # --- Step 4: Pop stash if used ---
+        if has_changes:
+            try:
+                repo.git.stash("pop")
+            except GitCommandError as e:
+                if "CONFLICT" in str(e):
+                    return JSONResponse(
+                        {"error": "UNSTASH_CONFLICT", "detail": "Rebase succeeded, but local edits conflicted."},
+                        status_code=409,
+                    )
+
+        # --- Step 5: Push explicitly to remote ---
+        refspec = f"refs/heads/{active_branch}:refs/heads/{active_branch}"
+        try:
+            push_info_list = origin.push(refspec)
+        except GitCommandError as e:
+            err_msg = str(e)
+            if "non-fast-forward" in err_msg.lower():
+                return JSONResponse({"error": "NON_FAST_FORWARD"}, status_code=409)
+            raise
+
+        push_summary = []
+        for info in push_info_list:
+            summary_line = str(info.summary)
+            push_summary.append(summary_line)
+            if info.flags & info.ERROR:
+                return JSONResponse(
+                    {"error": f"Push failed: {summary_line or 'unknown error'}"},
+                    status_code=500,
+                )
+
+        # --- Step 6: Verify remote matches local ---
+        origin.fetch()
+        local_commit = repo.head.commit.hexsha
+        try:
+            remote_commit = repo.commit(f"origin/{active_branch}").hexsha
+        except Exception:
+            remote_commit = None
+
+        if remote_commit != local_commit:
+            return JSONResponse(
+                {
+                    "error": "PUSH_NOT_APPLIED",
+                    "detail": (
+                        f"Local commit {local_commit[:7]} did not match remote {remote_commit[:7] if remote_commit else 'N/A'}."
+                    ),
+                },
+                status_code=500,
+            )
+
+        latest_commit = repo.commit(local_commit)
+        return {
+            "status": "success",
+            "message": f"Branch '{active_branch}' successfully synced (rebase + push).",
+            "active_branch": active_branch,
+            "commit": latest_commit.hexsha,
+            "summary": latest_commit.summary,
+            "push_result": push_summary,
+        }
+
+    except GitCommandError as e:
+        return JSONResponse({"error": f"Git error: {str(e)}"}, status_code=500)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

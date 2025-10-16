@@ -4,6 +4,7 @@ import { setupGitPanel } from "./gitDiffUI.js";
 import "./leftPanelButtons.js";
 import "./leftPanelFileTree.js";
 import "./editorContextMenu.js";
+import "./commitCurentStateUI.js";
 
 import * as txFormat from "./textFormatButtons.js";
 import { openImagePicker } from "./projectImagePicker.js";
