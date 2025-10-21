@@ -61,7 +61,7 @@ const HeadingList = styled.div`
       top: 13px;
       height: 2px;
       border-radius: 3px;
-      background-color: rgb(59 59 59);
+      background-color: rgb(145 145 145);
       border: 1px solid rgb(121 121 121);
       width: 100%;
       flex-shrink: 0;
@@ -85,6 +85,11 @@ const HeadingList = styled.div`
     span.active {
       font-weight: bold;
       color: var(--text-strong, #000);
+    }
+
+    &:has(> span.active)::before {
+      background-color: black;
+      border-color: black;
     }
   }
 
@@ -234,6 +239,35 @@ export const TableOfContents = () => {
     scrollParent.addEventListener("scroll", onScroll);
     return () => scrollParent.removeEventListener("scroll", onScroll);
   });
+
+  // Mark first heading active on initial load when scrolled to top
+useEffect(() => {
+  // only run if headings exist and we're at top of editor
+  const view = editorView.value;
+  if (!view || !headings.value.length) return;
+
+  const scrollParent = view.dom.parentElement;
+  const isAtTop = scrollParent.scrollTop === 0;
+
+  if (isAtTop) {
+    // Get the first heading in document order (topmost)
+    const firstHeading = (() => {
+      const flatten = (nodes, acc = []) => {
+        for (const h of nodes) {
+          acc.push(h);
+          if (h.children?.length) flatten(h.children, acc);
+        }
+        return acc;
+      };
+      return flatten(headings.value)[0];
+    })();
+
+    if (firstHeading) {
+      setActivePos(firstHeading.pos);
+    }
+  }
+}, [headings.value, editorView]);
+
 
   useEffect(() => {
     const el = wrapperRef.current;
