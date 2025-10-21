@@ -78,8 +78,8 @@
 
     <!-- Git pull current state svg icon -->
     <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
-      <symbol id="git-pull-from-remote" width="64px" height="64px" viewBox="2.1 0.8 11 11" fill="currentColor">
-        <path d="M 3.298 1.283 L 3.498 1.283 C 3.609 1.283 3.698 1.372 3.698 1.482 L 3.698 2.298 C 3.915 2.375 3.968 2.658 3.793 2.808 C 3.617 2.958 3.346 2.862 3.304 2.635 C 3.276 2.49 3.359 2.347 3.498 2.298 L 3.498 1.482 L 3.298 1.482 L 3.298 1.782 L 2.849 1.382 L 3.298 0.983 L 3.298 1.283 Z M 2.3 1.665 C 2.083 1.588 2.03 1.304 2.205 1.155 C 2.381 1.005 2.652 1.101 2.695 1.328 C 2.722 1.473 2.639 1.616 2.5 1.665 L 2.5 2.298 C 2.717 2.375 2.77 2.658 2.595 2.808 C 2.42 2.958 2.148 2.862 2.105 2.635 C 2.079 2.49 2.161 2.347 2.3 2.298 L 2.3 1.665 Z" style=""></path>
+      <symbol id="git-pull-from-remote" viewBox="4 0 80 80" width="50.8181px" height="48.0176px" fill="currentColor">
+        <path d="M 13.795 11.971 L 16.88 11.971 L 16.88 7.12 L 10.391 7.127 L 10.391 5.112 L 16.88 5.12 C 17.985 5.12 18.88 6.015 18.88 7.12 L 18.88 11.971 L 21.935 11.971 L 18.915 15.302 C 21.064 16.09 21.577 18.907 19.831 20.4 C 18.075 21.901 15.352 20.939 14.93 18.668 C 14.664 17.235 15.465 15.821 16.823 15.311 Z M 4.88 8.95 C 2.702 8.18 2.174 5.341 3.93 3.839 C 5.686 2.338 8.408 3.3 8.831 5.571 C 9.101 7.024 8.273 8.457 6.88 8.95 L 6.88 15.29 C 9.058 16.06 9.586 18.899 7.831 20.4 C 6.075 21.901 3.352 20.939 2.93 18.668 C 2.66 17.215 3.487 15.782 4.88 15.29 Z" style="stroke: rgb(0, 0, 0); paint-order: stroke; stroke-width: 0px;" transform="matrix(1, 0, 0, 1, 0.17955100536346436, -0.05985000357031822)"></path>
       </symbol>
     </svg>
 
@@ -89,6 +89,9 @@
         <path d="M 3.298 1.283 L 3.498 1.283 C 3.609 1.283 3.698 1.372 3.698 1.482 L 3.698 2.298 C 3.915 2.375 3.968 2.658 3.793 2.808 C 3.617 2.958 3.346 2.862 3.304 2.635 C 3.276 2.49 3.359 2.347 3.498 2.298 L 3.498 1.482 L 3.298 1.482 L 3.298 1.782 L 2.849 1.382 L 3.298 0.983 L 3.298 1.283 Z M 2.3 1.665 C 2.083 1.588 2.03 1.304 2.205 1.155 C 2.381 1.005 2.652 1.101 2.695 1.328 C 2.722 1.473 2.639 1.616 2.5 1.665 L 2.5 2.298 C 2.717 2.375 2.77 2.658 2.595 2.808 C 2.42 2.958 2.148 2.862 2.105 2.635 C 2.079 2.49 2.161 2.347 2.3 2.298 L 2.3 1.665 Z" style=""></path>
       </symbol>
     </svg>
+
+
+    
 
     <!-- SVG ICONS END -->
 
@@ -181,19 +184,19 @@
         </div>
         <div class="commit_field_row">
           <div id="git-push-pull">
-            <button id="refresh-branch" title="Refresh branch">
+            <button id="refresh-branch" title="Refresh branch (pull -rebase)">
               <svg width="14" height="14">
                 <use href="#git-refresh-from-remote"></use>
               </svg>
               <span>Refresh</span>
             </button>
-            <button id="git-pull" title="Pull">
+            <button id="git-pull" title="Git pull">
               <svg width="14" height="14">
                 <use href="#git-pull-from-remote"></use>
               </svg>
               <span>Pull</span>
             </button>
-            <button id="git-push" title="Push">
+            <button id="git-push" title="Git push">
               <svg width="14" height="14">
                 <use href="#git-push-to-remote"></use>
               </svg>

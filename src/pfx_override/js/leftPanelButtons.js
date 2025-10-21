@@ -102,32 +102,6 @@ function openMoveToDialog(itemPath) {
   };
 }
 
-
-// const { options } = useContext(MystState);
-
-// const controlsRow = document.getElementsByClassName("controls_row")[0];
-
-// if (options.mode.value === "GitCommit" && controlsRow) {
-//   controlsRow.style.opacity = "0";
-//   controlsRow.style.pointerEvents = "none";
-// } else {
-//   controlsRow.style.opacity = "1";
-//   controlsRow.style.pointerEvents = "undefined";
-// }
-
-
-
-// Find the first button with active="true" inside #topbar
-// const activeButton = document.querySelector('#topbar button[active="true"]');
-
-// if (activeButton) {
-//   const buttonName = activeButton.getAttribute("name");
-//   console.log("Active button name:", buttonName);
-// } else {
-//   console.log("No active button found.");
-// }
-
-
 // ----------------------- Toolbar Button Actions START ----------------------- //
 
 document.getElementById("move").onclick = () => {
@@ -333,53 +307,6 @@ document.getElementById("upload-image").onclick = () => {
   };
   input.click();
 };
-
-// document.getElementById("commit-files").onclick = async () => {
-//   const msgInput = document.getElementById("commit-message");
-//   const commitMsg = msgInput?.value?.trim() || "";
-
-//   const selected = (window.gitCommitCheckboxes || [])
-//     .filter(cb => cb.checked)
-//     .map(cb => cb.dataset.path);
-
-//   if (selected.length === 0) {
-//     if (!confirm("No files selected — commit all modified and untracked files?")) return;
-//   } else {
-//     if (!confirm(`Commit only selected files? (${selected.length} total)`)) return;
-//   }
-
-//   try {
-//     const res = await fetch("/api/git-commit-all", {
-//       method: "POST",
-//       headers: { "Content-Type": "application/json" },
-//       body: JSON.stringify({ message: commitMsg, files: selected }),
-//     });
-
-//     const data = await res.json();
-
-//     if (!res.ok) {
-//       alert(`Commit failed: ${data.error || "Unknown error"}`);
-//       return;
-//     }
-
-//     alert(
-//       `Commit successful!\n` +
-//       `Branch: ${data.active_branch || "(detached HEAD)"}\n` +
-//       `Commit: ${data.commit}\n` +
-//       `Message: ${data.summary}`
-//     );
-
-//     // Optional: clear message field after successful commit
-//     if (msgInput) msgInput.value = "";
-
-//     const tree_div = document.getElementById("tree");
-//     tree_div.innerHTML = "";
-//     fetchGitCommitTree();
-
-//   } catch (err) {
-//     alert(`Error: ${err.message}`);
-//   }
-// };
 
 // ----------------------- Toolbar Button Actions END ----------------------- //
 
