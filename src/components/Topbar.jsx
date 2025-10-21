@@ -533,9 +533,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
                 type="button"
                 onClick={b.action}
                 disabled={b.disabled}
-                // style={{
-                //   opacity: b.disabled ? 0.0 : 1,
-                // }}
               >
                 {b.text}
               </DefaultButton>

@@ -88,6 +88,10 @@ const HeadingList = styled.div`
     }
   }
 
+  ${Wrapper}.expanded & li {
+    margin: 0 0 0 6px !important;
+  }
+
   ${Wrapper}.expanded & li span {
     max-width: 200px;
     opacity: 1;
@@ -103,19 +107,32 @@ const HeadingList = styled.div`
   }
 `;
 
-function Heading({ heading, level = 1 }) {
+function Heading({ heading, level = 1, activePos, onClick }) {
+  const isActive = activePos === heading.pos;
+
   return (
     <li level={level}>
       <span
         title="Go to heading"
         data-heading-pos={heading.pos}
+        className={isActive ? "active" : ""}
+        onClick={(ev) => {
+          ev.stopPropagation();
+          onClick(ev, heading.pos); // pass known pos explicitly
+        }}
       >
         {heading.text}
       </span>
       {heading.children.length > 0 && (
         <ul>
           {heading.children.map((c) => (
-            <Heading heading={c} key={c.pos} level={level + 1} />
+            <Heading
+              heading={c}
+              key={c.pos}
+              level={level + 1}
+              activePos={activePos}
+              onClick={onClick}
+            />
           ))}
         </ul>
       )}
@@ -128,7 +145,11 @@ export const TableOfContents = () => {
   const [expanded, setExpanded] = useState(false);
   const [scrollable, setScrollable] = useState(false);
   const [activePos, setActivePos] = useState(null);
+  const [manualSelect, setManualSelect] = useState(false);
+
   const wrapperRef = useRef(null);
+  const manualScrollRef = useRef(false);
+
 
   const hasHeadings = headings.value.length > 0;
 
@@ -136,14 +157,21 @@ export const TableOfContents = () => {
     return null;
   }
 
-  function handleClick(ev) {
-    const posAttr = ev.target?.dataset?.headingPos;
-    if (!posAttr) return;
-    const pos = parseInt(posAttr, 10);
+  function handleClick(ev, pos) {
+    ev.stopPropagation();
+
+    manualScrollRef.current = true;
+    setActivePos(pos);
+
     editorView.value.dispatch({
       selection: { anchor: pos, head: pos },
       effects: EditorView.scrollIntoView(pos, { y: "start" }),
     });
+
+    // Wait longer than the editor’s scroll animation
+    setTimeout(() => {
+      manualScrollRef.current = false;
+    }, 800);
   }
 
   useSignalEffect(() => {
@@ -153,12 +181,14 @@ export const TableOfContents = () => {
     const scrollParent = view.dom.parentElement;
 
     const onScroll = () => {
-      const visible = view.visibleRanges;
-      if (!visible.length) return;
+      if (!view.visibleRanges.length) return;
 
-      const topFrom = visible[0].from; // first visible char in viewport
+      // The visible part of the document
+      const visible = view.visibleRanges[0];
+      const scrollTop = scrollParent.scrollTop;
+      const containerTop = scrollParent.getBoundingClientRect().top;
 
-      // Flatten headings (including children) into one list
+      // Flatten all headings
       const flattenHeadings = (nodes, acc = []) => {
         for (const h of nodes) {
           acc.push(h);
@@ -168,28 +198,42 @@ export const TableOfContents = () => {
       };
       const allHeadings = flattenHeadings(headings.value);
 
-      // Find the heading with the largest pos <= topFrom
+      // Filter headings that fall inside the visible range (rendered)
+      const visibleHeadings = allHeadings.filter(
+        (h) => h.pos >= visible.from && h.pos <= visible.to
+      );
+
+      // Among visible ones, find the one whose top is closest to but >= the scroll container top
       let current = null;
-      for (const h of allHeadings) {
-        if (h.pos <= topFrom) {
-          if (!current || h.pos > current.pos) {
-            current = h;
-          }
+      let minDelta = Infinity;
+
+      for (const h of visibleHeadings) {
+        const rect = view.coordsAtPos(h.pos);
+        if (!rect) continue;
+
+        const y = rect.top - containerTop + scrollTop; // position inside scroll container
+        const delta = Math.abs(y - scrollTop);
+
+        if (y >= scrollTop && delta < minDelta) {
+          current = h;
+          minDelta = delta;
         }
       }
 
+      // Fallback if none matched (e.g. scrolled beyond last heading)
+      if (!current && visibleHeadings.length) {
+        current = visibleHeadings[visibleHeadings.length - 1];
+      }
+
       if (current) {
-        console.log("Topmost visible heading:", current.text, current.pos);
-        setActivePos(current.pos);
+        // console.log("Topmost visible heading:", current.text, current.pos);
+        if (!manualScrollRef.current) setActivePos(current.pos);
       }
     };
 
     scrollParent.addEventListener("scroll", onScroll);
     return () => scrollParent.removeEventListener("scroll", onScroll);
   });
-
-
-
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -208,7 +252,6 @@ export const TableOfContents = () => {
   return (
     <Wrapper
       ref={wrapperRef}
-      onClick={handleClick}
       onMouseEnter={() => {
         if (hasHeadings) {
           setExpanded(true);
@@ -224,7 +267,12 @@ export const TableOfContents = () => {
       <HeadingList>
         <ul>
           {headings.value.map((h) => (
-            <Heading heading={h} key={h.pos} />
+            <Heading
+              heading={h}
+              key={h.pos}
+              activePos={activePos}
+              onClick={handleClick}
+            />
           ))}
         </ul>
       </HeadingList>
