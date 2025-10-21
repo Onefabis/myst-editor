@@ -1,18 +1,19 @@
 @echo off
-REM Go to root of the project
+REM --- Go to root of the project ---
 cd /d "%~dp0"
 
-REM Activate the virtual environment
-call myst_venv\Scripts\activate.bat
+REM --- Ensure we are in the Myst-Editor directory ---
+cd /d "%~dp0"
 
-REM Change to the directory containing app.py and cert files
-cd ./server
+REM --- Go into server directory ---
+cd server
 
-REM Run the server (cert.pem and key.pem will now be found)
+REM --- Start browser ---
 start "" http://localhost:5000
-python app.py
 
-REM Keep terminal open
+REM --- Run the server using the virtual environment Python explicitly ---
+..\myst_venv\Scripts\python.exe app.py
+
 echo.
 echo Server stopped. Press any key to exit...
 pause > nul
