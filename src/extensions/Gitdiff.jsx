@@ -5,7 +5,8 @@ import { styled } from "styled-components";
 import { ExtensionBuilder } from "../extensions";
 import { MystState } from "../mystState";
 import { useSignalEffect } from "@preact/signals";
-import { highlightActiveLine } from "@codemirror/view";
+import { EditorView } from "codemirror";
+import { highlightFocusedActiveLine } from "./activeLineHighlight";
 
 // Layout for diff view
 const GitDiffContainer = styled.div`
@@ -32,19 +33,30 @@ const MergeViewCodeEditor = styled(CodeEditor)`
  */
 const initMergeView = ({ aDoc, bDoc, root, transforms, useReadonlyA = true, useReadonlyB = true }) => {
   const builderA = new ExtensionBuilder().useMarkdown(transforms);
-  if (useReadonlyA) builderA.useReadonly();
-  const extensionsA = builderA.create();
+
+  let extensionsA = builderA.create();
+  if (useReadonlyA) {
+    builderA.useReadonly();
+    extensionsA = builderA.create().filter(
+      ext => ext !== highlightFocusedActiveLine
+    );
+    extensionsA.push(EditorView.editable.of(false));
+  }
 
   const builderB = new ExtensionBuilder().useMarkdown(transforms);
-  if (useReadonlyB) builderB.useReadonly();
-  const extensionsB = builderB.create();
 
-  extensionsA.push(highlightActiveLine());
-  extensionsB.push(highlightActiveLine());
+  let extensionsB = builderB.create();
+  if (useReadonlyB) {
+    builderB.useReadonly();
+    extensionsB = builderB.create().filter(
+      ext => ext !== highlightFocusedActiveLine
+    );
+    extensionsB.push(EditorView.editable.of(false));
+  }
 
   return new MergeView({
-    a: { doc: aDoc, extensions: extensionsA, editable: true },
-    b: { doc: bDoc, extensions: extensionsB, editable: true },
+    a: { doc: aDoc, extensions: extensionsA },
+    b: { doc: bDoc, extensions: extensionsB },
     orientation: "a-b",
     root,
   });
@@ -157,27 +169,11 @@ const Gitdiff = () => {
             console.error("[Gitdiff] Fetch failed:", res.status, await res.text());
             return;
           }
-
           const result = await res.json();
           const leftContentFromGit = result.left_content ?? "// Failed left commit";
           const rightContentFromGit = result.right_content ?? "// Failed right commit";
-
-          // const leftIdx = parseIndexFromOption(commitLeft?.selectedOptions?.[0]);
-          // const rightIdx = parseIndexFromOption(commitRight?.selectedOptions?.[0]);
-
-          // if (leftIdx > rightIdx) {
-          //   aDoc = rightContentFromGit;
-          //   bDoc = leftContentFromGit;
-          //   newerSide = "left";
-          // } else {
-          //   aDoc = leftContentFromGit;
-          //   bDoc = rightContentFromGit;
-          //   newerSide = "right";
-          // }
-
           aDoc = leftContentFromGit;
           bDoc = rightContentFromGit;
-
         }
 
         // Init MergeView
@@ -195,17 +191,9 @@ const Gitdiff = () => {
           leftRef.current.innerHTML = "";
           rightRef.current.innerHTML = "";
           if (mode === "local"){
-              leftRef.current.appendChild(mergeView.current.b.dom);
-              rightRef.current.appendChild(mergeView.current.a.dom);
+            leftRef.current.appendChild(mergeView.current.b.dom);
+            rightRef.current.appendChild(mergeView.current.a.dom);
           } else {
-            // if (newerSide === "left") {
-            //   leftRef.current.appendChild(mergeView.current.b.dom);
-            //   rightRef.current.appendChild(mergeView.current.a.dom);
-            // } else {
-            //   leftRef.current.appendChild(mergeView.current.a.dom);
-            //   rightRef.current.appendChild(mergeView.current.b.dom);
-            // }
-
             leftRef.current.appendChild(mergeView.current.a.dom);
             rightRef.current.appendChild(mergeView.current.b.dom);
           }

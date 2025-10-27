@@ -1,6 +1,10 @@
 import { MergeView } from "@codemirror/merge";
 import { basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { highlightFocusedActiveLine } from "./activeLineHighlight";
+import { MystState } from "../mystState";
+import { ExtensionBuilder } from "../extensions";
 
 /**
  * SVG Icons (return DOM elements)
@@ -37,7 +41,6 @@ const ExpandMergeViewIcon = () => {
   return svg;
 };
 
-
 /**
  * Fetch helper
  */
@@ -61,13 +64,10 @@ export async function logFilePaths() {
 
   const mystHost = document.getElementById("myst");
   if (!mystHost || !mystHost.shadowRoot) return;
-
   const commitWrapper = mystHost.shadowRoot.querySelector("#commit-wrapper");
   if (!commitWrapper) return;
   commitWrapper.innerHTML = "";
-
   window.gitCommitCheckboxes = [];
-
   let headCommit = null;
   try {
     const headRes = await fetchJson("/api/git-head");
@@ -79,21 +79,17 @@ export async function logFilePaths() {
   for (const path of filePaths) {
     const container = document.createElement("div");
     container.className = "commit-file-container";
-
     // Header
     const titleDiv = document.createElement("div");
     titleDiv.className = "commit-file-header";
-
     // Left: arrow + filename
     const leftGroup = document.createElement("div");
     leftGroup.className = "commit-file-header-left";
-
     const arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     arrow.classList.add("commit-file-arrow");
     arrow.setAttribute("width", "12");
     arrow.setAttribute("height", "12");
     arrow.setAttribute("viewBox", "0 0 24 24");
-
     const tickPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
     tickPath.setAttribute("d", "M6 9l6 6 6-6");
     tickPath.setAttribute("stroke", "#555");
@@ -102,33 +98,27 @@ export async function logFilePaths() {
     tickPath.setAttribute("stroke-linecap", "round");
     tickPath.setAttribute("stroke-linejoin", "round");
     arrow.appendChild(tickPath);
-
     const textSpan = document.createElement("span");
     textSpan.textContent = path;
-
     leftGroup.appendChild(arrow);
     leftGroup.appendChild(textSpan);
 
     // Right: collapse icon + checkbox
     const rightGroup = document.createElement("div");
     rightGroup.className = "commit-file-header-right";
-
     const collapseBtn = document.createElement("button");
     collapseBtn.type = "button";
     collapseBtn.className = "collapse-btn";
     collapseBtn.appendChild(CollapseMergeViewIcon());
     collapseBtn.title = "Collapse identical lines";
-
     const checkbox = document.createElement("input");
     checkbox.classList.add("commit_file_checkbox");
     checkbox.type = "checkbox";
     checkbox.checked = true;
     checkbox.dataset.path = path;
     window.gitCommitCheckboxes.push(checkbox);
-
     rightGroup.appendChild(collapseBtn);
     rightGroup.appendChild(checkbox);
-
     titleDiv.appendChild(leftGroup);
     titleDiv.appendChild(rightGroup);
 
@@ -160,15 +150,19 @@ export async function logFilePaths() {
       } catch (err) {
         console.error(err);
       }
-
       let isCollapsed = true;
-
+      const builder = ExtensionBuilder.basicSetup(); // returns an ExtensionBuilder instance
+      let extensions = builder.create().filter(
+        ext => ext !== highlightFocusedActiveLine
+      );
+      // Now you can add readOnly / editable as needed
+      extensions.push(EditorState.readOnly.of(true), EditorView.editable.of(false));
       function buildMergeView() {
         childDiv.innerHTML = "";
         const mv = new MergeView({
-          a: { doc: headContent, extensions: [basicSetup, EditorState.readOnly.of(true)], editable: false },
-          b: { doc: localContent, extensions: [basicSetup, EditorState.readOnly.of(true)], editable: false },
-          orientation: "a-b",
+          a: { doc: headContent, extensions: extensions },
+          b: { doc: localContent, extensions: extensions },
+          orientation: "b-a",
           collapseUnchanged: isCollapsed ? { margin: 3, minSize: 4 } : null,
           root: commitWrapper.getRootNode(),
           useReadonlyA: true,
@@ -179,13 +173,14 @@ export async function logFilePaths() {
       }
 
       let mergeViewInstance = buildMergeView();
-
       collapseBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         isCollapsed = !isCollapsed;
         collapseBtn.innerHTML = "";
         collapseBtn.appendChild(isCollapsed ? CollapseMergeViewIcon() : ExpandMergeViewIcon());
         collapseBtn.title = isCollapsed ? "Collapse identical lines" : "Expand identical lines";
+        // destroy and rebuild to apply collapse state
+        mergeViewInstance?.destroy();
         mergeViewInstance = buildMergeView();
       });
     })();
@@ -202,4 +197,3 @@ export async function logFilePaths() {
     commitWrapper.appendChild(container);
   }
 }
-

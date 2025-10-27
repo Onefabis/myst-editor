@@ -303,7 +303,7 @@ ul {
   }
 }
 
-.cm-changedText {
+.myst-main-editor .cm-changedText {
   background: none !important;
 }
 
