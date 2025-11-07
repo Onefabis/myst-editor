@@ -8,6 +8,7 @@ import Avatars from "./Avatars";
 import { MystState } from "../mystState";
 import { fetchLocalTree, fetchGitTree, fetchGitCommitTree } from "../pfx_override/js/leftPanelFileTree.js";
 import { logFilePaths } from "../extensions/gitCommit";
+import { saveCurrentEditorContent } from "../pfx_override/js/saveEditorText.js";
 
 const renderMdLinks = (title) =>
   [...(title || "").matchAll(/\[(.+)\]\(([^\s]+)\)/g)].reduce(
@@ -295,7 +296,7 @@ const SuggestIcon = () => (
 const icons = {
   fullscreen: FullscreenIcon,
   // "copy-html": CopyIcon,
-  // refresh: RefreshIcon,
+  //refresh: RefreshIcon,
   "print-to-pdf": PrintPDFIcon,
   settings: SettingsIcon,
   templates: TemplatesIcon,
@@ -317,8 +318,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
   useSignalEffect(() => {
     if (options.mode.value === "GitCommit") {
       fetchGitCommitTree();
-
-      
     } 
 
     localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
@@ -342,15 +341,13 @@ export const EditorTopbar = ({ alert, buttons }) => {
       { id: "preview", tooltip: "Preview", action: () => { options.mode.value = "Preview"; fetchLocalTree(false); }, icon: PreviewIcon },
       { id: "both", tooltip: "Dual Pane", action: () => { options.mode.value = "Both"; fetchLocalTree(false); }, icon: BothIcon },
       { id: "inline", tooltip: "Inline Preview", action: () => { options.mode.value = "Inline"; fetchLocalTree(false); }, icon: InlinePreviewIcon },
-      { id: "gitdiff", tooltip: "Git Diff", action: () => { options.mode.value = "Gitdiff"; }, icon: GitdiffIcon },
-      { id: "gitcommit", tooltip: "Git Commit", action: () => { options.mode.value = "GitCommit"; }, icon: GitCommitIcon },
+      { id: "gitdiff", tooltip: "Git Diff", action: () => { options.mode.value = "Gitdiff"; saveCurrentEditorContent(true)}, icon: GitdiffIcon },
+      { id: "gitcommit", tooltip: "Git Commit", action: () => { options.mode.value = "GitCommit"; saveCurrentEditorContent(true)}, icon: GitCommitIcon },
       { id: "outline", text: "Table of Contents", action: () => { options.mode.value = "Outline"; }, icon: TocIcon },
     ];
-
     if (options.collaboration.value.resolvingCommentsEnabled) {
       modeButtons.push({ id: "resolved", text: "Resolved", action: () => { options.mode.value = "Resolved"; }, icon: ResolvedIcon });
     }
-
     return modeButtons;
   });
 
@@ -450,31 +447,38 @@ export const EditorTopbar = ({ alert, buttons }) => {
 
   return (
     <Topbar id="topbar">
-      <div className="side" style={{ display: options.mode.value === "GitCommit" ? "none" : "flex" }}>
+      <div className="side">
         <div className="btns">
-          {buttonsLeft.map((button) => (
-            <div key={button.id}>
-              <TopbarButton
-                className="icon"
-                active={button.active?.({ suggestMode })}
-                type="button"
-                title={button.tooltip}
-                name={button.id}
-                onClick={button.action}
-                disabled={button.disabled}
-              >
-                {typeof button.icon == "function" ? <button.icon /> : <img src={button.icon} />}
-              </TopbarButton>
-              {button.dropdown && (
-                <div className="btn-dropdown">
-                  <div className="dropdown-content">{button.dropdown()}</div>
-                </div>
-              )}
-            </div>
-          ))}
+          {buttonsLeft.map((button) => {
+            // Hide only specific buttons when in GitCommit mode
+            const hiddenInGitCommit = ["print-to-pdf", "settings", "templates"];
+            if (options.mode.value === "GitCommit" && hiddenInGitCommit.includes(button.id)) {
+              return null;
+            }
+            return (
+              <div key={button.id}>
+                <TopbarButton
+                  className="icon"
+                  active={button.active?.({ suggestMode })}
+                  type="button"
+                  title={button.tooltip}
+                  name={button.id}
+                  onClick={button.action}
+                  disabled={button.disabled}
+                >
+                  {typeof button.icon === "function" ? <button.icon /> : <img src={button.icon} />}
+                </TopbarButton>
+                {button.dropdown && (
+                  <div className="btn-dropdown">
+                    <div className="dropdown-content">{button.dropdown()}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         {alert.value && <Alert className="topbar-alert"> {alert} </Alert>}
-        <Title id="document-title" dangerouslySetInnerHTML={{ __html: titleHtml.value }} />
+        <Title id="document-title" dangerouslySetInnerHTML={{ __html: titleHtml.value }} style={{display: options.mode.value === "GitCommit" ? "none" : "flex" }}/>
       </div>
       <div className="side" style={{ width: "100%", display: options.mode.value === "GitCommit" ? "flex" : "none" }}>
         <div className="btns" id="select-all-for-commit">

@@ -91,6 +91,19 @@
     </svg>
 
 
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+      <symbol id="git-pull-rebase" width="23" height="23" viewBox="-2 -2 43 43" fill="none">
+        <path d="M21.75 1V7.66H14.9" stroke-width="1.75" stroke="currentColor" />
+        <path
+          d="M21.65 12.5899C20.95 17.4199 16.78 21.1399 11.75 21.1399C6.23 21.1399 1.75 16.6599 1.75 11.1399C1.75 5.61989 6.23 1.13989 11.75 1.13989C16.24 1.13989 20.03 4.09989 21.3 8.16989"
+          stroke-width="1.75"
+          stroke="currentColor"
+        />
+      </symbol>
+    </svg>
+
+
+
     
 
     <!-- SVG ICONS END -->
@@ -143,6 +156,13 @@
                     </svg>
                   </span>
                 </button>
+                <button id="git-refresh" title="Refresh file state from remote">
+                  <span>
+                    <svg width="14" height="14">
+                      <use href="#git-pull-rebase"></use>
+                    </svg>
+                  </span>
+                </button>
               </div>
 
             </div>
@@ -175,12 +195,12 @@
           />
         </div>
         <div class="commit_field_row">
-          <input
+          <textarea
             id="commit-description"
-            type="text"
-            class="commit-message-input"
+            class="commit-message-input auto-expand"
             placeholder="Description"
-          />
+            rows="1"
+          ></textarea>
         </div>
         <div class="commit_field_row">
           <div id="git-push-pull">
@@ -190,12 +210,12 @@
               </svg>
               <span>Refresh</span>
             </button>
-            <button id="git-pull" title="Git pull">
+          <!--   <button id="git-pull" title="Git pull">
               <svg width="14" height="14">
                 <use href="#git-pull-from-remote"></use>
               </svg>
               <span>Pull</span>
-            </button>
+            </button> -->
             <button id="git-push" title="Git push">
               <svg width="14" height="14">
                 <use href="#git-push-to-remote"></use>

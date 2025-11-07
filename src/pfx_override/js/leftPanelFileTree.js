@@ -154,7 +154,7 @@ export function clearActiveStates() {
   });
 }
 
-function restoreActiveFile(currentPath) {
+export function restoreActiveFile(currentPath) {
   const allFiles = document.querySelectorAll('.file');
   for (const fileEl of allFiles) {
     if (normalizePath(fileEl.title) === currentPath) {
@@ -514,7 +514,6 @@ class TreeRenderer {
         
         title.onclick = async (e) => {
           e.stopPropagation();
-          // await this.handleFileClick(node, title);
 
           const mystHost = document.getElementById("myst");
           const commitWrapper = mystHost?.shadowRoot?.getElementById("commit-wrapper");

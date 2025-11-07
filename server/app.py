@@ -742,7 +742,14 @@ async def git_commit_all(payload: dict = Body(...)):
 
     try:
         if repo.head.is_detached:
-            return JSONResponse({"error": "HEAD is detached — cannot commit."}, status_code=400)
+            return JSONResponse(
+                {
+                    "error": "HEAD_DETACHED",
+                    "detail": "Repository is in a detached HEAD state — cannot commit. "
+                              "Please check out a branch before retrying (e.g. 'git checkout main')."
+                },
+                status_code=400,
+            )
 
         active_branch = repo.active_branch.name
 
@@ -803,6 +810,69 @@ async def git_commit_all(payload: dict = Body(...)):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
+@app.post("/api/git-push")
+async def git_push():
+    try:
+        if repo.head.is_detached:
+            return JSONResponse(
+                {
+                    "error": "HEAD_DETACHED",
+                    "detail": "Repository is in a detached HEAD state — cannot push/pull/sync. "
+                              "Please check out a branch (e.g. 'git checkout main')."
+                },
+                status_code=400,
+            )
+        active_branch = repo.active_branch.name
+        origin = repo.remotes.origin
+        refspec = f"refs/heads/{active_branch}:refs/heads/{active_branch}"
+        push_info = origin.push(refspec)
+        return {"status": "success", "push_result": [str(info.summary) for info in push_info], "commit": repo.head.commit.hexsha, "active_branch": active_branch}
+    except GitCommandError as e:
+        return JSONResponse({"error": "NON_FAST_FORWARD" if "non-fast-forward" in str(e) else str(e)}, status_code=409)
+
+
+@app.post("/api/git-pull")
+async def git_pull():
+    try:
+        # --- Step 1: Handle detached HEAD early ---
+        if repo.head.is_detached:
+            return JSONResponse(
+                {
+                    "error": "HEAD_DETACHED",
+                    "detail": (
+                        "Repository is in a detached HEAD state — cannot pull.\n"
+                        "Please check out a branch before retrying.\n\n"
+                        "Example:\n  git checkout main"
+                    ),
+                },
+                status_code=400,
+            )
+
+        # --- Step 2: Proceed with normal pull ---
+        active_branch = repo.active_branch.name
+        origin = repo.remotes.origin
+
+        try:
+            repo.git.pull("--rebase", "origin", active_branch)
+        except GitCommandError as e:
+            if "CONFLICT" in str(e) or "rebase" in str(e):
+                repo.git.rebase("--abort")  # abort immediately so files aren't modified
+                return JSONResponse({"error": "REBASE_CONFLICT"}, status_code=409)
+            raise
+
+        return {
+            "status": "success",
+            "commit": repo.head.commit.hexsha,
+            "active_branch": active_branch,
+        }
+
+    except GitCommandError as e:
+        if "CONFLICT" in str(e):
+            return JSONResponse({"error": "REBASE_CONFLICT"}, status_code=409)
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 @app.post("/api/git-sync")
 async def git_sync():
     """
@@ -811,7 +881,15 @@ async def git_sync():
     """
     try:
         if repo.head.is_detached:
-            return JSONResponse({"error": "HEAD is detached — cannot sync."}, status_code=400)
+            if repo.head.is_detached:
+                return JSONResponse(
+                    {
+                        "error": "HEAD_DETACHED",
+                        "detail": "Repository is in a detached HEAD state — cannot push/pull/sync. "
+                                  "Please check out a branch (e.g. 'git checkout main')."
+                    },
+                    status_code=400,
+                )
 
         active_branch = repo.active_branch.name
         if not repo.remotes:

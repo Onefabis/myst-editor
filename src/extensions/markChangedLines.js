@@ -2,6 +2,9 @@ import { ViewPlugin, EditorView } from "@codemirror/view";
 import * as merge from "@codemirror/merge";
 import { mergeCompartment } from "../components/CodeMirror";
 
+
+import { saveCurrentEditorContent } from "../pfx_override/js/saveEditorText"
+
 // Global plugin instance
 export let pluginInstance = null;
 
@@ -157,6 +160,9 @@ class MystPluginClass {
       });
 
       this.updateRevertButton();
+      saveCurrentEditorContent(true);
+      clearDiffStatusForCurrentFile();
+
     } catch (error) {
       console.error("Error reverting file:", error);
       alert("Failed to revert file to git version");
@@ -227,6 +233,21 @@ export const mystExtension = [
     if (update.docChanged) pluginInstance?.updateRevertButton();
   }),
 ];
+
+export function clearDiffStatusForCurrentFile() {
+  const currentPath = localStorage.getItem("currentPath");
+  if (!currentPath) return;
+
+  // Find the active file element in the tree
+  const fileEl = document.querySelector(`.file[title="${currentPath}"]`);
+  if (!fileEl) return;
+
+  // Remove all diff-related classes and SVG icon
+  fileEl.classList.remove("diff-modified", "diff-added", "diff-deleted");
+  const icon = fileEl.querySelector(".diff-icon");
+  if (icon) icon.remove();
+}
+
 
 // Convenience functions
 export function showLatestCommitDiff(mystEditor) {

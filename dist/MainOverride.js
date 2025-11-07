@@ -1,5 +1,5 @@
 /* empty css                          */
-import { s as g, M as y, d as w, r as S, a as x, o as b, c as I, b as B, e as C, f as E, w as T, g as F, p as W, h as f, i as l, j as P } from "./MystEditor-Czk3a6s1.js";
+import { s as g, M as y, d as w, a as S, o as x, c as b, b as I, e as B, f as C, w as E, g as T, p as F, h as W, r as P, i as f, j as l } from "./MystEditor-BnQODMva.js";
 let t = null;
 document.getElementById("editor-panel");
 const c = document.getElementById("sidebar"), _ = document.getElementById("resizer"), h = localStorage.getItem("sidebarWidth");
@@ -44,48 +44,50 @@ async function L(o) {
         id: "revert",
         text: "🧹 Revert",
         visible: !1,
-        action: () => S()
+        action: () => {
+          P();
+        }
       }, {
         id: "save",
         text: "💾 Save",
         visible: !0,
-        action: () => x(!0)
+        action: () => S(!0)
       }, {
         id: "image",
         text: "🗃️ Image",
         visible: !0,
-        action: () => b()
+        action: () => x()
       }, {
         id: "clear_format",
         text: "Clear",
         visible: !0,
-        action: () => I()
+        action: () => b()
       }, {
         id: "h1_format",
         text: "H1",
         visible: !0,
-        action: () => B()
+        action: () => I()
       }, {
         id: "h2_format",
         text: "H2",
         visible: !0,
-        action: () => C()
+        action: () => B()
       }, {
         id: "b_format",
         text: "B",
         visible: !0,
-        action: () => E()
+        action: () => C()
       }]),
       spellcheckOpts: !1,
       syncScroll: !0
     }, e);
-    const m = await T();
-    F(m), await W, ["Both", "Source", "Inline"].includes(t.options.mode.v) && f(t), window._mystEditor = t, t.options.mode.subscribe((u) => {
+    const m = await E();
+    T(m), await F, ["Both", "Source", "Inline"].includes(t.options.mode.v) && f(t), window._mystEditor = t, t.options.mode.subscribe((u) => {
       requestAnimationFrame(async () => {
         var p;
         ["Both", "Source", "Inline"].includes(u) ? (await new Promise((v) => setTimeout(v, 150)), l ? l.handleModeChange(u, t) : f(t)) : u === "Gitdiff" && (l ? l.clearMergeView(t) : (p = t.editorView) != null && p.v && t.editorView.v.dispatch({
           effects: mergeCompartment.reconfigure([])
-        }), P());
+        }), W());
       });
     });
   }), localStorage.setItem("lastOpened", o);

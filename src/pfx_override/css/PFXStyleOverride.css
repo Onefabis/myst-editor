@@ -110,11 +110,12 @@ ul {
 .controls_row {
   width: 100%;
   height: 100%;
+  padding: 0px 0px 0px 6px;
   margin: auto auto 3px;
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-content: center;
-  justify-content: center;
+  justify-content: left;
   align-items: center;
 }
 
@@ -147,7 +148,7 @@ ul {
 }
 
 .commit_view_buttons {
-  height: 93px;
+  /*height: 93px;*/
   padding: 8px 10px;
   background: #e7e7e7;
   display: none;
@@ -198,7 +199,9 @@ ul {
 .commit-message-input {
   flex: 1;
   width: 100%;
-  height: 11px;
+  height: 16px;
+  font-style: italic;
+  font: 0.8em Arial;
   padding: 6px 8px;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -206,6 +209,22 @@ ul {
   font-size: 14px;
   color: #333;
   transition: border-color 0.2s ease, background-color 0.2s ease;
+  resize: none; 
+  overflow: hidden; 
+}
+
+textarea.commit-message-input {
+  width: 100%;
+  height: 16px;
+  padding: 5px 8px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 16px; /* explicit line height */
+  resize: none;
+  overflow: hidden;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  transition: height 0.1s ease;
 }
 
 .commit-message-input:focus {
@@ -308,11 +327,13 @@ ul {
 }
 
 .cm-merge-b .cm-changedLine {
-  background-color: rgb(236 252 230) !important;
+  background-color: transparent !important;
+  /*background-color: rgb(236 252 230) !important;*/
 }
 
 .cm-merge-a .cm-changedLine {
-  background-color: rgb(250 230 230) !important;
+  background-color: transparent !important;
+  /*background-color: rgb(250 230 230) !important;*/
 }
 
 /* Base folder look: reserve 2px at left so layout is stable */
@@ -1429,7 +1450,7 @@ aside.danger>header::before {
 
 /* Folder list */
 #image-picker-folder-list {
-  width: 30%;
+  width: 100%;
   overflow-y: auto;
   border-right: 1px solid #ccc;
   padding: 10px;

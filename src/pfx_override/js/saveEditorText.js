@@ -153,6 +153,7 @@ export async function saveCurrentEditorContent(manual = false) {
     if (manual) alert("Editor is not ready.");
     return;
   }
+  if (!view.v) return;
 
   const content = view.v.state.sliceDoc(0, view.state?.doc.length);
   const path = localStorage.getItem('currentPath');

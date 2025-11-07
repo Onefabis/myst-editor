@@ -16,7 +16,9 @@ import { TableOfContents } from "./components/TableOfContents";
 import ErrorModal from "./components/ErrorModal";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { createLogger, Logger } from "./logger";
-import { fetchGitTree } from "./pfx_override/js/leftPanelFileTree.js"
+import { fetchGitTree } from "./pfx_override/js/leftPanelFileTree"
+import { runGitAction } from "./pfx_override/js/commitCurentStateUI"
+import { revertFileChanges } from "./extensions/markChangedLines"
 
 
 
@@ -228,9 +230,15 @@ const MystEditor = () => {
       },
       fullscreen: () => (fullscreen.value = !fullscreen.peek()),
       refresh: () => {
-        cache.transform.clear();
-        text.renderText(false);
-        alertFor("Rich links refreshed!", 1);
+        // cache.transform.clear();
+        // text.renderText(false);
+        // alertFor("Rich links refreshed!", 1);
+        revertFileChanges(editorView);
+        // runGitAction(
+        //   "refresh",
+        //   "Refresh Branch?",
+        //   "Fetch and rebase from remote? Local changes may cause conflicts."
+        // );
       },
       "suggest-mode": () => (suggestMode.value = !suggestMode.peek()),
     }),

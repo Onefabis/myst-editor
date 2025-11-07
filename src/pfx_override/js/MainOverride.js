@@ -87,7 +87,7 @@ export async function loadFile(filename) {
       title: title,
       additionalStyles: sheet,
       includeButtons: defaultButtons.concat([
-        { id: "revert", text: "🧹 Revert", visible: false, action: () => revertFileChanges(mystEditorInstance) },
+        { id: "revert", text: "🧹 Revert", visible: false, action: () => { revertFileChanges(mystEditorInstance); } },
         { id: "save",  text: "💾 Save", visible: true, action: () => saveCurrentEditorContent(true) },
         { id: "image", text: "🗃️ Image", visible: true, action: () => openImagePicker() },
         { id: "clear_format", text: "Clear", visible: true, action: () => txFormat.clearLineSymbols() },

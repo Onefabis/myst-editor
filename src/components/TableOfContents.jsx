@@ -180,20 +180,19 @@ export const TableOfContents = () => {
   }
 
   useSignalEffect(() => {
-    const view = editorView.value;
-    if (!view) return;
+    const mystHost = document.getElementById("myst");
+    if (!mystHost?.shadowRoot) return;
 
-    const scrollParent = view.dom.parentElement;
+    // Find the preview container inside the shadow root
+    const previewEl = mystHost.shadowRoot.querySelector(".myst-preview");
+    if (!previewEl) return;
 
     const onScroll = () => {
-      if (!view.visibleRanges.length) return;
+      if (!headings.value?.length) return;
 
-      // The visible part of the document
-      const visible = view.visibleRanges[0];
-      const scrollTop = scrollParent.scrollTop;
-      const containerTop = scrollParent.getBoundingClientRect().top;
+      const previewRect = previewEl.getBoundingClientRect();
 
-      // Flatten all headings
+      // Flatten nested heading structure into a list
       const flattenHeadings = (nodes, acc = []) => {
         for (const h of nodes) {
           acc.push(h);
@@ -203,71 +202,75 @@ export const TableOfContents = () => {
       };
       const allHeadings = flattenHeadings(headings.value);
 
-      // Filter headings that fall inside the visible range (rendered)
-      const visibleHeadings = allHeadings.filter(
-        (h) => h.pos >= visible.from && h.pos <= visible.to
+      // Find all rendered headings (H1–H6) in preview, in document order
+      const headingEls = Array.from(
+        previewEl.querySelectorAll("h1, h2, h3, h4, h5, h6")
       );
+      if (!headingEls.length) return;
 
-      // Among visible ones, find the one whose top is closest to but >= the scroll container top
       let current = null;
       let minDelta = Infinity;
 
-      for (const h of visibleHeadings) {
-        const rect = view.coordsAtPos(h.pos);
-        if (!rect) continue;
+      // Iterate through rendered heading elements in order
+      for (let i = 0; i < headingEls.length && i < allHeadings.length; i++) {
+        const el = headingEls[i];
+        const rect = el.getBoundingClientRect();
+        const delta = Math.abs(rect.top - previewRect.top);
 
-        const y = rect.top - containerTop + scrollTop; // position inside scroll container
-        const delta = Math.abs(y - scrollTop);
-
-        if (y >= scrollTop && delta < minDelta) {
-          current = h;
+        if (rect.top >= previewRect.top - 10 && delta < minDelta) {
+          current = allHeadings[i];
           minDelta = delta;
         }
       }
 
-      // Fallback if none matched (e.g. scrolled beyond last heading)
-      if (!current && visibleHeadings.length) {
-        current = visibleHeadings[visibleHeadings.length - 1];
+      // Fallback to last visible heading if none matched
+      if (!current && headingEls.length) {
+        const lastVisibleIndex = headingEls.findLastIndex(
+          (el) => el.getBoundingClientRect().top < previewRect.bottom
+        );
+        if (lastVisibleIndex >= 0 && allHeadings[lastVisibleIndex]) {
+          current = allHeadings[lastVisibleIndex];
+        }
       }
 
-      if (current) {
-        // console.log("Topmost visible heading:", current.text, current.pos);
-        if (!manualScrollRef.current) setActivePos(current.pos);
+      if (current && !manualScrollRef.current) {
+        setActivePos(current.pos);
       }
     };
 
-    scrollParent.addEventListener("scroll", onScroll);
-    return () => scrollParent.removeEventListener("scroll", onScroll);
+    previewEl.addEventListener("scroll", onScroll);
+    return () => previewEl.removeEventListener("scroll", onScroll);
   });
 
+
+
   // Mark first heading active on initial load when scrolled to top
-useEffect(() => {
-  // only run if headings exist and we're at top of editor
-  const view = editorView.value;
-  if (!view || !headings.value.length) return;
+  useEffect(() => {
+    // only run if headings exist and we're at top of editor
+    const view = editorView.value;
+    if (!view || !headings.value.length) return;
 
-  const scrollParent = view.dom.parentElement;
-  const isAtTop = scrollParent.scrollTop === 0;
+    const scrollParent = view.dom.parentElement;
+    const isAtTop = scrollParent.scrollTop === 0;
 
-  if (isAtTop) {
-    // Get the first heading in document order (topmost)
-    const firstHeading = (() => {
-      const flatten = (nodes, acc = []) => {
-        for (const h of nodes) {
-          acc.push(h);
-          if (h.children?.length) flatten(h.children, acc);
-        }
-        return acc;
-      };
-      return flatten(headings.value)[0];
-    })();
+    if (isAtTop) {
+      // Get the first heading in document order (topmost)
+      const firstHeading = (() => {
+        const flatten = (nodes, acc = []) => {
+          for (const h of nodes) {
+            acc.push(h);
+            if (h.children?.length) flatten(h.children, acc);
+          }
+          return acc;
+        };
+        return flatten(headings.value)[0];
+      })();
 
-    if (firstHeading) {
-      setActivePos(firstHeading.pos);
+      if (firstHeading) {
+        setActivePos(firstHeading.pos);
+      }
     }
-  }
-}, [headings.value, editorView]);
-
+  }, [headings.value, editorView]);
 
   useEffect(() => {
     const el = wrapperRef.current;

@@ -1,5 +1,6 @@
-import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates, treeState, fetchGitCommitTree } from "./leftPanelFileTree.js";
-import { loadFile, insertImageMarkdown } from "./MainOverride.js";
+import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates, treeState, fetchGitCommitTree } from "./leftPanelFileTree";
+import { loadFile, insertImageMarkdown } from "./MainOverride";
+import { runGitAction } from "./commitCurentStateUI";
 
 const CONFIG = {
   ignoredFolders: ["_static", "_templates", ".obsidian"],
@@ -307,6 +308,13 @@ document.getElementById("upload-image").onclick = () => {
   };
   input.click();
 };
+
+document.getElementById("git-refresh").onclick = () =>
+  runGitAction(
+    "refresh",
+    "Refresh Branch?",
+    "Fetch and rebase from remote? Local changes may cause conflicts."
+  );
 
 // ----------------------- Toolbar Button Actions END ----------------------- //
 
