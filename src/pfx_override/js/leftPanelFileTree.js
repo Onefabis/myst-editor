@@ -1,10 +1,11 @@
-import "./gitDiffUI.js";
-import { loadFile, insertImageMarkdown } from "./MainOverride.js";
-import { saveCurrentEditorContent, setLastSavedTimestamp } from './saveEditorText.js';
+import "./gitDiffUI";
+import { loadFile } from "./MainOverride";
+import { saveCurrentEditorContent, setLastSavedTimestamp } from './saveEditorText';
 import { autosaveEnabled } from '../../MystEditor.jsx';
 import { useContext } from "preact/hooks";
-import { MystState } from "../../mystState.js";
-import { logFilePaths } from "../../extensions/gitCommit";
+import { MystState } from "../../mystState";
+import { logFilePaths } from "../../extensions/gitCommitView";
+import { showModal, showConfirm, showInputModal } from "./modalWindows"
 
 // ========================= CONSTANTS =========================
 
@@ -45,6 +46,13 @@ const CONFIG = {
 
 // ========================= STATE MANAGEMENT =========================
 
+/**
+ * Encapsulates persistent UI state for the file tree component.
+ * Responsibilities:
+ *  - Track which folder paths are expanded (openFolders).
+ *  - Track the active folder path and the currently selected element.
+ *  - Persist selected/open state to localStorage to preserve session continuity.
+ */
 class FileTreeState {
   constructor() {
     this.openFolders = new Set(JSON.parse(localStorage.getItem('openFolders') || '[]'));
@@ -52,33 +60,56 @@ class FileTreeState {
     this.selectedElement = null; // Store the selected element info
   }
 
+  /**
+   * Add a folder path to the set of expanded folders and persist the change.
+   */
   addOpenFolder(path) {
     this.openFolders.add(path);
     this.saveOpenFolders();
   }
 
+  /**
+   * Remove a folder path from the set of expanded folders and persist the change.
+   */
   removeOpenFolder(path) {
     this.openFolders.delete(path);
     this.saveOpenFolders();
   }
 
+  /**
+   * Query whether a path is currently considered expanded/open.
+   */
   isOpen(path) {
     return this.openFolders.has(path);
   }
 
+  /**
+   * Persist the current openFolders set to localStorage. This is a writable side-effect
+   * and ensures the UI remembers expanded folders across reloads.
+   */
   saveOpenFolders() {
     localStorage.setItem('openFolders', JSON.stringify([...this.openFolders]));
   }
 
+  /**
+   * Record the folder that is considered "active" for UI purposes.
+   */
   setActiveFolderPath(path) {
     this.activeFolderPath = path;
   }
 
+  /**
+   * Return the currently active folder path.
+   */
   getActiveFolderPath() {
     return this.activeFolderPath;
   }
 
-  // New methods for selected element management
+  /**
+   * Record the currently selected UI element (file or folder).
+   * Stores a compact representation in localStorage (with timestamp) to allow
+   * rehydration while avoiding very stale selections.
+   */
   setSelectedElement(element) {
     this.selectedElement = element;
     // Store in localStorage for persistence across page reloads if needed
@@ -94,6 +125,11 @@ class FileTreeState {
     }
   }
 
+  /**
+   * Return the selected element. Prefer in-memory value, fall back to localStorage
+   * if present and not stale (5 minutes threshold). This balances UX persistence
+   * and avoiding pointing to resources long since removed.
+   */
   getSelectedElement() {
     // First check memory
     if (this.selectedElement) {
@@ -118,6 +154,9 @@ class FileTreeState {
     return null;
   }
 
+  /**
+   * Clear selected element both from memory and persistent storage.
+   */
   clearSelectedElement() {
     this.selectedElement = null;
     localStorage.removeItem('selectedElement');
@@ -128,14 +167,28 @@ export const treeState = new FileTreeState();
 
 // ========================= UTILITY FUNCTIONS =========================
 
+/**
+ * Normalize file path separators into forward-slash form. Ensures consistent
+ * comparisons between paths originating from different OS or APIs.
+ */
 export function normalizePath(path) {
   return path.replace(/\\/g, '/');
 }
 
+/**
+ * Small accessor that resolves whether autosave mode has been toggled on.
+ * Wrapped so other code doesn't directly reference external state shape.
+ */
 function isAutosaveEnabled() {
   return !!autosaveEnabled.value;
 }
 
+/**
+ * Recursively search a tree-of-nodes structure to determine whether a file
+ * with the given path exists. Returns true if found, false otherwise.
+ *
+ * This is used to detect missing/deleted files or validate selections.
+ */
 function fileExistsInTree(path, nodes) {
   for (const node of nodes) {
     if (node.path === path && node.type === 'file') return true;
@@ -148,12 +201,20 @@ function fileExistsInTree(path, nodes) {
 
 // ========================= DOM MANIPULATION =========================
 
+/**
+ * Remove the 'active' class from all file elements. This is a DOM-level
+ * utility used prior to setting a new active element to ensure single-active semantics.
+ */
 export function clearActiveStates() {
   document.querySelectorAll('.file').forEach(el => {
     el.classList.remove('active');
   });
 }
 
+/**
+ * Find the DOM element representing the given path and add the 'active' class,
+ * then bring it into view. Called when updating the tree to re-establish visual focus.
+ */
 export function restoreActiveFile(currentPath) {
   const allFiles = document.querySelectorAll('.file');
   for (const fileEl of allFiles) {
@@ -165,6 +226,10 @@ export function restoreActiveFile(currentPath) {
   }
 }
 
+/**
+ * Defer re-highlighting the active file until after a render frame to ensure the
+ * elements exist in the DOM (useful after a tree re-render).
+ */
 function restoreActiveFileAfterRender() {
   const currentPath = localStorage.getItem('currentPath');
   if (!currentPath) return;
@@ -181,6 +246,11 @@ function restoreActiveFileAfterRender() {
   });
 }
 
+/**
+ * Utility that waits for an element inside a component's Shadow DOM to appear,
+ * then invokes the callback with that element. This abstracts away the timing
+ * race between host component rendering and external script operations.
+ */
 function observeShadowElement(hostSelector, elementId, callback) {
   const host = document.querySelector(hostSelector);
   if (!host?.shadowRoot) return;
@@ -206,7 +276,18 @@ function observeShadowElement(hostSelector, elementId, callback) {
 
 // ========================= GIT OPERATIONS =========================
 
+/**
+ * Helper that interprets raw Git diff API results into structures
+ * the UI can use: a path→status map and a set of folders that contain changes.
+ *
+ * It intentionally separates diff processing from rendering logic.
+ */
 class GitDiffManager {
+  /**
+   * Convert the API diff list into a dictionary mapping each file path (trimmed
+   * relative to treeRoot when appropriate) to its Git status code. Handles renamed
+   * entries by representing the old path as DELETED and the new path as ADDED.
+   */
   static buildDiffMap(diffs, treeRoot = CONFIG.treeRoot) {
     const map = {};
     
@@ -230,10 +311,18 @@ class GitDiffManager {
     return map;
   }
 
+  /**
+   * Walk the tree and return a Set of folder paths that contain changed files
+   * (or are themselves marked changed). This enables directory-level highlighting.
+   */
   static computeChangedFolders(nodes, diffMap) {
     const changedFolders = new Set();
     const isChangedFile = (path) => [GIT_STATUS.ADDED, GIT_STATUS.DELETED, GIT_STATUS.MODIFIED].includes(diffMap[path]);
 
+    /**
+     * Depth-first traversal helper that returns true when the subtree at `node`
+     * contains any changed files. When a subtree has changes, record the folder path.
+     */
     function dfs(node) {
       if (node.type === 'file') {
         return isChangedFile(node.path);
@@ -252,6 +341,10 @@ class GitDiffManager {
     return changedFolders;
   }
 
+  /**
+   * Apply the appropriate CSS class on a DOM element to visually indicate
+   * Git state (added/modified/deleted). Removes prior diff classes first.
+   */
   static applyDiffStatus(element, status) {
     element.classList.remove("diff-added", "diff-deleted", "diff-modified");
     
@@ -271,7 +364,17 @@ class GitDiffManager {
 
 // ========================= UPDATED TREE RENDERING =========================
 
+/**
+ * Responsible for transforming node structures into DOM nodes, wiring UI events,
+ * applying Git metadata, and restoring selection/open state. This class focuses
+ * on UI composition; it deliberately delegates diff interpretation and API calls.
+ */
 class TreeRenderer {
+  /**
+   * Choose and set the correct icon markup for a folder element. When Git diff mode
+   * is active, prefer Git glyphs that represent the folder's status; otherwise use
+   * standard open/closed folder icons.
+   */
   static setFolderIcon(icon, isOpen, gitDiffActive, status) {
     if (gitDiffActive) {
       switch (status) {
@@ -290,6 +393,15 @@ class TreeRenderer {
     icon.innerHTML = isOpen ? SVG_ICONS.openFolder : SVG_ICONS.closedFolder;
   }
 
+  /**
+   * Build the DOM fragments that represent a single folder in the tree:
+   *  - li: container
+   *  - title: clickable folder label (with metadata attributes)
+   *  - icon: visual glyph container
+   *  - textSpan: the readable folder name (cleaned of extensions)
+   *
+   * Also applies selection classes and diff markers when appropriate.
+   */
   static createFolderElement(node, gitDiffActive, diffMap, changedFolders) {
     const li = document.createElement('li');
     const title = document.createElement('span');
@@ -326,6 +438,14 @@ class TreeRenderer {
   }
 
 
+  /**
+   * Build the DOM fragments that represent a single file in the tree:
+   *  - li: container
+   *  - title: clickable file label (with metadata attributes and file name cleaned)
+   *  - icon: optional icon space (can host Git glyphs)
+   * Apply selection and diff decorations. Also observe shadow DOM gitPanel presence
+   * before injecting per-file small icons (prevents early DOM races).
+   */
   static createFileElement(node, gitDiffActive, diffMap) {
 
     const li = document.createElement('li');
@@ -351,6 +471,7 @@ class TreeRenderer {
     if (gitDiffActive) {
       GitDiffManager.applyDiffStatus(title, diffMap[node.path]);
       
+      // Wait for the host's gitPanel to exist before injecting small per-file Git icons.
       observeShadowElement("#myst", "gitPanel", () => {
         switch (diffMap[node.path]) {
           case GIT_STATUS.ADDED:
@@ -369,6 +490,13 @@ class TreeRenderer {
     return { li, title, icon };
   }
 
+  /**
+   * Centralized click handler for files:
+   *  - Update active/selected UI state
+   *  - Persist selection
+   *  - Trigger autosave of current editor if enabled and the file is changing
+   *  - Clear the saved timestamp and instruct the host to load the selected file
+   */
   static async handleFileClick(node, titleElement) {
     clearActiveStates();
     titleElement.classList.add('active');
@@ -396,6 +524,11 @@ class TreeRenderer {
     loadFile(newPath);
   }
 
+  /**
+   * When viewing commit diffs inside a host's commit-wrapper, attempt to scroll the
+   * commit panel to the block corresponding to the selected file. Also updates selection.
+   * If the commit-wrapper or desired child cannot be found, this no-ops gracefully.
+   */
   static async scrollCommitWrapperToFile(node, titleElement) {
     clearActiveStates();
     titleElement.classList.add('active');
@@ -436,6 +569,13 @@ class TreeRenderer {
     }
   }
 
+  /**
+   * Click handler for folder headers. Responsibilities:
+   *  - Manage selection and active UI state
+   *  - Persist selection and active folder path
+   *  - Support ctrl+click to recursively expand/collapse subtrees
+   *  - Toggle rendering of the subtree and update folder icons & persisted open state
+   */
   static handleFolderClick(node, li, icon, gitDiffActive, diffMap, changedFolders, event, titleElement) {
     event.stopPropagation();
 
@@ -479,6 +619,14 @@ class TreeRenderer {
     }
   }
 
+  /**
+   * The core rendering routine:
+   *  - Clear the parent container and build an <ul> containing nodes (folders & files)
+   *  - Apply filtering rules (ignored folders, hidden dot/underscore folders unless in diff mode)
+   *  - Create DOM fragments via createFolderElement/createFileElement
+   *  - Attach click handlers that route either to commit-panel scrolling or to normal file loading
+   *  - Restore active file highlight after render and attach a parent click handler to clear selection on empty-space clicks
+   */
   static renderTree(nodes, parent, gitDiffActive = false, diffMap = {}, changedFolders = new Set()) {
     parent.innerHTML = '';
     const ul = document.createElement('ul');
@@ -548,7 +696,17 @@ class TreeRenderer {
 
 // ========================= TREE OPERATIONS =========================
 
+/**
+ * Helpers to perform bulk operations on folder hierarchies: mark open/closed
+ * recursively, expand everything under a node, or collapse everything under it.
+ * These operations update both the DOM and the persisted openFolders state.
+ */
+
 class TreeOperations {
+  /**
+   * Walk the given node subtree and either add or remove all folder paths to the
+   * treeState openFolders registry. The internal `walk` function is a small recursive helper.
+   */
   static markAllOpenFolders(node, add = true) {
     function walk(n) {
       if (n.type === 'folder') {
@@ -563,6 +721,10 @@ class TreeOperations {
     walk(node);
   }
 
+  /**
+   * Given a folder's <li> and its node representation, render all children and
+   * recursively expand every nested folder. Also updates folder icons and persistent open state.
+   */
   static expandAllSubfolders(li, node, gitDiffActive, diffMap, changedFolders) {
     const container = li.querySelector('.subtree');
     container.innerHTML = '';
@@ -586,6 +748,10 @@ class TreeOperations {
     treeState.addOpenFolder(node.path);
   }
 
+  /**
+   * Clear the subtree DOM for the given li, remove all descendant folder paths
+   * from the open registration, and reset the icon for the collapsed folder.
+   */
   static collapseAllSubfolders(li, node) {
     const container = li.querySelector('.subtree');
     container.innerHTML = '';
@@ -601,13 +767,25 @@ class TreeOperations {
 
 // ========================= API LAYER =========================
 
+/**
+ * Thin network layer that wraps fetch calls to backend endpoints responsible
+ * for returning Git metadata (head commit, tree, diffs, union trees).
+ * Each method returns parsed JSON from the server and throws/propagates fetch errors.
+ */
 class TreeAPI {
+  /**
+   * Query the server for the current HEAD commit hash. Returns the `head` string.
+   */
   static async getHeadCommit() {
     const response = await fetch("/api/git-head");
     const { head } = await response.json();
     return head;
   }
 
+  /**
+   * Request a union of two commit trees (files that exist in either commit),
+   * used to present commit-vs-commit comparisons.
+   */
   static async getUnionTree(commitLeft, commitRight) {
     const response = await fetch(
       `/api/tree-union?commit_left=${encodeURIComponent(commitLeft)}&commit_right=${encodeURIComponent(commitRight)}`
@@ -615,12 +793,22 @@ class TreeAPI {
     return response.json();
   }
 
+  /**
+   * Fetch the file tree representation for either HEAD (no param) or a specific commit.
+   * Returns parsed JSON from the server.
+   */
   static async getTree(commit = null) {
     const url = commit ? `/api/tree?commit=${encodeURIComponent(commit)}` : '/api/tree';
     const response = await fetch(url);
     return response.json();
   }
 
+  /**
+   * Generic entry to retrieve diffs. Supported `type` values:
+   *  - 'working-tree': diffs between working directory and a commit (params.commit)
+   *  - 'tree': diffs between two commits (params.left, params.right)
+   * Returns parsed JSON array of diff objects.
+   */
   static async getDiff(type, params) {
     let url;
     switch (type) {
@@ -638,6 +826,11 @@ class TreeAPI {
     return response.json();
   }
 
+  /**
+   * Poll the host's Shadow DOM for two commit dropdown elements to become ready.
+   * This is a coordination helper to avoid races between component render and API calls.
+   * Returns { left, right } when ready or null after a timeout.
+   */
   static async waitForDropdowns() {
     const host = document.querySelector('#myst');
     if (!host) return null;
@@ -662,6 +855,13 @@ class TreeAPI {
 
 // ========================= MAIN FUNCTIONS =========================
 
+/**
+ * Load and render the repository tree with working-tree diffs applied. Steps:
+ *  - Get current HEAD commit, base tree, and working-tree diffs
+ *  - Prepare diff map (filter out deleted entries to avoid showing deleted files)
+ *  - Compute changed folders and render the tree in diff mode
+ *  - Optionally load the currently selected file into the editor
+ */
 export async function fetchLocalTree(loadfile=true) {
   const commitHash = await TreeAPI.getHeadCommit();
   const baseTree = await TreeAPI.getTree();
@@ -682,12 +882,24 @@ export async function fetchLocalTree(loadfile=true) {
   TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
 
   const currentPath = localStorage.getItem('currentPath');
-  if (loadfile){
+
+  // Only load/restore if a valid path exists
+  if (currentPath && loadfile) {
     loadFile(normalizePath(currentPath));
   }
-  restoreActiveFile(normalizePath(currentPath));
+
+  if (currentPath) {
+    restoreActiveFile(normalizePath(currentPath));
+  }
 }
 
+/**
+ * Render the tree based on either:
+ *  - Commit-vs-commit comparison (if gitCommit parameter truthy and dropdowns present)
+ *  - Working-tree vs HEAD (fallback)
+ *
+ * This function coordinates with the host UI (commit dropdowns) and switches diff sources accordingly.
+ */
 export async function fetchGitTree(gitCommit) {
   const dropdowns = await TreeAPI.waitForDropdowns();
   if (!dropdowns) return;
@@ -725,6 +937,13 @@ export async function fetchGitTree(gitCommit) {
   }
 }
 
+/**
+ * Special loader for the "local commit" view:
+ *  - Fetch a precomputed local tree/diff payload from the server
+ *  - Toggle visibility of the tree and "select all" control depending on whether there are items
+ *  - Build diff map and changed folder set and render the tree
+ *  - Restore active file and log file paths for downstream features
+ */
 export async function fetchGitCommitTree() {
   const resp = await fetch("/api/tree-local-diff");
   const data = await resp.json();
@@ -761,6 +980,320 @@ export async function fetchGitCommitTree() {
   logFilePaths();
 }
 
+
+// ========================= CUSTOM CONTEXT MENU =========================
+
+// Create the context menu container
+const contextMenu = document.createElement("div");
+contextMenu.id = "custom-tree-context-menu";
+Object.assign(contextMenu.style, {
+  position: "absolute",
+  background: "#fff",
+  border: "1px solid #ccc",
+  borderRadius: "9px",
+  padding: "4px 0",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+  display: "none",
+  zIndex: 1000,
+  minWidth: "120px",
+  fontSize: "13px",
+});
+document.body.appendChild(contextMenu);
+
+// Helper to make a styled menu item
+function createMenuItem(label) {
+  const item = document.createElement("div");
+  item.textContent = label;
+  Object.assign(item.style, {
+    padding: "6px 12px",
+    cursor: "pointer",
+  });
+  item.onmouseover = () => (item.style.background = "#eee");
+  item.onmouseout = () => (item.style.background = "#fff");
+  contextMenu.appendChild(item);
+  return item;
+}
+
+// Create menu items
+const renameOption = createMenuItem("Rename");
+const moveOption   = createMenuItem("Move");
+const deleteOption = createMenuItem("Delete");
+
+let contextTargetElement = null;
+
+// Show custom menu
+document.getElementById("tree").addEventListener("contextmenu", (e) => {
+  const targetSpan = e.target.closest("span.file, span.folder");
+  if (!targetSpan) return;
+
+  e.preventDefault();
+  contextTargetElement = targetSpan;
+  contextMenu.style.left = `${e.pageX}px`;
+  contextMenu.style.top = `${e.pageY}px`;
+  contextMenu.style.display = "block";
+});
+
+// Hide menu
+document.addEventListener("click", () => (contextMenu.style.display = "none"));
+
+
+// ----------------------- Move To Dialog ----------------------- //
+
+/* Opens the "Move To" dialog for relocating files or folders.
+Allows restructuring of the project's file/folder hierarchy on a raw "doc" (markdown) folder.
+This structure doesn't reflect the final Sphinx navigation tree, because it's driven by "toctree" defined inside key markdown files.
+Read Sphinx docs here - https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#table-of-contents
+ */
+export function openMoveToDialog(itemPath) {
+  const modal = document.createElement("div");
+  modal.className = "move-modal";
+
+  modal.innerHTML = `
+    <h3>Select folder to move to</h3>
+    <div id="move-tree" class="move-tree"></div>
+    <div class="move-actions">
+      <button id="move-cancel">Cancel</button>
+      <button id="move-ok">OK</button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  let selectedMovePath = "";
+
+  fetch("/api/tree").then(res => res.json()).then(data => {
+    const container = document.getElementById("move-tree");
+    const rootNode = {
+      type: "folder",
+      name: "root",
+      path: "",
+      children: data
+    };
+    renderMoveTree([rootNode], container);
+  });
+
+  function renderMoveTree(nodes, parent) {
+    const ul = document.createElement("ul");
+    for (const node of nodes) {
+      if (node.type !== "folder") continue;
+      if (CONFIG.ignoredFolders.includes(node.name)) continue;
+      const li = document.createElement("li");
+      const btn = document.createElement("div");
+      btn.textContent = "📁 " + node.name;
+      btn.className = "move-folder-btn";
+      btn.onclick = () => {
+        selectedMovePath = node.path.replace(/\\/g, "/");
+        document.querySelectorAll("#move-tree div").forEach(el => el.classList.remove("selected"));
+        btn.classList.add("selected");
+      };
+      li.appendChild(btn);
+      if (node.children) {
+        renderMoveTree(node.children, li);
+      }
+      ul.appendChild(li);
+    }
+    parent.appendChild(ul);
+  }
+
+  document.getElementById("move-ok").onclick = async () => {
+    if (selectedMovePath === null) {
+      alert("Select a file or folder to move.");
+      return;
+    }
+    const name = itemPath.replace(/\\/g, "/").split("/").pop();
+    const newPath = selectedMovePath ? `${selectedMovePath}/${name}` : name;
+    const res = await fetch("/api/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oldPath: itemPath, newPath }),
+    });
+    if (!res.ok) {
+      alert("Error while moving.");
+    } else {
+      let currentPath = localStorage.getItem('currentPath') || "";
+      if (currentPath === itemPath) {
+        localStorage.setItem('currentPath', newPath);
+      }
+      
+      // Update selected element if it was moved
+      const selectedElement = treeState.getSelectedElement();
+      if (selectedElement && selectedElement.path === itemPath) {
+        treeState.setSelectedElement({
+          path: newPath,
+          name: selectedElement.name,
+          type: selectedElement.type
+        });
+      }
+      
+      fetchLocalTree();
+    }
+    modal.remove();
+  };
+
+  document.getElementById("move-cancel").onclick = () => {
+    modal.remove();
+  };
+}
+
+
+// -------- Rename --------
+async function performRename(selectedElement) {
+  const path = selectedElement.path;
+  const name = selectedElement.name;
+
+  if (ignoredFolders.includes(name)) {
+    showModal("Cannot Rename", `Protected folder: ${name}`, { isError: true });
+    return;
+  }
+
+  const oldPath = path.replace(/\\/g, "/");
+  const segments = oldPath.split("/");
+  const oldName = segments.pop();
+  const dirPath = segments.join("/");
+
+  const displayName = oldName.endsWith(".md") ? oldName.replace(/\.md$/, "") : oldName;
+  const inputName = await showInputModal("Rename Item", "Enter a new name:", displayName);
+  if (!inputName || inputName === displayName) return;
+
+  const newName =
+    oldName.endsWith(".md") && !inputName.endsWith(".md") ? `${inputName}.md` : inputName;
+  const newPath = dirPath ? `${dirPath}/${newName}` : newName;
+
+  const res = await fetch("/api/rename", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ oldPath, newPath, action: "check" }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    showModal("Rename Error", error.error || "Unknown rename error", { isError: true });
+    return;
+  }
+
+  let currentPath = localStorage.getItem("currentPath") || "";
+  if (currentPath === oldPath) {
+    localStorage.setItem("currentPath", newPath);
+  }
+
+  treeState.setSelectedElement({
+    path: newPath,
+    name: newName,
+    type: selectedElement.type,
+  });
+
+  fetchLocalTree();
+}
+
+// -------- Delete --------
+async function performDelete(selectedElement) {
+  if (!selectedElement) {
+    showModal("Delete Failed", "Select a file or folder to delete.", { isError: true });
+    return;
+  }
+
+  const path = selectedElement.path;
+  const name = selectedElement.name;
+
+  if (ignoredFolders.includes(name)) {
+    showModal("Delete Blocked", `Protected folder: ${name}`, { isError: true });
+    return;
+  }
+
+  const isFolder = selectedElement.type === "folder";
+  const confirmText = isFolder
+    ? `Delete folder "${path}" and all contents?`
+    : `Delete file "${path}"?`;
+
+  const confirmed = await showConfirm("Confirm Delete", confirmText);
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch("/api/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+
+    if (!res.ok) {
+      const error = await res.text();
+      showModal("Delete Error", error, { isError: true });
+      return;
+    }
+
+    clearActiveStates();
+    treeState.clearSelectedElement();
+
+    let currentPath = localStorage.getItem("currentPath") || "";
+    if (currentPath) {
+      const myst = document.getElementById("myst");
+      if (isFolder && currentPath.startsWith(path + "/")) {
+        localStorage.removeItem("currentPath");
+        localStorage.removeItem("lastOpened");
+        if (myst) myst.innerHTML = "";
+      } else if (!isFolder && currentPath === path) {
+        localStorage.removeItem("currentPath");
+        localStorage.removeItem("lastOpened");
+        if (myst) myst.innerHTML = "";
+      }
+    }
+
+    fetchLocalTree();
+  } catch (err) {
+    showModal("Delete Error", err.message, { isError: true });
+  }
+}
+
+// -------- Move --------
+async function performMove(selectedElement) {
+  if (!selectedElement) {
+    showModal("Move Failed", "Select a file or folder to move.", { isError: true });
+    return;
+  }
+
+  const name = selectedElement.name;
+  if (ignoredFolders.includes(name)) {
+    showModal("Move Blocked", `Protected folder: ${name}`, { isError: true });
+    return;
+  }
+
+  openMoveToDialog(selectedElement.path);
+  fetchLocalTree();
+}
+
+// ========================= MENU HANDLERS =========================
+
+renameOption.onclick = async () => {
+  if (!contextTargetElement) return;
+  const selectedElement = {
+    path: contextTargetElement.dataset.elementPath,
+    name: contextTargetElement.dataset.elementName,
+    type: contextTargetElement.dataset.elementType,
+  };
+  await performRename(selectedElement);
+  contextMenu.style.display = "none";
+};
+
+moveOption.onclick = async () => {
+  if (!contextTargetElement) return;
+  const selectedElement = {
+    path: contextTargetElement.dataset.elementPath,
+    name: contextTargetElement.dataset.elementName,
+    type: contextTargetElement.dataset.elementType,
+  };
+  await performMove(selectedElement);
+  contextMenu.style.display = "none";
+};
+
+deleteOption.onclick = async () => {
+  if (!contextTargetElement) return;
+  const selectedElement = {
+    path: contextTargetElement.dataset.elementPath,
+    name: contextTargetElement.dataset.elementName,
+    type: contextTargetElement.dataset.elementType,
+  };
+  await performDelete(selectedElement);
+  contextMenu.style.display = "none";
+};
 
 // ========================= EXPORTS =========================
 

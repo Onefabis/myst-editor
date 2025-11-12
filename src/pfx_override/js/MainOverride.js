@@ -1,17 +1,17 @@
 import '../css/PFXStyleOverride.css';
 
-import { setupGitPanel } from "./gitDiffUI.js";
-import "./leftPanelButtons.js";
-import "./leftPanelFileTree.js";
-import "./editorContextMenu.js";
-import "./commitCurentStateUI.js";
+import { setupGitPanel } from "./gitDiffUI";
+import "./leftPanelButtons";
+import "./leftPanelFileTree";
+import "./editorContextMenu";
+import "./commitCurentStateUI";
 
-import * as txFormat from "./textFormatButtons.js";
-import { openImagePicker } from "./projectImagePicker.js";
-import { waitForEditorReady, saveCurrentEditorContent, bindFocusBlurHandlers, setLastSavedTimestamp } from "./saveEditorText.js"
+import * as txFormat from "./textFormatButtons";
+import { openImagePicker } from "./projectImagePicker";
+import { waitForEditorReady, saveCurrentEditorContent, bindFocusBlurHandlers, setLastSavedTimestamp } from "./saveEditorText"
 
 import MystEditor, { defaultButtons, autosaveEnabled } from '../../MystEditor.jsx';
-import { showLatestCommitDiff, revertFileChanges, pluginReady, pluginInstance } from "../../extensions/markChangedLines.js";
+import { showLatestCommitDiff, revertFileChanges, pluginReady, pluginInstance } from "../../extensions/markChangedLines";
 
 
 export let mystEditorInstance = null;
@@ -140,24 +140,4 @@ export async function loadFile(filename) {
   localStorage.setItem('lastOpened', filename);
 }
 
-// Insert image markdown into editor
-export function insertImageMarkdown(path) {
-  const filename = path.split("/").pop() || "";
-  const dotIndex = filename.lastIndexOf(".");
-  const altText = dotIndex > -1 ? filename.substring(0, dotIndex) : filename;
-  const imgSyntax = `![${altText}](/${path})`;
-  const view = mystEditorInstance?.editorView;
-  if (!view) {
-    alert("Editor is not ready yet.");
-    return;
-  }
-  console.log(view);
-  const { state } = view.v;
-  const { from, to } = state.selection.main; // selection range
-   view.v.dispatch({
-    changes: { from, to, insert: imgSyntax },
-    selection: { anchor: from + imgSyntax.length } // cursor after insert
-  });
 
-  view.v.focus();
-}

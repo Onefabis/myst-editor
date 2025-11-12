@@ -1,4 +1,4 @@
-import { insertImageMarkdown } from "./MainOverride.js";
+import { insertImageMarkdown } from "./leftPanelButtons"
 
 let imagePickerModal = null;
 let folderList = null;

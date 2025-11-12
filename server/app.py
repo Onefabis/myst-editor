@@ -754,10 +754,10 @@ async def git_commit_all(payload: dict = Body(...)):
         active_branch = repo.active_branch.name
 
         # Attempt to fetch latest from remote
-        try:
-            repo.remotes.origin.fetch()
-        except Exception as fetch_err:
-            print(f"Warning: could not fetch remote: {fetch_err}")
+        # try:
+        #     repo.remotes.origin.fetch()
+        # except Exception as fetch_err:
+        #     print(f"Warning: could not fetch remote: {fetch_err}")
 
         remote_ref = f"origin/{active_branch}"
         local_commit = repo.commit(active_branch)
@@ -816,20 +816,39 @@ async def git_push():
     try:
         if repo.head.is_detached:
             return JSONResponse(
-                {
-                    "error": "HEAD_DETACHED",
-                    "detail": "Repository is in a detached HEAD state — cannot push/pull/sync. "
-                              "Please check out a branch (e.g. 'git checkout main')."
-                },
+                {"error": "HEAD_DETACHED"},
                 status_code=400,
             )
+
         active_branch = repo.active_branch.name
         origin = repo.remotes.origin
         refspec = f"refs/heads/{active_branch}:refs/heads/{active_branch}"
-        push_info = origin.push(refspec)
-        return {"status": "success", "push_result": [str(info.summary) for info in push_info], "commit": repo.head.commit.hexsha, "active_branch": active_branch}
+        push_info_list = origin.push(refspec)
+
+        push_summary = []
+        for info in push_info_list:
+            push_summary.append(str(info.summary))
+            if info.flags & info.ERROR or info.flags & info.REJECTED:
+                return JSONResponse(
+                    {
+                        "error": "NON_FAST_FORWARD",
+                        "detail": str(info.summary)
+                    },
+                    status_code=409
+                )
+
+        return {
+            "status": "success",
+            "push_result": push_summary,
+            "commit": repo.head.commit.hexsha,
+            "active_branch": active_branch
+        }
+
     except GitCommandError as e:
-        return JSONResponse({"error": "NON_FAST_FORWARD" if "non-fast-forward" in str(e) else str(e)}, status_code=409)
+        return JSONResponse(
+            {"error": "NON_FAST_FORWARD" if "non-fast-forward" in str(e) else str(e)},
+            status_code=409
+        )
 
 
 @app.post("/api/git-pull")
@@ -857,7 +876,7 @@ async def git_pull():
             repo.git.pull("--rebase", "origin", active_branch)
         except GitCommandError as e:
             if "CONFLICT" in str(e) or "rebase" in str(e):
-                repo.git.rebase("--abort")  # abort immediately so files aren't modified
+                # repo.git.rebase("--abort")  # abort immediately so files aren't modified
                 return JSONResponse({"error": "REBASE_CONFLICT"}, status_code=409)
             raise
 
@@ -868,9 +887,18 @@ async def git_pull():
         }
 
     except GitCommandError as e:
-        if "CONFLICT" in str(e):
+        err_str = str(e)
+        if "CONFLICT" in err_str or "rebase" in err_str:
+            # Only abort if a rebase directory exists
+            rebase_dirs = ["rebase-apply", "rebase-merge"]
+            git_dir = repo.git_dir
+            if any(os.path.exists(os.path.join(git_dir, d)) for d in rebase_dirs):
+                try:
+                    repo.git.rebase("--abort")
+                except Exception:
+                    pass
             return JSONResponse({"error": "REBASE_CONFLICT"}, status_code=409)
-        return JSONResponse({"error": str(e)}, status_code=500)
+        raise
 
 
 @app.post("/api/git-sync")

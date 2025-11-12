@@ -6,9 +6,9 @@ import { DefaultButton } from "./CommonUI";
 import ButtonGroup from "./ButtonGroup";
 import Avatars from "./Avatars";
 import { MystState } from "../mystState";
-import { fetchLocalTree, fetchGitTree, fetchGitCommitTree } from "../pfx_override/js/leftPanelFileTree.js";
-import { logFilePaths } from "../extensions/gitCommit";
-import { saveCurrentEditorContent } from "../pfx_override/js/saveEditorText.js";
+import { fetchLocalTree, fetchGitTree, fetchGitCommitTree } from "../pfx_override/js/leftPanelFileTree";
+import { logFilePaths } from "../extensions/gitCommitView";
+import { saveCurrentEditorContent } from "../pfx_override/js/saveEditorText";
 
 const renderMdLinks = (title) =>
   [...(title || "").matchAll(/\[(.+)\]\(([^\s]+)\)/g)].reduce(

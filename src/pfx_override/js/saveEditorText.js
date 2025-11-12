@@ -1,26 +1,51 @@
 import { autosaveEnabled } from '../../MystEditor.jsx';
-import { mystEditorInstance } from "./MainOverride.js";
+import { mystEditorInstance } from "./MainOverride";
 
-// Track last saved timestamp
+// ========================= STATE MANAGEMENT =========================
+
+/**
+ * Tracks the timestamp of the most recent successful file save.
+ * Used to detect external file modifications and avoid overwrite conflicts.
+ */
 let lastSavedTimestamp = null;
 
+/** Updates the globally tracked save timestamp. */
 export function setLastSavedTimestamp(timestamp) {
   lastSavedTimestamp = timestamp;
 }
 
+/** Returns true if autosave mode is currently active. */
 function isAutosaveOn() {
   return !!autosaveEnabled.value;
 }
 
-// Bind Ctrl+S / Cmd+S globally
+// ========================= GLOBAL SHORTCUT BINDING =========================
+
+/**
+ * Registers a global listener for Ctrl+S / Cmd+S keyboard shortcuts.
+ * Enables manual saving regardless of editor focus.
+ */
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
-    saveCurrentEditorContent(true); // Manual save
+    saveCurrentEditorContent(true); // Manual save trigger
   }
 });
 
+// ========================= EDITOR EVENT BINDINGS =========================
+
+/**
+ * Attaches focus and blur event handlers to the editor view.
+ * These events allow autosave and file conflict detection to occur
+ * passively based on user attention rather than manual triggers.
+ */
 export async function bindFocusBlurHandlers(view) {
+  
+  /**
+   * On blur (when editor loses focus):
+   * If autosave is enabled and the file has changed externally,
+   * trigger a save to sync latest modifications.
+   */
   view.contentDOM.addEventListener('blur', async () => {
     if (!isAutosaveOn()) return; 
     const path = localStorage.getItem('currentPath');
@@ -30,6 +55,8 @@ export async function bindFocusBlurHandlers(view) {
       const res = await fetch(`/api/file/meta?path=${encodeURIComponent(path)}`); 
       if (!res.ok) return;
       const latest = await res.json();
+
+      // If server-side timestamp differs, update file automatically.
       if (latest.last_modified && latest.last_modified !== lastSavedTimestamp) {
         saveCurrentEditorContent();
       }
@@ -38,9 +65,19 @@ export async function bindFocusBlurHandlers(view) {
     }
   });
 
+  /**
+   * On focus (when editor regains attention):
+   * Compares local content with server-side version to detect
+   * potential external edits made while unfocused.
+   * Prompts the user to reload or discard changes via a custom modal.
+   */
   view.contentDOM.addEventListener('focus', async () => {
 
-    // Simple modal with Ok / Cancel buttons
+    // ===== MODAL CREATION UTILITY =====
+    /**
+     * Constructs a lightweight, ephemeral confirmation modal
+     * for handling file change conflicts interactively.
+     */
     function createConfirmModal() {
       const modal = document.createElement("div");
       modal.id = "custom-confirm-modal";
@@ -80,6 +117,10 @@ export async function bindFocusBlurHandlers(view) {
 
     const confirmModal = createConfirmModal();
 
+    /**
+     * Displays the modal and resolves to a boolean
+     * depending on user intent (true = reload).
+     */
     function showConfirmModal(text) {
       return new Promise((resolve) => {
         confirmModal.message.textContent = text;
@@ -93,15 +134,16 @@ export async function bindFocusBlurHandlers(view) {
 
         confirmModal.okBtn.onclick = () => {
           cleanup();
-          resolve(true); // Ok → reload
+          resolve(true);
         };
         confirmModal.cancelBtn.onclick = () => {
           cleanup();
-          resolve(false); // Cancel → keep current (save)
+          resolve(false);
         };
       });
     }
 
+    // ===== EXTERNAL FILE CHECK =====
     if (!isAutosaveOn()) return; 
     const path = localStorage.getItem('currentPath');
     if (!path) return;
@@ -111,10 +153,13 @@ export async function bindFocusBlurHandlers(view) {
       if (!res.ok) return;
       const latest = await res.json();
       
+      // Compare timestamps to detect remote changes
       if (latest.last_modified && latest.last_modified !== lastSavedTimestamp) {
         const shouldReload = await showConfirmModal(
           'File changed externally. Reload with external changes or discard external changes?'
         );
+        
+        // True → reload external file; false → keep current local edits
         if (shouldReload) {
           view.dispatch({
             changes: { from: 0, to: view.state?.doc.length, insert: latest.content },
@@ -132,6 +177,13 @@ export async function bindFocusBlurHandlers(view) {
   });
 }
 
+// ========================= EDITOR INITIALIZATION =========================
+
+/**
+ * Waits for the MyST editor instance to become fully ready.
+ * Resolves only once the editor's internal DOM (contentDOM)
+ * is available for event binding or manipulation.
+ */
 export function waitForEditorReady() {
   return new Promise((resolve) => {
     const check = () => {
@@ -146,7 +198,13 @@ export function waitForEditorReady() {
   });
 }
 
-// Save current editor content and update timestamp
+// ========================= SAVE HANDLING =========================
+
+/**
+ * Saves the current editor content to the backend and updates the local timestamp.
+ * - If invoked manually (`manual = true`), alerts on failure.
+ * - Integrates seamlessly with autosave and external modification checks.
+ */
 export async function saveCurrentEditorContent(manual = false) {
   const view = mystEditorInstance?.editorView;
   if (!view) {

@@ -230,15 +230,7 @@ const MystEditor = () => {
       },
       fullscreen: () => (fullscreen.value = !fullscreen.peek()),
       refresh: () => {
-        // cache.transform.clear();
-        // text.renderText(false);
-        // alertFor("Rich links refreshed!", 1);
         revertFileChanges(editorView);
-        // runGitAction(
-        //   "refresh",
-        //   "Refresh Branch?",
-        //   "Fetch and rebase from remote? Local changes may cause conflicts."
-        // );
       },
       "suggest-mode": () => (suggestMode.value = !suggestMode.peek()),
     }),

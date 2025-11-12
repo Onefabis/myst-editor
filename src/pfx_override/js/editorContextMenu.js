@@ -1,8 +1,9 @@
-import { mystEditorInstance, insertImageMarkdown } from "./MainOverride.js";
-import { showExcalidraw } from "../../extensions/excalidrawExtension.js";
-import { showOllamaPopup } from "../../extensions/ollamaAIQuery.js";
-import { showAIRephrasePopup } from "../../extensions/aiRephrase.js";
-import { showRenamePopup } from "../../extensions/renameImage.js";
+import { mystEditorInstance } from "./MainOverride";
+import { insertImageMarkdown } from "./leftPanelButtons"
+import { showExcalidraw } from "../../extensions/excalidrawExtension";
+import { showOllamaPopup } from "../../extensions/ollamaAIQuery";
+import { showAIRephrasePopup } from "../../extensions/aiRephrase";
+import { showRenamePopup } from "../../extensions/renameImage";
 
 
 const menu = document.createElement("div");

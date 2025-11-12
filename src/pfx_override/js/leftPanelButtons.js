@@ -1,150 +1,72 @@
 import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates, treeState, fetchGitCommitTree } from "./leftPanelFileTree";
-import { loadFile, insertImageMarkdown } from "./MainOverride";
+import { loadFile, mystEditorInstance } from "./MainOverride";
 import { runGitAction } from "./commitCurentStateUI";
+import { showModal, showInputModal } from "./modalWindows"
 
 const CONFIG = {
   ignoredFolders: ["_static", "_templates", ".obsidian"],
 };
 
-// ----------------------- Move To Dialog ----------------------- //
 
-/* Opens the "Move To" dialog for relocating files or folders.
-Allows restructuring of the project's file/folder hierarchy on a raw "doc" (markdown) folder.
-This structure doesn't reflect the final Sphinx navigation tree, because it's driven by "toctree" defined inside key markdown files.
-Read Sphinx docs here - https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#table-of-contents
- */
-function openMoveToDialog(itemPath) {
-  const modal = document.createElement("div");
-  modal.className = "move-modal";
-
-  modal.innerHTML = `
-    <h3>Select folder to move to</h3>
-    <div id="move-tree" class="move-tree"></div>
-    <div class="move-actions">
-      <button id="move-cancel">❌ Cancel</button>
-      <button id="move-ok">✅ OK</button>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  let selectedMovePath = "";
-
-  fetch("/api/tree").then(res => res.json()).then(data => {
-    const container = document.getElementById("move-tree");
-    const rootNode = {
-      type: "folder",
-      name: "root",
-      path: "",
-      children: data
-    };
-    renderMoveTree([rootNode], container);
+// Insert image markdown into editor
+export function insertImageMarkdown(path) {
+  const filename = path.split("/").pop() || "";
+  const dotIndex = filename.lastIndexOf(".");
+  const altText = dotIndex > -1 ? filename.substring(0, dotIndex) : filename;
+  const imgSyntax = `![${altText}](/${path})`;
+  const view = mystEditorInstance?.editorView;
+  if (!view) {
+    alert("Editor is not ready yet.");
+    return;
+  }
+  // console.log(view);
+  const { state } = view.v;
+  const { from, to } = state.selection.main; // selection range
+   view.v.dispatch({
+    changes: { from, to, insert: imgSyntax },
+    selection: { anchor: from + imgSyntax.length } // cursor after insert
   });
 
-  function renderMoveTree(nodes, parent) {
-    const ul = document.createElement("ul");
-    for (const node of nodes) {
-      if (node.type !== "folder") continue;
-      if (CONFIG.ignoredFolders.includes(node.name)) continue;
-      const li = document.createElement("li");
-      const btn = document.createElement("div");
-      btn.textContent = "📁 " + node.name;
-      btn.className = "move-folder-btn";
-      btn.onclick = () => {
-        selectedMovePath = node.path.replace(/\\/g, "/");
-        document.querySelectorAll("#move-tree div").forEach(el => el.classList.remove("selected"));
-        btn.classList.add("selected");
-      };
-      li.appendChild(btn);
-      if (node.children) {
-        renderMoveTree(node.children, li);
-      }
-      ul.appendChild(li);
-    }
-    parent.appendChild(ul);
-  }
-
-  document.getElementById("move-ok").onclick = async () => {
-    if (selectedMovePath === null) {
-      alert("Select a file or folder to move.");
-      return;
-    }
-    const name = itemPath.replace(/\\/g, "/").split("/").pop();
-    const newPath = selectedMovePath ? `${selectedMovePath}/${name}` : name;
-    const res = await fetch("/api/rename", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ oldPath: itemPath, newPath }),
-    });
-    if (!res.ok) {
-      alert("Error while moving.");
-    } else {
-      let currentPath = localStorage.getItem('currentPath') || "";
-      if (currentPath === itemPath) {
-        localStorage.setItem('currentPath', newPath);
-      }
-      
-      // Update selected element if it was moved
-      const selectedElement = treeState.getSelectedElement();
-      if (selectedElement && selectedElement.path === itemPath) {
-        treeState.setSelectedElement({
-          path: newPath,
-          name: selectedElement.name,
-          type: selectedElement.type
-        });
-      }
-      
-      fetchLocalTree();
-    }
-    modal.remove();
-  };
-
-  document.getElementById("move-cancel").onclick = () => {
-    modal.remove();
-  };
+  view.v.focus();
 }
 
 // ----------------------- Toolbar Button Actions START ----------------------- //
-
-document.getElementById("move").onclick = () => {
-  const selectedElement = treeState.getSelectedElement();
-  
-  if (!selectedElement) {
-    alert("Select a file or folder to move.");
-    return;
-  }
-  
-  const name = selectedElement.name;
-  if (ignoredFolders.includes(name)) {
-    alert(`Cannot move protected folder: ${name}`);
-    return;
-  }
-  
-  openMoveToDialog(selectedElement.path);
-};
 
 document.getElementById("new-file").onclick = async () => {
   const selectedElement = treeState.getSelectedElement();
   let targetFolder = '';
 
   if (selectedElement && selectedElement.type === 'folder') {
-    targetFolder = selectedElement.path; // use selected folder
+    targetFolder = selectedElement.path;
   } else if (activeFolderPath) {
-    targetFolder = activeFolderPath; // fallback
+    targetFolder = activeFolderPath;
   }
 
-  const name = prompt('Enter new file name (without ".md")');
-  if (!name || name.trim() === '') return;
+  // Use the existing showInputModal for consistent styling
+  const name = await showInputModal("New File", "Enter file name (without .md)");
+  if (!name) return;
+
   const fullName = name.endsWith('.md') ? name : `${name}.md`;
   const path = targetFolder ? `${targetFolder}/${fullName}` : fullName;
 
-  fetch('/api/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, type: 'file' }),
-  }).then(() => {
+  try {
+    const res = await fetch('/api/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, type: 'file' }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      showModal("Error", `Failed to create file: ${errText}`, { isError: true });
+      return;
+    }
+
     fetchLocalTree();
     setTimeout(() => loadFile(normalizePath(path)), 500);
-  });
+  } catch (err) {
+    showModal("Error", `Failed to create file: ${err.message}`, { isError: true });
+  }
 };
 
 document.getElementById("new-folder").onclick = async () => {
@@ -157,135 +79,32 @@ document.getElementById("new-folder").onclick = async () => {
     targetFolder = activeFolderPath;
   }
 
-  const name = prompt('Enter new folder name (e.g.: newfolder)');
+  // Use showInputModal for folder creation
+  const name = await showInputModal("New Folder", "Enter folder name (e.g. new-folder)");
   if (!name) return;
+
   const path = targetFolder ? `${targetFolder}/${name}` : name;
 
-  fetch('/api/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, type: 'folder' }),
-  }).then(() => fetchLocalTree());
-};
-
-
-document.getElementById("delete").onclick = async () => {
-  const selectedElement = treeState.getSelectedElement();
-  
-  if (!selectedElement) {
-    alert("Select a file or folder to delete.");
-    return;
-  }
-
-  const path = selectedElement.path;
-  const name = selectedElement.name;
-  
-  if (ignoredFolders.includes(name)) {
-    alert(`Cannot delete protected folder: ${name}`);
-    return;
-  }
-  
-  const isFolder = selectedElement.type === 'folder';
-  const confirmText = isFolder
-    ? `Are you sure you want to delete the folder "${path}" and all its contents?`
-    : `Are you sure you want to delete the file "${path}"?`;
-    
-  if (!confirm(confirmText)) return;
-  
   try {
-    const res = await fetch('/api/delete', {
+    const res = await fetch('/api/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path }),
+      body: JSON.stringify({ path, type: 'folder' }),
     });
-    
+
     if (!res.ok) {
-      const error = await res.text();
-      alert(`Error while deleting: ${error}`);
+      const errText = await res.text();
+      showModal("Error", `Failed to create folder: ${errText}`, { isError: true });
       return;
     }
-    
-    clearActiveStates();
-    treeState.clearSelectedElement(); // Clear the selection after deletion
-    
-    let currentPath = localStorage.getItem('currentPath') || "";
-    if (currentPath) {
-      if (isFolder && currentPath.startsWith(path + '/')) {
-        localStorage.removeItem('currentPath');
-        localStorage.removeItem('lastOpened');
-        localStorage.removeItem('currentPath');
-        const editor = document.getElementById("myst");
-        if (editor) editor.innerHTML = "";
-      } else if (!isFolder && currentPath === path) {
-        localStorage.removeItem('currentPath');
-        localStorage.removeItem('lastOpened');
-        localStorage.removeItem('currentPath');
-        const editor = document.getElementById("myst");
-        if (editor) editor.innerHTML = "";
-      }
-    }
-    
+
     fetchLocalTree();
   } catch (err) {
-    alert(`Error while deleting: ${err.message}`);
+    showModal("Error", `Failed to create folder: ${err.message}`, { isError: true });
   }
 };
 
-document.getElementById("rename").onclick = async () => {
-  const selectedElement = treeState.getSelectedElement();
-  
-  if (!selectedElement) {
-    alert("Select a file or folder to rename.");
-    return;
-  }
 
-  const path = selectedElement.path;
-  const name = selectedElement.name;
-  
-  if (ignoredFolders.includes(name)) {
-    alert(`Cannot rename protected folder: ${name}`);
-    return;
-  }
-
-  const oldPath = path.replace(/\\/g, "/");
-  const segments = oldPath.split("/");
-  const oldName = segments.pop();
-  const dirPath = segments.join("/");
-
-  const displayName = oldName.endsWith(".md") ? oldName.replace(/\.md$/, "") : oldName;
-  const inputName = prompt("Enter new name:", displayName);
-  if (!inputName || inputName.trim() === "" || inputName === displayName) return;
-
-  const newName = oldName.endsWith(".md") && !inputName.endsWith(".md")
-    ? `${inputName}.md` : inputName;
-  const newPath = dirPath ? `${dirPath}/${newName}` : newName;
-
-  const res = await fetch("/api/rename", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ oldPath, newPath, action: "check" }),
-  });
-
-  if (!res.ok) {
-    const error = await res.json();
-    alert("Rename error: " + (error.error || "Unknown"));
-    return;
-  }
-
-  let currentPath = localStorage.getItem('currentPath') || "";
-  if (currentPath === oldPath) {
-    localStorage.setItem("currentPath", newPath);
-  }
-  
-  // Update the selected element to reflect the new path/name
-  treeState.setSelectedElement({
-    path: newPath,
-    name: newName,
-    type: selectedElement.type
-  });
-  
-  fetchLocalTree();
-};
 
 document.getElementById("upload-image").onclick = () => {
   const input = document.createElement("input");
