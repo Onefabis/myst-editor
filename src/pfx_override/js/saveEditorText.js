@@ -19,18 +19,6 @@ function isAutosaveOn() {
   return !!autosaveEnabled.value;
 }
 
-// ========================= GLOBAL SHORTCUT BINDING =========================
-
-/**
- * Registers a global listener for Ctrl+S / Cmd+S keyboard shortcuts.
- * Enables manual saving regardless of editor focus.
- */
-window.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-    e.preventDefault();
-    saveCurrentEditorContent(true); // Manual save trigger
-  }
-});
 
 // ========================= EDITOR EVENT BINDINGS =========================
 
@@ -231,3 +219,16 @@ export async function saveCurrentEditorContent(manual = false) {
     if (manual) alert("Save failed: " + err.message);
   }
 }
+
+// ========================= GLOBAL SHORTCUT BINDING =========================
+
+/**
+ * Registers a global listener for Ctrl+S / Cmd+S keyboard shortcuts.
+ * Enables manual saving regardless of editor focus.
+ */
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    saveCurrentEditorContent(true); // Manual save trigger
+  }
+});

@@ -13,10 +13,9 @@ export async function runGitAction(action, confirmTitle, confirmMessage) {
   );
 
   try {
-    // --- Call the correct backend endpoint depending on action ---
-    let endpoint = "/api/git-sync"; // default (for backward compatibility)
+    let endpoint = "";
     if (action === "push") endpoint = "/api/git-push";
-    if (action === "pull" || action === "refresh") endpoint = "/api/git-pull";
+    if (action === "refresh") endpoint = "/api/git-pull";
 
     const res = await fetch(endpoint, {
       method: "POST",
@@ -43,7 +42,7 @@ export async function runGitAction(action, confirmTitle, confirmMessage) {
       UNMERGED_FILES: "Repository has unmerged or conflicted files. Resolve before continuing.",
       LOCAL_CHANGES: "You have local changes. Please commit your files before pulling remote files.",
       REBASE_CONFLICT:
-        "Conflicts detected with the remote branch.\n\nPlease resolve them in an external editor before trying again.",
+        "Remote branch mismatches detected.\n\nResolve any conflicts in external editor (client)",
       UNSTASH_CONFLICT:
         "Pull succeeded but restoring local changes caused conflicts.\n\nResolve manually before proceeding.",
       HEAD_DETACHED:
@@ -77,7 +76,7 @@ export async function runGitAction(action, confirmTitle, confirmMessage) {
       {
         onClose: () => {
 
-          if (action === "pull" || action === "refresh") {
+          if (action === "refresh") {
             const host = document.getElementById('myst');
             if (host && host.shadowRoot) {
 

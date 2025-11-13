@@ -1,3 +1,25 @@
+// ========================= Helper: attachModalKeyHandlers =========================
+function attachModalKeyHandlers({ okButton = null, cancelButton = null, onClose = null }) {
+  const handleKey = (e) => {
+    if (e.key === "Enter" && okButton) {
+      e.preventDefault();
+      okButton.click();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      if (cancelButton) {
+        cancelButton.click();
+      } else if (onClose) {
+        onClose();
+      }
+    }
+  };
+
+  document.addEventListener("keydown", handleKey);
+
+  // Return cleanup so modal can remove listener when closing
+  return () => document.removeEventListener("keydown", handleKey);
+}
+
 // ========================= showModal =========================
 export function showModal(title, message, { isError = false, onClose = null } = {}) {
   const existing = document.getElementById("git-modal");
@@ -20,10 +42,17 @@ export function showModal(title, message, { isError = false, onClose = null } = 
   modal.appendChild(content);
   document.body.appendChild(modal);
 
-  document.getElementById("modal-ok").onclick = () => {
+  const okBtn = document.getElementById("modal-ok");
+
+  const closeModal = () => {
     modal.remove();
+    cleanup();
     if (onClose) onClose();
   };
+
+  const cleanup = attachModalKeyHandlers({ okButton: okBtn, onClose: closeModal });
+
+  okBtn.onclick = closeModal;
 }
 
 // ========================= showConfirm =========================
@@ -50,12 +79,26 @@ export function showConfirm(title, message) {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    document.getElementById("confirm-cancel").onclick = () => {
+    const cancelBtn = document.getElementById("confirm-cancel");
+    const okBtn = document.getElementById("confirm-ok");
+
+    const cleanup = attachModalKeyHandlers({
+      okButton: okBtn,
+      cancelButton: cancelBtn,
+    });
+
+    const close = () => {
       modal.remove();
+      cleanup();
+    };
+
+    cancelBtn.onclick = () => {
+      close();
       resolve(false);
     };
-    document.getElementById("confirm-ok").onclick = () => {
-      modal.remove();
+
+    okBtn.onclick = () => {
+      close();
       resolve(true);
     };
   });
@@ -86,13 +129,30 @@ export function showInputModal(title, message, defaultValue = "") {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    document.getElementById("rename-cancel").onclick = () => {
+    const input = document.getElementById("rename-input");
+    const cancelBtn = document.getElementById("rename-cancel");
+    const okBtn = document.getElementById("rename-ok");
+
+    input.focus();
+
+    const cleanup = attachModalKeyHandlers({
+      okButton: okBtn,
+      cancelButton: cancelBtn,
+    });
+
+    const close = () => {
       modal.remove();
+      cleanup();
+    };
+
+    cancelBtn.onclick = () => {
+      close();
       resolve(null);
     };
-    document.getElementById("rename-ok").onclick = () => {
-      const value = document.getElementById("rename-input").value.trim();
-      modal.remove();
+
+    okBtn.onclick = () => {
+      const value = input.value.trim();
+      close();
       resolve(value);
     };
   });
@@ -120,9 +180,21 @@ export function showProgressModal(title, { onStop = null } = {}) {
   modal.appendChild(content);
   document.body.appendChild(modal);
 
-  document.getElementById("stop-action").onclick = () => {
-    if (onStop) onStop();
+  const stopBtn = document.getElementById("stop-action");
+
+  const close = () => {
+    cleanup();
     modal.remove();
+  };
+
+  const cleanup = attachModalKeyHandlers({
+    okButton: stopBtn, // Enter or Esc both trigger Stop
+    cancelButton: stopBtn,
+  });
+
+  stopBtn.onclick = () => {
+    if (onStop) onStop();
+    close();
   };
 
   return {
@@ -130,6 +202,6 @@ export function showProgressModal(title, { onStop = null } = {}) {
       const el = document.getElementById("progress-msg");
       if (el) el.textContent = msg;
     },
-    close: () => modal.remove(),
+    close,
   };
 }

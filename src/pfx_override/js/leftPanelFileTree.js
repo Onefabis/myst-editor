@@ -862,29 +862,50 @@ class TreeAPI {
  *  - Compute changed folders and render the tree in diff mode
  *  - Optionally load the currently selected file into the editor
  */
-export async function fetchLocalTree(loadfile=true) {
+export async function fetchLocalTree(loadfile = true) {
   const commitHash = await TreeAPI.getHeadCommit();
   const baseTree = await TreeAPI.getTree();
   const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
 
   const tree_div = document.getElementById("tree");
-  tree_div.style.display = "flex"; 
+  tree_div.style.display = "flex";
   const commit_message = document.getElementById("commit-no-changes-message");
   commit_message.style.display = "none";
 
-  // Filter out deleted files and keep original git statuses
-  // Handle case where git diff fails (e.g., newly initialized repo with no commits)
+  // Filter out deleted files
   const safeDiffs = Array.isArray(diffs) ? diffs : [];
   const filteredDiffs = safeDiffs.filter(diff => diff.status !== GIT_STATUS.DELETED);
   const diffMap = GitDiffManager.buildDiffMap(filteredDiffs);
-
   const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
+
   TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
 
-  const currentPath = localStorage.getItem('currentPath');
+  let currentPath = localStorage.getItem('currentPath');
 
-  // Only load/restore if a valid path exists
-  if (currentPath && loadfile) {
+  // If currentPath is empty or invalid, automatically load first file
+  if (!currentPath || !fileExistsInTree(currentPath, baseTree)) {
+    const firstFileNode = findFirstFile(baseTree);
+    if (firstFileNode) {
+      currentPath = normalizePath(firstFileNode.path);
+      localStorage.setItem('currentPath', currentPath);
+
+      // Mark it as active visually and logically
+      clearActiveStates();
+      const fileEl = document.querySelector(`.file[title="${CSS.escape(currentPath)}"]`);
+      if (fileEl) fileEl.classList.add('active');
+
+      treeState.setSelectedElement({
+        path: firstFileNode.path,
+        name: firstFileNode.name,
+        type: 'file'
+      });
+
+      if (loadfile) {
+        loadFile(currentPath);
+      }
+    }
+  } else if (loadfile) {
+    // Load the existing currentPath normally
     loadFile(normalizePath(currentPath));
   }
 
@@ -892,6 +913,21 @@ export async function fetchLocalTree(loadfile=true) {
     restoreActiveFile(normalizePath(currentPath));
   }
 }
+
+/**
+ * Recursively finds the first file in a tree (depth-first).
+ */
+function findFirstFile(nodes) {
+  for (const node of nodes) {
+    if (node.type === 'file') return node;
+    if (node.type === 'folder' && node.children) {
+      const found = findFirstFile(node.children);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 
 /**
  * Render the tree based on either:

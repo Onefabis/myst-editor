@@ -32,6 +32,7 @@ export const Modal = styled.dialog`
   width: 450px;
   max-width: 100vw;
   padding: 20px;
+  text-wrap: auto;
   background-color: var(--modal-bg);
   border: 1px solid var(--border);
   border-radius: var(--border-radius);

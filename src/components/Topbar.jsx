@@ -536,7 +536,6 @@ export const EditorTopbar = ({ alert, buttons }) => {
                 key={b.id}
                 type="button"
                 onClick={b.action}
-                disabled={b.disabled}
               >
                 {b.text}
               </DefaultButton>
