@@ -516,7 +516,7 @@ class TreeRenderer {
     const newPath = normalizePath(node.path);
     const currentPath = localStorage.getItem('currentPath');
 
-    if (isAutosaveEnabled() && currentPath && currentPath !== newPath) {
+    if (isAutosaveEnabled() && currentPath) {
       await saveCurrentEditorContent();
     }
     

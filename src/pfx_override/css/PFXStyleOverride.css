@@ -1143,6 +1143,127 @@ aside.danger>header::before {
 }
 
 /* ─── Dropdown groups ─────────────────────────── */
+
+#gitPanel .searchable-dropdown {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+  max-width: 220px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+/* Collapsed label (acts like <select>) */
+#gitPanel .searchable-dropdown .dropdown-label {
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hover effect like native select */
+#gitPanel .searchable-dropdown .dropdown-label:hover {
+  border-color: #999;
+}
+
+/* Dropdown panel */
+#gitPanel .searchable-dropdown .dropdown-panel {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  width: max-content;
+  max-width: 340px; 
+  padding: 5px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  z-index: 999999;
+  max-height: 240px;
+  overflow: hidden;
+}
+
+/* Ensure collapsing only happens when needed */
+#gitPanel .searchable-dropdown .dropdown-panel.hidden {
+  display: none;
+}
+
+/* Fix list + search width matching new panel */
+#gitPanel .searchable-dropdown .dropdown-search-wrap,
+#gitPanel .searchable-dropdown .dropdown-list {
+  width: 100%;
+}
+
+/* Search box wrapper */
+#gitPanel .searchable-dropdown .dropdown-search-wrap {
+  display: flex;
+  align-items: center;
+  padding: 0; 
+  border-bottom: 1px solid #eee;
+  gap: 4px;
+  background: #fafafa;
+}
+
+/* Search input */
+#gitPanel .searchable-dropdown .dropdown-search-input {
+  flex: 1;
+  padding: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  outline: none;
+  font-size: 13px;
+}
+
+#gitPanel .searchable-dropdown .dropdown-search-input:focus {
+  border-color: #888;
+}
+
+/* Clear button ✕ */
+#gitPanel .searchable-dropdown .dropdown-clear-btn {
+  margin-left: 4px;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 14px;
+  opacity: 0.6;
+  user-select: none;
+}
+
+#gitPanel .searchable-dropdown .dropdown-clear-btn:hover {
+  opacity: 1;
+}
+
+/* Items container */
+#gitPanel .searchable-dropdown .dropdown-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Dropdown item */
+#gitPanel .searchable-dropdown .dropdown-item {
+  padding: 6px 8px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#gitPanel .searchable-dropdown .dropdown-item:hover {
+  background: #f0f0f0;
+  cursor: pointer;
+}
+
+/* Highlight selected item (optional) */
+#gitPanel .searchable-dropdown .dropdown-item.selected {
+  background: #e0e0e0;
+  font-weight: 500;
+}
+
+/* Keep .git-dropdown-group layout unchanged */
 #gitPanel .git-dropdown-group {
   display: flex;
   align-items: center;
@@ -1151,25 +1272,18 @@ aside.danger>header::before {
   min-width: 0;
 }
 
-/* Labels (dropdown only, not toggle) */
-#gitPanel .git-dropdown-group label{
+#gitPanel .git-dropdown-group label {
   font-weight: 500;
   margin-right: 4px;
   white-space: nowrap;
   color: #333;
 }
 
-/* Dropdowns */
+/* Hide native selects inside replaced components */
 #gitPanel .git-dropdown-group select {
-  flex: 1;
-  min-width: 120px;
-  max-width: 220px;
-  padding: 4px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 14px;
-  box-sizing: border-box;
+  display: none !important;
 }
+
 
 /* ─── Commit details ──────────────────────────── */
 #gitPanel pre#commitDetails,
