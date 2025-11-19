@@ -4,9 +4,11 @@ A comprehensive documentation management system with version control
 """
 import os
 import re
+import tempfile
 import shutil
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import FastAPI, File, Form, UploadFile, Request, Query
 from fastapi.exceptions import HTTPException
@@ -30,6 +32,17 @@ class Config:
 
 
 config = Config()
+
+
+# ==================== RENAME IMAGE CONFIGS ===============
+
+MD_EXT = ".md"
+MAX_WORKERS = 12
+
+# --- Regex patterns ---
+RE_MD = re.compile(r'(!?\[[^\]]*\]\()\s*([^\)\s]+)\s*(\))')
+RE_REF = re.compile(r'^(\s*\[[^\]]+\]:\s*)(\S+)\s*$', re.MULTILINE)
+RE_IMG = re.compile(r'(<img[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
 
 
 # ==================== PYDANTIC MODELS ====================
@@ -418,6 +431,82 @@ async def delete_path(data: PathModel):
     return {"status": "deleted", "path": data.path}
 
 
+def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
+    """Scan repo_root and replace old_rel → new_rel in all .md files."""
+    old_rel = old_rel.lstrip("/")
+    new_rel = new_rel.lstrip("/")
+    old_base = os.path.basename(old_rel)
+    new_base = os.path.basename(new_rel)
+
+    # --- 1) Collect all markdown files fast ---
+    md_files = []
+    for dp, _, files in os.walk(repo_root):
+        md_files += [Path(dp) / f for f in files if f.lower().endswith(MD_EXT)]
+
+    def fix_path(path: str) -> str:
+        path = path.strip().strip('"').strip("'").replace("\\", "/")
+        if path == old_rel:
+            return new_rel
+        if path.endswith("/" + old_base) or path == old_base:
+            return path[: len(path) - len(old_base)] + new_base
+        return path
+
+    def replace_in_text(txt: str):
+        count = 0
+
+        def md_cb(m):
+            nonlocal count
+            np = fix_path(m.group(2))
+            if np != m.group(2): count += 1
+            return f"{m.group(1)}{np}{m.group(3)}"
+
+        def ref_cb(m):
+            nonlocal count
+            np = fix_path(m.group(2))
+            if np != m.group(2): count += 1
+            return f"{m.group(1)}{np}"
+
+        def img_cb(m):
+            nonlocal count
+            np = fix_path(m.group(2))
+            if np != m.group(2): count += 1
+            return f"{m.group(1)}{np}{m.group(3)}"
+
+        txt = RE_MD.sub(md_cb, txt)
+        txt = RE_REF.sub(ref_cb, txt)
+        txt = RE_IMG.sub(img_cb, txt)
+        return txt, count
+
+    def process_file(path: Path):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            try: text = path.read_text(encoding="latin-1")
+            except: return 0
+
+        new_text, cnt = replace_in_text(text)
+        if cnt == 0 or new_text == text:
+            return 0
+
+        fd, tmp = tempfile.mkstemp(dir=path.parent)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(new_text)
+        os.replace(tmp, path)
+        return cnt
+
+    # --- 2) Parallel processing ---
+    changed = 0
+    with ThreadPoolExecutor(MAX_WORKERS) as ex:
+        futs = [ex.submit(process_file, p) for p in md_files]
+        for f in as_completed(futs):
+            changed += f.result()
+
+    return {
+        "scanned": len(md_files),
+        "updated_references": changed,
+    }
+
+
 @app.post("/api/rename")
 async def rename_path(data: RenameModel):
     """Rename file or folder with collision handling"""
@@ -442,7 +531,13 @@ async def rename_path(data: RenameModel):
         
         new_path.parent.mkdir(parents=True, exist_ok=True)
         old_path.rename(new_path)
-        
+
+        update_md_refs(
+            repo_root=Path(config.REPO_DIR),
+            old_rel=old_path.relative_to(config.BASE_DIR).as_posix(),
+            new_rel=new_path.relative_to(config.BASE_DIR).as_posix()
+        )
+                
         rel_path = new_path.relative_to(config.BASE_DIR).as_posix()
         return {"status": "saved", "newPath": rel_path}
         
@@ -452,9 +547,10 @@ async def rename_path(data: RenameModel):
 
 # ==================== IMAGE MANAGEMENT ROUTES ====================
 
+
 @app.get("/api/images_in_folder")
 async def images_in_folder(folder: str = ""):
-    """List images in specific folder"""
+    """List images in specific folder for the project image picker"""
     try:
         folder = PathUtils.normalize_relative_path(folder)
     except ValueError:
@@ -471,7 +567,7 @@ async def images_in_folder(folder: str = ""):
 
 @app.get("/api/image_tree")
 async def get_image_tree():
-    """Get tree of all images in _static folder"""
+    """Get tree of all images in _static folder for the project image picker"""
     static_root = config.BASE_DIR / "_static"
     return FileUtils.scan_directory(static_root, static_root)
 
@@ -482,7 +578,7 @@ async def upload_image(
     path: str = Form(...),
     action: str = Form("check")
 ):
-    """Upload image with collision handling"""
+    """Upload image from outside of the project with collision handling"""
     filename = FileUtils.sanitize_filename(file.filename)
     
     try:

@@ -322,20 +322,6 @@ textarea.commit-message-input {
   }
 }
 
-.myst-main-editor .cm-changedText {
-  background: none !important;
-}
-
-.cm-merge-b .cm-changedLine {
-  background-color: transparent !important;
-  /*background-color: rgb(236 252 230) !important;*/
-}
-
-.cm-merge-a .cm-changedLine {
-  background-color: transparent !important;
-  /*background-color: rgb(250 230 230) !important;*/
-}
-
 /* Base folder look: reserve 2px at left so layout is stable */
 #tree_container .folder {
   border-left: 3px solid transparent;
@@ -1388,6 +1374,29 @@ aside.danger>header::before {
 }
 
 
+.cm-insertedLine .cm-changedText {
+  background: linear-gradient(rgba(34, 187, 34, 0.667), rgba(34, 187, 34, 0.667)) center bottom / 100% 2px no-repeat var(--inserted-bg) !important;
+}
+
+.cm-deletedLine .cm-changedText {
+  background: linear-gradient(rgba(238, 68, 51, 0.4), rgba(238, 68, 51, 0.4)) center bottom / 100% 2px no-repeat var(--deleted-bg) !important;
+}
+
+.myst-main-editor .cm-changedText {
+  background: var(--inserted-bg) !important;
+}
+
+.cm-merge-b .cm-changedLine, .cm-merge-b .cm-changedLine ins {
+  background-color: transparent !important;
+  /*background-color: rgb(236 252 230) !important;*/
+}
+
+.cm-merge-a .cm-changedLine, .cm-merge-a .cm-changedLine del {
+  background-color: transparent !important;
+  /*background-color: rgb(250 230 230) !important;*/
+}
+
+
 /* More specific selectors to override transparent selection */
 .cm-editor .cm-line .cm-insertedLine::selection,
 .cm-editor .cm-line .cm-insertedLine ::selection, 
@@ -1403,7 +1412,8 @@ aside.danger>header::before {
 .cm-line .cm-insertedLine ::selection, 
 .cm-line .cm-deletedLine::selection,
 .cm-line .cm-deletedLine ::selection {
-  background-color: rgb(204, 216, 239) !important;
+  background: transparent !important;
+  /*background-color: rgb(204, 216, 239) !important;*/
 }
 
 .cm-line {
