@@ -6,11 +6,12 @@ import "./leftPanelFileTree";
 import "./editorContextMenu";
 import "./commitCurentStateUI";
 
+
 import * as txFormat from "./textFormatButtons";
 import { openImagePicker } from "./projectImagePicker";
 import { waitForEditorReady, saveCurrentEditorContent, bindFocusBlurHandlers, setLastSavedTimestamp } from "./saveEditorText"
 
-import MystEditor, { defaultButtons, autosaveEnabled } from '../../MystEditor.jsx';
+import MystEditor, { defaultButtons } from '../../MystEditor.jsx';
 import { showLatestCommitDiff, revertFileChanges, pluginReady, pluginInstance } from "../../extensions/markChangedLines";
 
 

@@ -4,6 +4,7 @@ import { showExcalidraw } from "../../extensions/excalidrawExtension";
 import { showOllamaPopup } from "../../extensions/ollamaAIQuery";
 import { showAIRephrasePopup } from "../../extensions/aiRephrase";
 import { showRenamePopup } from "../../extensions/renameImage";
+import { renumberHeadings } from "../../extensions/numHeaders";
 
 
 const menu = document.createElement("div");
@@ -22,6 +23,7 @@ menu.innerHTML = `
     <button id="ai_rephrase_settings" title="Settings" style="flex: 1;background: none;border: none;">⚙️</button>
   </div>
   <div class="item" id="ask_ollama">🤖 Ask Ollama</div>
+  <div class="item" id="autonumber_headers">Autonumber headers</div>
 `;
 document.body.appendChild(menu);
 
@@ -253,6 +255,15 @@ document.getElementById("ai_rephrase_settings").addEventListener("click", () => 
   if (!view) return alert("Editor not ready");
 
   showAIRephrasePopup(view, { type: "settings" });
+});
+
+
+// AI Rephrase settings action
+document.getElementById("autonumber_headers").addEventListener("click", () => {
+  const view = mystEditorInstance?.editorView;
+  if (!view) return alert("Editor not ready");
+  renumberHeadings(view);
+  // triggerHeadingRenumber(view);
 });
 
 

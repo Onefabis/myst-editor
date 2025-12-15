@@ -42,6 +42,7 @@ import { aiRephraseExtension } from "./aiRephrase";
 import { harperExtension } from "./harperExtension";
 import { renameExtension } from "./renameImage";
 import { mystExtension } from "./markChangedLines";
+// import { headingAutoNumberExtension } from "./numHeaders"
 
 
 const getRelativeCursorLocation = (view) => {
@@ -157,6 +158,11 @@ export class ExtensionBuilder {
     this.extensions.push(...renameExtension);
     return this;
   }
+
+  // useHeadingAutoNumber() {
+  //   this.extensions.push(...headingAutoNumberExtension);
+  //   return this;
+  // }
 
   useMarkChangedLines(){
     this.extensions.push(mystExtension);

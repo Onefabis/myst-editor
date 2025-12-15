@@ -6,7 +6,7 @@
     <link rel="icon" href="data:," />  
     <link rel="icon" href="data:," />
     <script type="module" crossorigin src="./MainOverride.js"></script>
-    <script type="module" crossorigin src="./MystEditor-LcaGzXO1.js"></script>
+    <script type="module" crossorigin src="./MystEditor-BhAQBkHK.js"></script>
     <link rel="stylesheet" crossorigin href="./PFXStyleOverride.css">
     <link rel="stylesheet" crossorigin href="./MystEditor.css">
   </head>
@@ -147,6 +147,33 @@
                 <span>
                   No local changes! <br>Working directory <br>matches latest commit.
                 </span>
+              </div>
+              <div id="branch_edit">
+                <div id="branch_switch">
+                  <div id="branch_select_container">
+                    <select name="branch_list" id="branch_select">
+                      <option value="">Local only content</option>
+                    </select>
+                  </div>
+                  <div id="branch_select_approve">
+                    <button title="Set branch and checkout">Set</button>
+                  </div>
+                </div>
+                <div id="branch_create">
+                  <div id="create_branch_container">
+                    <input
+                      id="create_branch"
+                      type="text"
+                      class="create_branch_input"
+                      placeholder="Branch name"
+                    />
+                  </div>
+                  <div id="create_branch_button_container">
+                    <button id="create_branch_button" title="Create new branch">
+                      <span>Create</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

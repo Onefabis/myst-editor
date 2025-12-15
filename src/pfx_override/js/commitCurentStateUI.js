@@ -24,10 +24,12 @@ export async function runGitAction(action, confirmTitle, confirmMessage) {
       signal: abortController.signal,
     });
 
+    const contentType = res.headers.get("content-type") || "";
+
     let data;
-    try {
+    if (contentType.includes("application/json")) {
       data = await res.json();
-    } catch {
+    } else {
       const text = await res.text();
       progressModal.close();
       showModal("Network Error", text.slice(0, 400), { isError: true });
@@ -55,6 +57,17 @@ export async function runGitAction(action, confirmTitle, confirmMessage) {
         "Git Operation Failed",
         errors[data.error] || data.detail || data.error,
         { isError: true }
+      );
+      return;
+    }
+
+    // --- NO-OP: remote branch does not exist ---
+    if (data.status === "noop" && data.reason === "REMOTE_BRANCH_MISSING") {
+      progressModal.close();
+      showModal(
+        "Nothing to Refresh",
+        `No remote branch exists for '${data.branch}'.\n\nLocal branch was left unchanged.`,
+        { isError: false }
       );
       return;
     }

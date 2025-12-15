@@ -309,9 +309,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
 
   const gitCommitDiff = localStorage.getItem("gitLeftListToggle");
   const showLeftCommitList = useSignal(gitCommitDiff === null ? true : gitCommitDiff === "true");
-
   const firstRender = useRef(true);
-
   const activeBranch = useSignal("");
 
 
@@ -369,6 +367,8 @@ export const EditorTopbar = ({ alert, buttons }) => {
   );
 
   const textButtons = useMemo(() => buttons.filter((b) => b.text), [buttons]);
+
+  // Button list which visibility changed on Git Commit mode
   const targetButtonIds = ["revert", "save", "image", "clear_format", "h1_format", "h2_format", "b_format"];
 
   useEffect(() => {

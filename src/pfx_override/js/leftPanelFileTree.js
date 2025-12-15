@@ -6,6 +6,7 @@ import { useContext } from "preact/hooks";
 import { MystState } from "../../mystState";
 import { logFilePaths } from "../../extensions/gitCommitView";
 import { showModal, showConfirm, showInputModal } from "./modalWindows"
+import { initBranchSwitcher } from "./branchEditing.js";
 
 // ========================= CONSTANTS =========================
 
@@ -856,11 +857,7 @@ class TreeAPI {
 // ========================= MAIN FUNCTIONS =========================
 
 /**
- * Load and render the repository tree with working-tree diffs applied. Steps:
- *  - Get current HEAD commit, base tree, and working-tree diffs
- *  - Prepare diff map (filter out deleted entries to avoid showing deleted files)
- *  - Compute changed folders and render the tree in diff mode
- *  - Optionally load the currently selected file into the editor
+ * Load and render the current branch repository tree applied:
  */
 export async function fetchLocalTree(loadfile = true) {
   const commitHash = await TreeAPI.getHeadCommit();
@@ -879,6 +876,9 @@ export async function fetchLocalTree(loadfile = true) {
   const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
 
   TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
+  // Create context menu for every item in a tree
+  removeTreeContextMenu();
+  createTreeMenu();
 
   let currentPath = localStorage.getItem('currentPath');
 
@@ -911,6 +911,11 @@ export async function fetchLocalTree(loadfile = true) {
 
   if (currentPath) {
     restoreActiveFile(normalizePath(currentPath));
+  }
+  initBranchSwitcher();
+  const brangh_edit = document.getElementById("branch_edit");
+  if (brangh_edit){
+    brangh_edit.style.display = "flex"; 
   }
 }
 
@@ -970,6 +975,11 @@ export async function fetchGitTree(gitCommit) {
     const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
     
     TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
+    removeTreeContextMenu();
+  }
+  const brangh_edit = document.getElementById("branch_edit");
+  if (brangh_edit){
+    brangh_edit.style.display = "none"; 
   }
 }
 
@@ -989,6 +999,7 @@ export async function fetchGitCommitTree() {
   const diffs = Array.isArray(data?.diffs) ? data.diffs : [];
   const tree_div = document.getElementById("tree");
   const host = document.querySelector("#myst");
+
   if (!host?.shadowRoot) return;
 
   const shadow = host.shadowRoot;
@@ -1014,30 +1025,39 @@ export async function fetchGitCommitTree() {
   restoreActiveFile(normalizePath(currentPath));
 
   logFilePaths();
+  removeTreeContextMenu();
+  const brangh_edit = document.getElementById("branch_edit");
+  if (brangh_edit){
+    brangh_edit.style.display = "none"; 
+  }
 }
 
 
 // ========================= CUSTOM CONTEXT MENU =========================
 
-// Create the context menu container
-const contextMenu = document.createElement("div");
-contextMenu.id = "custom-tree-context-menu";
-Object.assign(contextMenu.style, {
-  position: "absolute",
-  background: "#fff",
-  border: "1px solid #ccc",
-  borderRadius: "9px",
-  padding: "4px 0",
-  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-  display: "none",
-  zIndex: 1000,
-  minWidth: "120px",
-  fontSize: "13px",
-});
-document.body.appendChild(contextMenu);
+function removeTreeContextMenu() {
+  const menu = document.getElementById("custom-tree-context-menu");
+  if (menu) menu.remove();
+}
+
+async function waitForButtons(selector) {
+  return new Promise(resolve => {
+    const check = () => {
+      const host = document.getElementById("myst");
+      const root = host?.shadowRoot;
+      if (!root) return requestAnimationFrame(check);
+
+      const buttons = root.querySelectorAll(selector);
+      if (buttons && buttons.length > 0) return resolve(buttons);
+
+      requestAnimationFrame(check);
+    };
+    check();
+  });
+}
 
 // Helper to make a styled menu item
-function createMenuItem(label) {
+function createMenuItem(label, contextMenu) {
   const item = document.createElement("div");
   item.textContent = label;
   Object.assign(item.style, {
@@ -1050,28 +1070,83 @@ function createMenuItem(label) {
   return item;
 }
 
-// Create menu items
-const renameOption = createMenuItem("Rename");
-const moveOption   = createMenuItem("Move");
-const deleteOption = createMenuItem("Delete");
-
 let contextTargetElement = null;
 
-// Show custom menu
-document.getElementById("tree").addEventListener("contextmenu", (e) => {
-  const targetSpan = e.target.closest("span.file, span.folder");
-  if (!targetSpan) return;
+// Context menu creation for every tree element
+async function createTreeMenu() {
+  let contextMenu = null;
+  const buttons = await waitForButtons('.side button[type="button"]');
+  const activeButton = Array.from(buttons).find(btn =>
+    btn.getAttribute('active') === 'true'
+  );
 
-  e.preventDefault();
-  contextTargetElement = targetSpan;
-  contextMenu.style.left = `${e.pageX}px`;
-  contextMenu.style.top = `${e.pageY}px`;
-  contextMenu.style.display = "block";
-});
+  if (activeButton &&
+     ["Dual Pane", "Preview", "Source", "Inline"].includes(activeButton.title)) {
 
-// Hide menu
-document.addEventListener("click", () => (contextMenu.style.display = "none"));
+    // Create menu only when allowed
+    contextMenu = document.createElement("div");
+    contextMenu.id = "custom-tree-context-menu";
+    Object.assign(contextMenu.style, {
+      position: "absolute",
+      background: "#fff",
+      border: "1px solid #ccc",
+      borderRadius: "9px",
+      padding: "4px 0",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+      display: "none",
+      zIndex: 1000,
+      minWidth: "120px",
+      fontSize: "13px",
+    });
 
+    document.body.appendChild(contextMenu);
+  }
+
+  const renameOption = createMenuItem("Rename", contextMenu);
+  const moveOption   = createMenuItem("Move", contextMenu);
+  const deleteOption = createMenuItem("Delete", contextMenu);
+
+  renameOption.onclick = async () => {
+    if (!contextTargetElement) return;
+    await performRename(getSelectedElement(contextTargetElement));
+    contextMenu.style.display = "none";
+  };
+
+  moveOption.onclick = async () => {
+    if (!contextTargetElement) return;
+    await performMove(getSelectedElement(contextTargetElement));
+    contextMenu.style.display = "none";
+  };
+
+  deleteOption.onclick = async () => {
+    if (!contextTargetElement) return;
+    await performDelete(getSelectedElement(contextTargetElement));
+    contextMenu.style.display = "none";
+  };
+
+  function getSelectedElement(el) {
+    return {
+      path: el.dataset.elementPath,
+      name: el.dataset.elementName,
+      type: el.dataset.elementType,
+    };
+  }
+
+  // Show custom menu
+  document.getElementById("tree").addEventListener("contextmenu", (e) => {
+    const targetSpan = e.target.closest("span.file, span.folder");
+    if (!targetSpan) return;
+
+    e.preventDefault();
+    contextTargetElement = targetSpan;
+    contextMenu.style.left = `${e.pageX}px`;
+    contextMenu.style.top = `${e.pageY}px`;
+    contextMenu.style.display = "block";
+  });
+
+  // Hide menu
+  document.addEventListener("click", () => (contextMenu.style.display = "none"));
+}
 
 // ----------------------- Move To Dialog ----------------------- //
 
@@ -1296,45 +1371,26 @@ async function performMove(selectedElement) {
   fetchLocalTree();
 }
 
-// ========================= MENU HANDLERS =========================
-
-renameOption.onclick = async () => {
-  if (!contextTargetElement) return;
-  const selectedElement = {
-    path: contextTargetElement.dataset.elementPath,
-    name: contextTargetElement.dataset.elementName,
-    type: contextTargetElement.dataset.elementType,
-  };
-  await performRename(selectedElement);
-  contextMenu.style.display = "none";
-};
-
-moveOption.onclick = async () => {
-  if (!contextTargetElement) return;
-  const selectedElement = {
-    path: contextTargetElement.dataset.elementPath,
-    name: contextTargetElement.dataset.elementName,
-    type: contextTargetElement.dataset.elementType,
-  };
-  await performMove(selectedElement);
-  contextMenu.style.display = "none";
-};
-
-deleteOption.onclick = async () => {
-  if (!contextTargetElement) return;
-  const selectedElement = {
-    path: contextTargetElement.dataset.elementPath,
-    name: contextTargetElement.dataset.elementName,
-    type: contextTargetElement.dataset.elementType,
-  };
-  await performDelete(selectedElement);
-  contextMenu.style.display = "none";
-};
-
 // ========================= EXPORTS =========================
 
 export const ignoredFolders = CONFIG.ignoredFolders;
 export let activeFolderPath = treeState.getActiveFolderPath();
 
-// Initialize
 fetchLocalTree(true);
+
+// Initialize
+// const viewModeButtonID = localStorage.getItem("mainButtonSelection") || '0';
+
+// if (viewModeButtonID === '4'){
+//   fetchLocalTree(false);
+//   fetchGitTree(localStorage.getItem("gitLeftListToggle"));
+//   console.log("Init git diff view");
+// } else if (viewModeButtonID === '5'){
+//   fetchLocalTree(false);
+//   fetchGitCommitTree();
+//   console.log("Init git commit view");
+// } else {
+//   fetchLocalTree(true);
+//   console.log("Init edit/preview view");
+// }
+

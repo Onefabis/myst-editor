@@ -389,6 +389,7 @@ const CodeMirror = () => {
         .useOllamaAIQuery()
         .useImageRename()
         .useAiRephrase()
+        // .useHeadingAutoNumber()
         .useMarkChangedLines()
         .useHarperGrammarChecker()
         .if(options.cmDarkTheme.value, (b) => b.useCmDarkTheme())

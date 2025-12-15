@@ -168,7 +168,7 @@ const hideBodyScrollIf = (val) => (document.documentElement.style.overflow = val
 
 const MystEditor = () => {
 
-  const { editorView, cache, options, collab, text, suggestMode } = useContext(MystState);
+  const { editorView, cache, options, collab, text, headings, suggestMode } = useContext(MystState);
 
   // Git panel elements style START
   // Initialize the signal with saved state

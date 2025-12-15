@@ -1,25 +1,29 @@
 """
-FastAPI Documentation Manager with Git Integration
+Starlette Documentation Manager with Git Integration
 A comprehensive documentation management system with version control
 """
 import os
 import re
 import tempfile
 import shutil
+import json
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from fastapi import FastAPI, File, Form, UploadFile, Request, Query
-from fastapi.exceptions import HTTPException
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+from starlette.requests import Request
+from starlette.responses import JSONResponse, FileResponse, Response
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException
+from starlette.datastructures import UploadFile
 from git import Repo, GitCommandError
 
 
-# ==================== CONFIGURATION ====================
+# ==================== CONFIGURATION START ==================== #
 
 class Config:
     """Application configuration"""
@@ -33,8 +37,10 @@ class Config:
 
 config = Config()
 
+# ==================== CONFIGURATION END ==================== #
 
-# ==================== RENAME IMAGE CONFIGS ===============
+
+# ==================== RENAME IMAGE CONFIGS START =============== #
 
 MD_EXT = ".md"
 MAX_WORKERS = 12
@@ -44,43 +50,10 @@ RE_MD = re.compile(r'(!?\[[^\]]*\]\()\s*([^\)\s]+)\s*(\))')
 RE_REF = re.compile(r'^(\s*\[[^\]]+\]:\s*)(\S+)\s*$', re.MULTILINE)
 RE_IMG = re.compile(r'(<img[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
 
-
-# ==================== PYDANTIC MODELS ====================
-
-class PathModel(BaseModel):
-    """Model for file/folder path operations"""
-    path: str
-    type: Optional[str] = Field(None, pattern="^(file|folder)$")
+# ==================== RENAME IMAGE CONFIGS END =============== #
 
 
-class RenameModel(BaseModel):
-    """Model for rename operations with collision handling"""
-    oldPath: str
-    newPath: str
-    action: str = Field("check", pattern="^(check|overwrite|increment)$")
-
-
-class FileRequest(BaseModel):
-    """Model for git file operations"""
-    filename: str
-
-
-class DiffRequest(BaseModel):
-    """Model for git diff comparison"""
-    filename: str
-    branch_left: str
-    commit_left: str
-    branch_right: str
-    commit_right: str
-
-
-class GitCommitRequest(BaseModel):
-    """Model for git commit operation"""
-    message: str = Field(default="(no message)")
-    files: List[str] = Field(default_factory=list)
-
-
-# ==================== PATH UTILITIES ====================
+# ==================== PATH UTILITIES START ==================== #
 
 class PathUtils:
     """Utilities for safe path handling"""
@@ -136,8 +109,10 @@ class PathUtils:
         
         return final_path
 
+# ==================== PATH UTILITIES END ==================== #
 
-# ==================== FILE UTILITIES ====================
+
+# ==================== FILE UTILITIES START ==================== #
 
 class FileUtils:
     """Utilities for file operations"""
@@ -214,8 +189,10 @@ class FileUtils:
         
         return entries
 
+# ==================== FILE UTILITIES END ==================== #
 
-# ==================== GIT UTILITIES ====================
+
+# ==================== GIT UTILITIES START ==================== #
 
 class GitUtils:
     """Utilities for git operations"""
@@ -301,135 +278,22 @@ class GitUtils:
         return {"status": "ok"}
 
 
-# ==================== FASTAPI APPLICATION ====================
-
-app = FastAPI(
-    title="Documentation Manager API",
-    description="API for managing documentation with git integration",
-    version="1.0.0"
-)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Initialize Git repository
 if not (config.REPO_DIR / ".git").exists():
     raise FileNotFoundError(f"Git repository not found in {config.REPO_DIR}")
 
-repo = Repo(config.REPO_DIR)
+# Always resolve as absolute path to .git directory
+git_root = Path(config.REPO_DIR).resolve()
+
+# This ensures repo is ALWAYS the project/.git dir
+repo = Repo(git_root)
+
 git_utils = GitUtils(repo)
 
-
-# ==================== FILE MANAGEMENT ROUTES ====================
-
-@app.get("/api/tree")
-async def get_file_tree():
-    """Get recursive tree of all markdown files"""
-    return FileUtils.scan_directory(config.BASE_DIR, config.BASE_DIR, [config.MARKDOWN_EXT])
+# ==================== GIT UTILITIES END ==================== #
 
 
-@app.get("/api/file")
-async def get_file(path: str):
-    """Get file content and metadata"""
-    try:
-        full_path = PathUtils.safe_join(config.BASE_DIR, path)
-        
-        if not full_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        with open(full_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        
-        mtime = full_path.stat().st_mtime
-        
-        return {
-            "content": content,
-            "last_modified": int(mtime * 1000)
-        }
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.get("/api/file/meta")
-async def get_file_meta(path: str):
-    """Get file modification timestamp"""
-    try:
-        full_path = PathUtils.safe_join(config.BASE_DIR, path)
-        
-        if not full_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        mtime = full_path.stat().st_mtime
-        return {"last_modified": int(mtime * 1000)}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post("/api/file")
-async def save_file(path: str, request: Request):
-    """Save content to file"""
-    try:
-        full_path = PathUtils.safe_join(config.BASE_DIR, path)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    data = await request.json()
-    content = data.get("content", "")
-    
-    full_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    with open(full_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    
-    mtime = full_path.stat().st_mtime
-    
-    return {
-        "status": "saved",
-        "last_modified": int(mtime * 1000)
-    }
-
-
-@app.post("/api/create")
-async def create_file_or_folder(data: PathModel):
-    """Create new file or folder"""
-    try:
-        full_path = PathUtils.safe_join(config.BASE_DIR, data.path)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    if data.type == "folder":
-        full_path.mkdir(parents=True, exist_ok=True)
-    elif data.type == "file":
-        full_path.parent.mkdir(parents=True, exist_ok=True)
-        full_path.touch()
-    
-    return {"status": "created", "path": data.path}
-
-
-@app.post("/api/delete")
-async def delete_path(data: PathModel):
-    """Delete file or folder"""
-    try:
-        full_path = PathUtils.safe_join(config.BASE_DIR, data.path)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    if not full_path.exists():
-        raise HTTPException(status_code=404, detail="Path does not exist")
-    
-    if full_path.is_file():
-        full_path.unlink()
-    else:
-        shutil.rmtree(full_path)
-    
-    return {"status": "deleted", "path": data.path}
-
+# ==================== MARKDOWN REFERENCE UPDATER START ==================== #
 
 def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
     """Scan repo_root and replace old_rel → new_rel in all .md files."""
@@ -506,79 +370,216 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
         "updated_references": changed,
     }
 
+# ==================== MARKDOWN REFERENCE UPDATER END ==================== #
 
-@app.post("/api/rename")
-async def rename_path(data: RenameModel):
-    """Rename file or folder with collision handling"""
+
+# ==================== ROUTE HANDLERS START ==================== #
+
+async def get_file_tree(request: Request):
+    """Get recursive tree of all markdown files"""
+    return JSONResponse(
+        FileUtils.scan_directory(config.BASE_DIR, config.BASE_DIR, [config.MARKDOWN_EXT])
+    )
+
+
+async def get_file(request: Request):
+    """Get file content and metadata"""
+    path = request.query_params.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="Missing path parameter")
+    
     try:
-        old_path = PathUtils.safe_join(config.BASE_DIR, data.oldPath.lstrip("/"))
-        new_path = PathUtils.safe_join(config.BASE_DIR, data.newPath.lstrip("/"))
+        full_path = PathUtils.safe_join(config.BASE_DIR, path)
         
-        if data.action == "check":
-            if new_path.exists():
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        with open(full_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        mtime = full_path.stat().st_mtime
+        
+        return JSONResponse({
+            "content": content,
+            "last_modified": int(mtime * 1000)
+        })
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+async def get_file_meta(request: Request):
+    """Get file modification timestamp"""
+    path = request.query_params.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="Missing path parameter")
+    
+    try:
+        full_path = PathUtils.safe_join(config.BASE_DIR, path)
+        
+        if not full_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        mtime = full_path.stat().st_mtime
+        return JSONResponse({"last_modified": int(mtime * 1000)})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+async def save_file(request: Request):
+    """Save content to file"""
+    path = request.query_params.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="Missing path parameter")
+    
+    try:
+        full_path = PathUtils.safe_join(config.BASE_DIR, path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    data = await request.json()
+    content = data.get("content", "")
+    
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(full_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    
+    mtime = full_path.stat().st_mtime
+    
+    return JSONResponse({
+        "status": "saved",
+        "last_modified": int(mtime * 1000)
+    })
+
+
+async def create_file_or_folder(request: Request):
+    """Create new file or folder"""
+    data = await request.json()
+    path = data.get("path")
+    type_ = data.get("type")
+    
+    if not path:
+        raise HTTPException(status_code=400, detail="Missing path")
+    
+    try:
+        full_path = PathUtils.safe_join(config.BASE_DIR, path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    if type_ == "folder":
+        full_path.mkdir(parents=True, exist_ok=True)
+    elif type_ == "file":
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.touch()
+    
+    return JSONResponse({"status": "created", "path": path})
+
+
+async def delete_path(request: Request):
+    """Delete file or folder"""
+    data = await request.json()
+    path = data.get("path")
+    
+    if not path:
+        raise HTTPException(status_code=400, detail="Missing path")
+    
+    try:
+        full_path = PathUtils.safe_join(config.BASE_DIR, path)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail="Path does not exist")
+    
+    if full_path.is_file():
+        full_path.unlink()
+    else:
+        shutil.rmtree(full_path)
+    
+    return JSONResponse({"status": "deleted", "path": path})
+
+
+async def rename_path(request: Request):
+    """Rename file or folder with collision handling"""
+    data = await request.json()
+    old_path = data.get("oldPath")
+    new_path = data.get("newPath")
+    action = data.get("action", "check")
+    
+    if not old_path or not new_path:
+        raise HTTPException(status_code=400, detail="Missing oldPath or newPath")
+    
+    try:
+        old_full = PathUtils.safe_join(config.BASE_DIR, old_path.lstrip("/"))
+        new_full = PathUtils.safe_join(config.BASE_DIR, new_path.lstrip("/"))
+        
+        if action == "check":
+            if new_full.exists():
                 return JSONResponse({"collision": True}, status_code=409)
         
-        elif data.action == "overwrite":
-            if old_path.resolve() == new_path.resolve():
-                return {"status": "no_change", "newPath": data.newPath}
+        elif action == "overwrite":
+            if old_full.resolve() == new_full.resolve():
+                return JSONResponse({"status": "no_change", "newPath": new_path})
             
-            if new_path.exists():
-                new_path.unlink()
+            if new_full.exists():
+                new_full.unlink()
         
-        elif data.action == "increment":
-            new_name = FileUtils.increment_filename(new_path.parent, new_path.name)
-            new_path = new_path.parent / new_name
+        elif action == "increment":
+            new_name = FileUtils.increment_filename(new_full.parent, new_full.name)
+            new_full = new_full.parent / new_name
         
-        new_path.parent.mkdir(parents=True, exist_ok=True)
-        old_path.rename(new_path)
+        new_full.parent.mkdir(parents=True, exist_ok=True)
+        old_full.rename(new_full)
 
         update_md_refs(
             repo_root=Path(config.REPO_DIR),
-            old_rel=old_path.relative_to(config.BASE_DIR).as_posix(),
-            new_rel=new_path.relative_to(config.BASE_DIR).as_posix()
+            old_rel=old_full.relative_to(config.BASE_DIR).as_posix(),
+            new_rel=new_full.relative_to(config.BASE_DIR).as_posix()
         )
                 
-        rel_path = new_path.relative_to(config.BASE_DIR).as_posix()
-        return {"status": "saved", "newPath": rel_path}
+        rel_path = new_full.relative_to(config.BASE_DIR).as_posix()
+        return JSONResponse({"status": "saved", "newPath": rel_path})
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== IMAGE MANAGEMENT ROUTES ====================
-
-
-@app.get("/api/images_in_folder")
-async def images_in_folder(folder: str = ""):
+async def images_in_folder(request: Request):
     """List images in specific folder for the project image picker"""
+    folder = request.query_params.get("folder", "")
+    
     try:
         folder = PathUtils.normalize_relative_path(folder)
     except ValueError:
-        return []
+        return JSONResponse([])
     
     static_dir = config.BASE_DIR / "_static"
     folder_path = static_dir / folder
     
     if not folder_path.is_dir():
-        return []
+        return JSONResponse([])
     
-    return FileUtils.scan_directory(folder_path, static_dir, list(config.ALLOWED_IMAGE_EXTS))
+    return JSONResponse(
+        FileUtils.scan_directory(folder_path, static_dir, list(config.ALLOWED_IMAGE_EXTS))
+    )
 
 
-@app.get("/api/image_tree")
-async def get_image_tree():
+async def get_image_tree(request: Request):
     """Get tree of all images in _static folder for the project image picker"""
     static_root = config.BASE_DIR / "_static"
-    return FileUtils.scan_directory(static_root, static_root)
+    return JSONResponse(FileUtils.scan_directory(static_root, static_root))
 
 
-@app.post("/api/upload_image")
-async def upload_image(
-    file: UploadFile = File(...),
-    path: str = Form(...),
-    action: str = Form("check")
-):
+async def upload_image(request: Request):
     """Upload image from outside of the project with collision handling"""
+    form = await request.form()
+    file = form.get("file")
+    path = form.get("path", "")
+    action = form.get("action", "check")
+    
+    if not isinstance(file, UploadFile):
+        raise HTTPException(status_code=400, detail="No file provided")
+    
     filename = FileUtils.sanitize_filename(file.filename)
     
     try:
@@ -598,30 +599,35 @@ async def upload_image(
         full_path.parent.mkdir(parents=True, exist_ok=True)
         
         with open(full_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+            content = await file.read()
+            f.write(content)
         
         rel_path = full_path.relative_to(config.BASE_DIR).as_posix()
-        return {"status": "saved", "newPath": rel_path}
+        return JSONResponse({"status": "saved", "newPath": rel_path})
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# ==================== ROUTE HANDLERS END ==================== #
 
-# ==================== GIT OPERATION ROUTES ====================
 
-@app.post("/search-file")
-async def search_file(req: FileRequest):
+# ==================== GIT SECTION START ==================== #
+
+async def search_file(request: Request):
     """Get git history for file"""
-    target_file = f"{config.DOCS_DIR}/{req.filename.replace('\\', '/')}" if req.filename else None
+    data = await request.json()
+    filename = data.get("filename", "")
+    
+    target_file = f"{config.DOCS_DIR}/{filename.replace('\\', '/')}" if filename else None
     
     try:
         if not repo.branches:
-            return {
+            return JSONResponse({
                 "branches": [],
                 "commits": {},
                 "active_branch": None,
                 "head_commit": None,
-            }
+            })
         
         branches = []
         commits = {}
@@ -657,40 +663,49 @@ async def search_file(req: FileRequest):
         is_detached, active_branch = git_utils.check_head_status()
         head_commit = repo.head.commit.hexsha if repo.head.commit else None
         
-        return {
+        return JSONResponse({
             "branches": sorted(set(branches)),
             "commits": commits,
             "active_branch": active_branch,
             "head_commit": head_commit,
-        }
+        })
     except Exception as e:
         print(f"Error in search_file: {e}")
-        return {
+        return JSONResponse({
             "branches": [],
             "commits": {},
             "active_branch": None,
             "head_commit": None,
-        }
+        })
 
 
-@app.post("/get-file-from-git")
-async def get_file_from_git(req: DiffRequest):
+async def get_file_from_git(request: Request):
     """Get file content from two commits for diff"""
-    left_content = git_utils.get_file_content(req.commit_left, req.filename)
-    right_content = git_utils.get_file_content(req.commit_right, req.filename)
+    data = await request.json()
+    filename = data.get("filename")
+    commit_left = data.get("commit_left")
+    commit_right = data.get("commit_right")
     
-    return {
+    if not all([filename, commit_left, commit_right]):
+        raise HTTPException(status_code=400, detail="Missing required parameters")
+    
+    left_content = git_utils.get_file_content(commit_left, filename)
+    right_content = git_utils.get_file_content(commit_right, filename)
+    
+    return JSONResponse({
         "left_content": left_content,
         "right_content": right_content,
-    }
+    })
 
 
-@app.get("/api/git-diff-tree")
-async def git_diff_tree(
-    commit_left: str = Query(...),
-    commit_right: str = Query(...)
-):
+async def git_diff_tree(request: Request):
     """Get diff between two commits"""
+    commit_left = request.query_params.get("commit_left")
+    commit_right = request.query_params.get("commit_right")
+    
+    if not commit_left or not commit_right:
+        raise HTTPException(status_code=400, detail="Missing commit parameters")
+    
     commit_left_obj = repo.commit(commit_left)
     commit_right_obj = repo.commit(commit_right)
     
@@ -712,26 +727,29 @@ async def git_diff_tree(
             "status": status,
         })
     
-    return result
+    return JSONResponse(result)
 
 
-@app.get("/api/git-head")
-async def git_head():
+async def git_head(request: Request):
     """Get current HEAD commit and active branch"""
     try:
         is_detached, active_branch = git_utils.check_head_status()
         
-        return {
+        return JSONResponse({
             "head": repo.head.commit.hexsha,
             "active_branch": active_branch
-        }
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/git-diff-working-tree")
-async def git_diff_working_tree(commit: str = Query(...)):
+async def git_diff_working_tree(request: Request):
     """Compare working tree against commit"""
+    commit = request.query_params.get("commit")
+    
+    if not commit:
+        raise HTTPException(status_code=400, detail="Missing commit parameter")
+    
     try:
         result = []
         
@@ -771,17 +789,19 @@ async def git_diff_working_tree(commit: str = Query(...)):
                     "status": "A"
                 })
         
-        return result
+        return JSONResponse(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/tree-union")
-async def get_tree_union(
-    commit_left: str = Query(...),
-    commit_right: str = Query(...)
-):
+async def get_tree_union(request: Request):
     """Get union of files from two commits"""
+    commit_left = request.query_params.get("commit_left")
+    commit_right = request.query_params.get("commit_right")
+    
+    if not commit_left or not commit_right:
+        raise HTTPException(status_code=400, detail="Missing commit parameters")
+    
     try:
         left_files = git_utils.get_md_files_from_commit(repo.commit(commit_left))
         right_files = git_utils.get_md_files_from_commit(repo.commit(commit_right))
@@ -802,13 +822,12 @@ async def get_tree_union(
                         result.append(node)
             return result
         
-        return filter_tree(local_tree)
+        return JSONResponse(filter_tree(local_tree))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/tree-local-diff")
-async def get_tree_local_diff():
+async def get_tree_local_diff(request: Request):
     """Get local changes compared to HEAD"""
     try:
         result = []
@@ -893,15 +912,18 @@ async def get_tree_local_diff():
                         })
             return filtered
         
-        return {"tree": filter_tree(local_tree), "diffs": result}
+        return JSONResponse({"tree": filter_tree(local_tree), "diffs": result})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/git-commit-all")
-async def git_commit_all(payload: GitCommitRequest):
+async def git_commit_all(request: Request):
     """Commit changes to git"""
     try:
+        data = await request.json()
+        message = data.get("message", "(no message)")
+        files = data.get("files", [])
+        
         is_detached, active_branch = git_utils.check_head_status()
         
         if is_detached:
@@ -919,27 +941,26 @@ async def git_commit_all(payload: GitCommitRequest):
             raise HTTPException(status_code=409, detail=remote_status["detail"])
         
         # Stage files
-        if payload.files:
-            for f in payload.files:
+        if files:
+            for f in files:
                 repo.git.add(os.path.join(config.DOCS_DIR, f))
         else:
             repo.git.add(all=True)
         
         # Commit
-        new_commit = repo.index.commit(payload.message)
+        new_commit = repo.index.commit(message)
         
-        return {
+        return JSONResponse({
             "status": "success",
             "commit": new_commit.hexsha,
             "summary": new_commit.summary,
             "active_branch": active_branch,
-        }
+        })
     except GitCommandError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/git-push")
-async def git_push():
+async def git_push(request: Request):
     """Push to remote repository"""
     try:
         is_detached, active_branch = git_utils.check_head_status()
@@ -961,97 +982,252 @@ async def git_push():
                     detail=f"Push rejected: {info.summary}"
                 )
         
-        return {
+        return JSONResponse({
             "status": "success",
             "push_result": push_summary,
             "commit": repo.head.commit.hexsha,
             "active_branch": active_branch
-        }
+        })
     except GitCommandError as e:
         error_msg = "Non-fast-forward" if "non-fast-forward" in str(e) else str(e)
         raise HTTPException(status_code=409, detail=error_msg)
 
 
-@app.post("/api/git-pull")
-async def git_pull():
-    """Pull from remote with rebase"""
+async def git_pull(request: Request):
+    """Pull from remote with rebase (only if remote branch exists)"""
     try:
         is_detached, active_branch = git_utils.check_head_status()
-        
+
         if is_detached:
             raise HTTPException(
                 status_code=400,
                 detail="Repository is in detached HEAD state. Check out a branch first."
             )
-        
+
+        # --- ALWAYS fetch first ---
+        repo.git.fetch("origin")
+
+        remote_branch = f"origin/{active_branch}"
+
+        # --- Check if matching remote branch exists ---
+        remote_refs = {ref.name for ref in repo.refs}
+        if remote_branch not in remote_refs:
+            return JSONResponse(
+                {
+                    "status": "noop",
+                    "reason": "REMOTE_BRANCH_MISSING",
+                    "branch": active_branch,
+                },
+                status_code=200
+            )
+
+        # --- Original pull logic ---
         try:
             repo.git.pull("--rebase", "origin", active_branch)
+
         except GitCommandError as e:
             if "CONFLICT" in str(e) or "rebase" in str(e):
                 # Abort rebase if in progress
-                rebase_dirs = ["rebase-apply", "rebase-merge"]
                 git_dir = Path(repo.git_dir)
-                
-                if any((git_dir / d).exists() for d in rebase_dirs):
+                if any((git_dir / d).exists() for d in ("rebase-apply", "rebase-merge")):
                     try:
                         repo.git.rebase("--abort")
                     except Exception:
                         pass
-                
-                raise HTTPException(status_code=409, detail="Rebase conflict occurred")
+
+                raise HTTPException(
+                    status_code=409,
+                    detail="Rebase conflict occurred"
+                )
             raise
-        
-        return {
-            "status": "success",
-            "commit": repo.head.commit.hexsha,
-            "active_branch": active_branch,
-        }
+
+        return JSONResponse(
+            {
+                "status": "success",
+                "active_branch": active_branch,
+                "commit": repo.head.commit.hexsha,
+            }
+        )
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== STATIC FILE ROUTES ====================
+# async def git_hard_pull(request: Request):
+#     try:
+#         is_detached, active_branch = git_utils.check_head_status()
 
-@app.get("/_static/{subpath:path}")
-async def serve_static_files(subpath: str):
+#         if is_detached:
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail="Repository is in detached HEAD state"
+#             )
+
+#         # Always fetch first
+#         repo.git.fetch("origin")
+
+#         remote_branch = f"origin/{active_branch}"
+
+#         # Collect remote branches
+#         remote_refs = {ref.name for ref in repo.refs}
+
+#         if remote_branch not in remote_refs:
+#             # Remote branch does not exist — do NOT force reset
+#             return JSONResponse(
+#                 {
+#                     "status": "noop",
+#                     "reason": "REMOTE_BRANCH_MISSING",
+#                     "branch": active_branch,
+#                 },
+#                 status_code=200
+#             )
+
+#         # Force overwrite local branch
+#         repo.git.reset("--hard", remote_branch)
+
+#         # Optional cleanup
+#         repo.git.clean("-fd")
+
+#         return JSONResponse(
+#             {
+#                 "status": "success",
+#                 "forced": True,
+#                 "branch": active_branch,
+#                 "commit": repo.head.commit.hexsha,
+#             }
+#         )
+
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---- GET /api/git-status ----
+async def git_status(request: Request):
+    try:
+        DOCS = config.DOCS_DIR
+
+        # Modified / deleted / changed but unstaged (docs only)
+        tracked_changes = repo.git.diff("--name-only", DOCS)
+
+        # Staged changes (docs only)
+        staged_changes = repo.git.diff("--name-only", "--cached", DOCS)
+
+        # Untracked docs only
+        untracked = repo.git.ls_files("--others", "--exclude-standard", DOCS).splitlines()
+
+        has_changes = (
+            bool(tracked_changes.strip()) or
+            bool(staged_changes.strip()) or
+            len(untracked) > 0
+        )
+
+        return JSONResponse({"has_uncommitted_changes": has_changes})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ---- POST /api/git-checkout ----
+async def git_checkout(request: Request):
+    """
+    Body:
+        { "branch": "feature/x" }
+    """
+    try:
+        data = await request.json()
+        branch = data.get("branch")
+
+        if not branch:
+            return JSONResponse({"error": "Missing 'branch' field"}, status_code=400)
+
+        # Checkout
+        repo.git.checkout(branch)
+
+        # Always pull to ensure latest
+        try:
+            repo.git.pull("--rebase")
+        except Exception:
+            # Some repos don’t need pull, or branch not tracked
+            pass
+
+        return JSONResponse({"ok": True})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def git_create_branch(request: Request):
+    data = await request.json()
+    branch = data.get("branch", "").strip()
+
+    if not branch:
+        raise HTTPException(status_code=400, detail="Branch name required")
+
+    try:
+        if branch in [b.name for b in repo.branches]:
+            return JSONResponse({"error": f"Branch '{branch}' already exists"})
+
+        new_branch = repo.create_head(branch)
+        new_branch.checkout()
+
+        return JSONResponse({"success": True, "branch": branch})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+
+# ==================== GIT SECTION END ==================== #
+
+
+# ==================== STATIC SECTION START ==================== #
+
+async def serve_static_files(request: Request):
     """Serve static files from _static directory"""
+    subpath = request.path_params["subpath"]
+    
     try:
         full_path = PathUtils.safe_join(config.BASE_DIR / "_static", subpath)
         
         if not full_path.is_file():
             raise HTTPException(status_code=404, detail="File not found")
         
-        headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
-        return FileResponse(full_path, headers=headers)
+        return FileResponse(full_path, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     except ValueError:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
-@app.get("/dictionaries/{path:path}")
-async def send_dictionaries(path: str):
+async def send_dictionaries(request: Request):
     """Serve dictionary files from frontend build"""
+    path = request.path_params["path"]
     return FileResponse(config.STATIC_FOLDER / "dictionaries" / path)
 
 
-@app.get("/templates/{path:path}")
-async def get_templates(path: str):
+async def get_templates(request: Request):
     """Serve template files from frontend build"""
+    path = request.path_params["path"]
     return FileResponse(config.STATIC_FOLDER / "templates" / path)
 
 
-@app.get("/linkedtemplatelist.json")
-async def serve_linked_template_list():
+async def serve_linked_template_list(request: Request):
     """Serve linked template list JSON"""
     return FileResponse(config.STATIC_FOLDER / "linkedtemplatelist.json")
 
 
-@app.post("/save")
-async def save_uploaded_file(file: UploadFile = File(...), filename: str = ""):
+async def save_uploaded_file(request: Request):
     """Save uploaded file to disk"""
+    form = await request.form()
+    file = form.get("file")
+    filename = form.get("filename", "")
+    
     if not filename:
         raise HTTPException(status_code=400, detail="Missing filename")
+    
+    if not isinstance(file, UploadFile):
+        raise HTTPException(status_code=400, detail="No file provided")
     
     try:
         save_path = PathUtils.safe_join(config.BASE_DIR, filename)
@@ -1060,14 +1236,76 @@ async def save_uploaded_file(file: UploadFile = File(...), filename: str = ""):
     
     save_path.parent.mkdir(parents=True, exist_ok=True)
     
+    content = await file.read()
     with open(save_path, "wb") as f:
-        f.write(await file.read())
+        f.write(content)
     
-    return {"success": True, "path": str(save_path)}
+    return JSONResponse({"success": True, "path": str(save_path)})
 
 
-# Mount frontend static files
-app.mount("/", StaticFiles(directory=str(config.STATIC_FOLDER), html=True), name="frontend")
+# ==================== STATIC SECTION END ==================== #
+
+
+# ==================== APPLICATION SETUP ====================
+
+
+routes = [
+    # File management routes
+    Route("/api/tree", get_file_tree, methods=["GET"]),
+    Route("/api/file", get_file, methods=["GET"]),
+    Route("/api/file/meta", get_file_meta, methods=["GET"]),
+    Route("/api/file", save_file, methods=["POST"]),
+    Route("/api/create", create_file_or_folder, methods=["POST"]),
+    Route("/api/delete", delete_path, methods=["POST"]),
+    Route("/api/rename", rename_path, methods=["POST"]),
+    
+    # Image management routes
+    Route("/api/images_in_folder", images_in_folder, methods=["GET"]),
+    Route("/api/image_tree", get_image_tree, methods=["GET"]),
+    Route("/api/upload_image", upload_image, methods=["POST"]),
+    
+    # Git operation routes
+    Route("/search-file", search_file, methods=["POST"]),
+    Route("/get-file-from-git", get_file_from_git, methods=["POST"]),
+    Route("/api/git-diff-tree", git_diff_tree, methods=["GET"]),
+    Route("/api/git-head", git_head, methods=["GET"]),
+    Route("/api/git-diff-working-tree", git_diff_working_tree, methods=["GET"]),
+    Route("/api/tree-union", get_tree_union, methods=["GET"]),
+    Route("/api/tree-local-diff", get_tree_local_diff, methods=["GET"]),
+    Route("/api/git-commit-all", git_commit_all, methods=["POST"]),
+    Route("/api/git-push", git_push, methods=["POST"]),
+    Route("/api/git-pull", git_pull, methods=["POST"]),
+    # Route("/api/git-hard-pull", git_hard_pull, methods=["POST"]),
+    Route("/api/git-status", git_status, methods=["GET"]),
+    Route("/api/git-checkout", git_checkout, methods=["POST"]),
+    Route("/api/git-create-branch", git_create_branch, methods=["POST"]),
+    
+    # Static file routes
+    Route("/_static/{subpath:path}", serve_static_files, methods=["GET"]),
+    Route("/dictionaries/{path:path}", send_dictionaries, methods=["GET"]),
+    Route("/templates/{path:path}", get_templates, methods=["GET"]),
+    Route("/linkedtemplatelist.json", serve_linked_template_list, methods=["GET"]),
+    Route("/save", save_uploaded_file, methods=["POST"]),
+    
+    # Frontend static files (must be last)
+    Mount("/", StaticFiles(directory=str(config.STATIC_FOLDER), html=True), name="frontend"),
+]
+
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Configure for production
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+]
+
+app = Starlette(
+    debug=True,
+    routes=routes,
+    middleware=middleware,
+)
 
 
 # ==================== APPLICATION ENTRY POINT ====================

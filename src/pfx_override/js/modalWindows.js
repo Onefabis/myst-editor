@@ -1,25 +1,3 @@
-// ========================= Helper: attachModalKeyHandlers =========================
-function attachModalKeyHandlers({ okButton = null, cancelButton = null, onClose = null }) {
-  const handleKey = (e) => {
-    if (e.key === "Enter" && okButton) {
-      e.preventDefault();
-      okButton.click();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      if (cancelButton) {
-        cancelButton.click();
-      } else if (onClose) {
-        onClose();
-      }
-    }
-  };
-
-  document.addEventListener("keydown", handleKey);
-
-  // Return cleanup so modal can remove listener when closing
-  return () => document.removeEventListener("keydown", handleKey);
-}
-
 // ========================= showModal =========================
 export function showModal(title, message, { isError = false, onClose = null } = {}) {
   const existing = document.getElementById("git-modal");
@@ -42,17 +20,10 @@ export function showModal(title, message, { isError = false, onClose = null } = 
   modal.appendChild(content);
   document.body.appendChild(modal);
 
-  const okBtn = document.getElementById("modal-ok");
-
-  const closeModal = () => {
+  document.getElementById("modal-ok").onclick = () => {
     modal.remove();
-    cleanup();
     if (onClose) onClose();
   };
-
-  const cleanup = attachModalKeyHandlers({ okButton: okBtn, onClose: closeModal });
-
-  okBtn.onclick = closeModal;
 }
 
 // ========================= showConfirm =========================
@@ -79,26 +50,12 @@ export function showConfirm(title, message) {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    const cancelBtn = document.getElementById("confirm-cancel");
-    const okBtn = document.getElementById("confirm-ok");
-
-    const cleanup = attachModalKeyHandlers({
-      okButton: okBtn,
-      cancelButton: cancelBtn,
-    });
-
-    const close = () => {
+    document.getElementById("confirm-cancel").onclick = () => {
       modal.remove();
-      cleanup();
-    };
-
-    cancelBtn.onclick = () => {
-      close();
       resolve(false);
     };
-
-    okBtn.onclick = () => {
-      close();
+    document.getElementById("confirm-ok").onclick = () => {
+      modal.remove();
       resolve(true);
     };
   });
@@ -129,30 +86,13 @@ export function showInputModal(title, message, defaultValue = "") {
     modal.appendChild(content);
     document.body.appendChild(modal);
 
-    const input = document.getElementById("rename-input");
-    const cancelBtn = document.getElementById("rename-cancel");
-    const okBtn = document.getElementById("rename-ok");
-
-    input.focus();
-
-    const cleanup = attachModalKeyHandlers({
-      okButton: okBtn,
-      cancelButton: cancelBtn,
-    });
-
-    const close = () => {
+    document.getElementById("rename-cancel").onclick = () => {
       modal.remove();
-      cleanup();
-    };
-
-    cancelBtn.onclick = () => {
-      close();
       resolve(null);
     };
-
-    okBtn.onclick = () => {
-      const value = input.value.trim();
-      close();
+    document.getElementById("rename-ok").onclick = () => {
+      const value = document.getElementById("rename-input").value.trim();
+      modal.remove();
       resolve(value);
     };
   });
@@ -165,7 +105,7 @@ export function showProgressModal(title, { onStop = null } = {}) {
 
   const modal = document.createElement("div");
   modal.id = "git-modal";
-  modal.className = "tree-modal-overlay";
+  modal.className = "modal-overlay";
 
   const content = document.createElement("div");
   content.className = "tree-modal-content";
@@ -180,21 +120,9 @@ export function showProgressModal(title, { onStop = null } = {}) {
   modal.appendChild(content);
   document.body.appendChild(modal);
 
-  const stopBtn = document.getElementById("stop-action");
-
-  const close = () => {
-    cleanup();
-    modal.remove();
-  };
-
-  const cleanup = attachModalKeyHandlers({
-    okButton: stopBtn, // Enter or Esc both trigger Stop
-    cancelButton: stopBtn,
-  });
-
-  stopBtn.onclick = () => {
+  document.getElementById("stop-action").onclick = () => {
     if (onStop) onStop();
-    close();
+    modal.remove();
   };
 
   return {
@@ -202,6 +130,6 @@ export function showProgressModal(title, { onStop = null } = {}) {
       const el = document.getElementById("progress-msg");
       if (el) el.textContent = msg;
     },
-    close,
+    close: () => modal.remove(),
   };
 }

@@ -17,6 +17,10 @@ body {
   box-sizing: border-box;
 }
 
+#tree {
+  height: 100%;
+}
+
 #tree_container {
   overflow-x: auto;
   white-space: nowrap;
@@ -1374,16 +1378,18 @@ aside.danger>header::before {
 }
 
 
-.cm-insertedLine .cm-changedText {
-  background: linear-gradient(rgba(34, 187, 34, 0.667), rgba(34, 187, 34, 0.667)) center bottom / 100% 2px no-repeat var(--inserted-bg) !important;
+.myst-main-editor .cm-changedText, .cm-insertedLine .cm-changedText {
+  background: rgb(39 255 0 / 12%) !important;
+  text-decoration-color: #22bb22 !important;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
 }
 
 .cm-deletedLine .cm-changedText {
-  background: linear-gradient(rgba(238, 68, 51, 0.4), rgba(238, 68, 51, 0.4)) center bottom / 100% 2px no-repeat var(--deleted-bg) !important;
-}
-
-.myst-main-editor .cm-changedText {
-  background: var(--inserted-bg) !important;
+  background: rgb(255 73 0 / 12%) !important;
+  text-decoration-color: #ee4433 !important;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
 }
 
 .cm-merge-b .cm-changedLine, .cm-merge-b .cm-changedLine ins {
@@ -1412,7 +1418,7 @@ aside.danger>header::before {
 .cm-line .cm-insertedLine ::selection, 
 .cm-line .cm-deletedLine::selection,
 .cm-line .cm-deletedLine ::selection {
-  background: transparent !important;
+  /*background: transparent !important;*/
   /*background-color: rgb(204, 216, 239) !important;*/
 }
 
@@ -1646,6 +1652,48 @@ aside.danger>header::before {
   cursor: pointer;
 }
 
+#branch_switch, #branch_create{
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+#branch_select_container, #branch_select, #create_branch_container, #create_branch {
+  width: 100%;
+  outline: none;
+  box-shadow: none;
+}
+
+#branch_select {
+  border: solid rgb(157 157 157);
+  border-width: 1px 0px 1px 1px;
+  border-radius: 5px 0px 0px 5px;
+  height: 21px;
+}
+
+#branch_select_approve button, #create_branch_button_container button {
+  border: solid rgb(169 169 169);
+  border-width: 1px 1px 1px 0px;
+  border-radius: 0px 5px 5px 0px;
+  height: 21px;
+  width: 56px;
+}
+
+#branch_edit {
+  display: flex;
+  padding: 10px;
+  gap: 5px;
+  flex-direction: column;
+}
+
+#create_branch {
+  border: solid rgb(157 157 157);
+  border-width: 1px 0px 1px 1px;
+  height: 19px;
+  border-radius: 5px 0px 0px 5px;
+  width: 100%;
+  padding: 0 0 0 3px;
+}
+
 /* ------------------- Image Picker Window END ----------------------------- */
 
 /* ---------------- Commit current state UI elements START ----------------- */
@@ -1807,7 +1855,7 @@ aside.danger>header::before {
 
 /* Input field */
 .tree-modal-content input {
-  width: 100%;
+  width: 95%;
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 8px;

@@ -35,7 +35,7 @@ export const trackHeadings = (headings) =>
     },
   });
 
-function getHeadingsFlat(/** @type {EditorState} */ state) {
+export function getHeadingsFlat(/** @type {EditorState} */ state) {
   const headingsFlat = [];
   const maxParseTimeMs = 10_000;
   ensureSyntaxTree(state, state.doc.length, maxParseTimeMs).iterate({
