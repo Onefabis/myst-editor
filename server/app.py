@@ -1055,56 +1055,6 @@ async def git_pull(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# async def git_hard_pull(request: Request):
-#     try:
-#         is_detached, active_branch = git_utils.check_head_status()
-
-#         if is_detached:
-#             raise HTTPException(
-#                 status_code=400,
-#                 detail="Repository is in detached HEAD state"
-#             )
-
-#         # Always fetch first
-#         repo.git.fetch("origin")
-
-#         remote_branch = f"origin/{active_branch}"
-
-#         # Collect remote branches
-#         remote_refs = {ref.name for ref in repo.refs}
-
-#         if remote_branch not in remote_refs:
-#             # Remote branch does not exist — do NOT force reset
-#             return JSONResponse(
-#                 {
-#                     "status": "noop",
-#                     "reason": "REMOTE_BRANCH_MISSING",
-#                     "branch": active_branch,
-#                 },
-#                 status_code=200
-#             )
-
-#         # Force overwrite local branch
-#         repo.git.reset("--hard", remote_branch)
-
-#         # Optional cleanup
-#         repo.git.clean("-fd")
-
-#         return JSONResponse(
-#             {
-#                 "status": "success",
-#                 "forced": True,
-#                 "branch": active_branch,
-#                 "commit": repo.head.commit.hexsha,
-#             }
-#         )
-
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-
 # ---- GET /api/git-status ----
 async def git_status(request: Request):
     try:
@@ -1275,7 +1225,6 @@ routes = [
     Route("/api/git-commit-all", git_commit_all, methods=["POST"]),
     Route("/api/git-push", git_push, methods=["POST"]),
     Route("/api/git-pull", git_pull, methods=["POST"]),
-    # Route("/api/git-hard-pull", git_hard_pull, methods=["POST"]),
     Route("/api/git-status", git_status, methods=["GET"]),
     Route("/api/git-checkout", git_checkout, methods=["POST"]),
     Route("/api/git-create-branch", git_create_branch, methods=["POST"]),

@@ -6,7 +6,7 @@
     <link rel="icon" href="data:," />  
     <script type="module" src="/pfx_override/js/MainOverride.js"></script>
     <script type="module" crossorigin src="./MystEditor.jsx"></script>
-    <link rel="stylesheet" crossorigin href="/styles/MystEditor.css">
+    <link rel="stylesheet" crossorigin href="/styles/MystEditor.css"> <!-- TODO: Fix css compile in vite with only one css link-->
     <link rel="stylesheet" href="/styles/MystEditor.css" />
     <link rel="icon" href="data:," />
   </head>
@@ -141,7 +141,7 @@
               </div>
             </div>
             <div id="tree_container">
-              <div id="tree">
+              <div id="tree"> <!-- FILE TREE PLACEMENT -->
               </div>
               <div id="commit-no-changes-message">
                 <span>
@@ -183,7 +183,7 @@
           </div>
         </div>
         <div id="editor-panel" class="printable">
-          <div id="myst"></div>
+          <div id="myst"></div> <!-- MYST EDITOR PLACEMENT -->
         </div>
       </div>
       <div class="commit_view_buttons">
