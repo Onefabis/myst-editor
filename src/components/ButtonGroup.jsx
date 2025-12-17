@@ -66,9 +66,9 @@ const ButtonGroup = ({ buttons, clickedId, mainButtonsNum = buttons.value.length
     const savedIndex = localStorage.getItem("mainButtonSelection");
     if (savedIndex !== null && !isNaN(savedIndex)) {
       selectedIndex.value = Number(savedIndex);
-      buttons.value[Number(savedIndex)]?.action();
+      // buttons.value[Number(savedIndex)]?.action();
     } else {
-      buttons.value[clickedId]?.action();
+      // buttons.value[clickedId]?.action();
     }
   }, []);
 

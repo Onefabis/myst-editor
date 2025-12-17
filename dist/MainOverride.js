@@ -1,5 +1,4 @@
-/* empty css                          */
-import { s as y, M as g, d as w, a as S, o as b, c as x, b as I, e as B, f as C, w as E, g as F, p as W, h as T, r as P, i as m, j as n } from "./MystEditor-BhAQBkHK.js";
+import { s as y, M as g, d as w, a as S, o as b, c as x, b as I, e as B, f as C, w as E, g as F, p as W, h as T, r as P, i as m, j as n } from "./MystEditor-BD9pC6ei.js";
 let t = null;
 document.getElementById("editor-panel");
 const a = document.getElementById("sidebar"), _ = document.getElementById("resizer"), u = localStorage.getItem("sidebarWidth");
@@ -17,7 +16,7 @@ _.onmousedown = function(o) {
 function H(o) {
   return o.replace(/\\/g, "/");
 }
-async function O(o) {
+async function L(o) {
   const i = await fetch(`/api/file?path=${encodeURIComponent(H(o))}`);
   if (i.status === 404) {
     console.warn("Last opened file not found."), localStorage.removeItem("lastOpened");
@@ -93,7 +92,7 @@ async function O(o) {
   }), localStorage.setItem("lastOpened", o);
 }
 export {
-  O as loadFile,
+  L as loadFile,
   t as mystEditorInstance
 };
 //# sourceMappingURL=MainOverride.js.map

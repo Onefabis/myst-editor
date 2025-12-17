@@ -3,11 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <title>MyST Editor Integration</title>
-    <link rel="icon" href="data:," />  
+    <link rel="icon" href="data:," />
+
+    <link rel="stylesheet" crossorigin href="/pfx_override/css/PFXStyleOverride.css"> <!-- Furo theme adaptation CSS Style and Main style for everything outside MYST block -->
+    <link rel="stylesheet" href="/styles/MystEditor.css" /> <!-- Common Myst CSS style -->
+    <script type="module" src="/pfx_override/js/leftPanelButtons.js"></script>
+    <script type="module" src="/pfx_override/js/leftPanelFileTree.js"></script>
+    <script type="module" src="/pfx_override/js/editorContextMenu.js"></script>  
     <script type="module" src="/pfx_override/js/MainOverride.js"></script>
     <script type="module" crossorigin src="./MystEditor.jsx"></script>
-    <link rel="stylesheet" crossorigin href="/styles/MystEditor.css"> <!-- TODO: Fix css compile in vite with only one css link-->
-    <link rel="stylesheet" href="/styles/MystEditor.css" />
     <link rel="icon" href="data:," />
   </head>
   <body>

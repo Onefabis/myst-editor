@@ -1376,21 +1376,21 @@ async function performMove(selectedElement) {
 export const ignoredFolders = CONFIG.ignoredFolders;
 export let activeFolderPath = treeState.getActiveFolderPath();
 
-fetchLocalTree(true);
+// fetchLocalTree(true);
 
-// Initialize
-// const viewModeButtonID = localStorage.getItem("mainButtonSelection") || '0';
+//Initialize
+const viewModeButtonID = localStorage.getItem("mainButtonSelection") || '0';
 
-// if (viewModeButtonID === '4'){
-//   fetchLocalTree(false);
-//   fetchGitTree(localStorage.getItem("gitLeftListToggle"));
-//   console.log("Init git diff view");
-// } else if (viewModeButtonID === '5'){
-//   fetchLocalTree(false);
-//   fetchGitCommitTree();
-//   console.log("Init git commit view");
-// } else {
-//   fetchLocalTree(true);
-//   console.log("Init edit/preview view");
-// }
+if (viewModeButtonID === '4'){
+  fetchLocalTree(false);
+  fetchGitTree(localStorage.getItem("gitLeftListToggle"));
+  console.log("Init git diff view");
+} else if (viewModeButtonID === '5'){
+  fetchLocalTree(false);
+  fetchGitCommitTree();
+  console.log("Init git commit view");
+} else {
+  fetchLocalTree(true);
+  console.log("Init edit/preview view");
+}
 

@@ -1,16 +1,7 @@
-import '../css/PFXStyleOverride.css';
-
 import { setupGitPanel } from "./gitDiffUI";
-import "./leftPanelButtons";
-import "./leftPanelFileTree";
-import "./editorContextMenu";
-import "./commitCurentStateUI";
-
-
-import * as txFormat from "./textFormatButtons";
+import { clearLineSymbols, convertToH1, convertToH2, convertToBold } from "./textFormatButtons";
 import { openImagePicker } from "./projectImagePicker";
 import { waitForEditorReady, saveCurrentEditorContent, bindFocusBlurHandlers, setLastSavedTimestamp } from "./saveEditorText"
-
 import MystEditor, { defaultButtons } from '../../MystEditor.jsx';
 import { showLatestCommitDiff, revertFileChanges, pluginReady, pluginInstance } from "../../extensions/markChangedLines";
 
@@ -91,10 +82,10 @@ export async function loadFile(filename) {
         { id: "revert", text: "🧹 Revert", visible: false, action: () => { revertFileChanges(mystEditorInstance); } },
         { id: "save",  text: "💾 Save", visible: true, action: () => saveCurrentEditorContent(true) },
         { id: "image", text: "🗃️ Image", visible: true, action: () => openImagePicker() },
-        { id: "clear_format", text: "Clear", visible: true, action: () => txFormat.clearLineSymbols() },
-        { id: "h1_format", text: "H1", visible: true, action: () => txFormat.convertToH1() },
-        { id: "h2_format", text: "H2", visible: true, action: () => txFormat.convertToH2() },
-        { id: "b_format", text: "B",  visible: true, action: () => txFormat.convertToBold() }
+        { id: "clear_format", text: "Clear", visible: true, action: () => clearLineSymbols() },
+        { id: "h1_format", text: "H1", visible: true, action: () => convertToH1() },
+        { id: "h2_format", text: "H2", visible: true, action: () => convertToH2() },
+        { id: "b_format", text: "B",  visible: true, action: () => convertToBold() }
       ]),
       spellcheckOpts: false,
       syncScroll: true,
