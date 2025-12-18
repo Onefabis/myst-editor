@@ -1,4 +1,4 @@
-import { s as y, M as g, d as w, a as S, o as b, c as x, b as I, e as B, f as C, w as E, g as F, p as W, h as T, r as P, i as m, j as n } from "./MystEditor-BD9pC6ei.js";
+import { s as y, M as g, d as w, a as S, o as b, c as x, b as I, e as B, f as C, w as E, g as F, p as W, h as T, r as P, i as m, j as n } from "./MystEditor-DjOuzPt9.js";
 let t = null;
 document.getElementById("editor-panel");
 const a = document.getElementById("sidebar"), _ = document.getElementById("resizer"), u = localStorage.getItem("sidebarWidth");
@@ -6,8 +6,8 @@ u && (a.style.width = u + "px");
 _.onmousedown = function(o) {
   o.preventDefault();
   const i = o.clientX, s = a.offsetWidth;
-  document.onmousemove = function(r) {
-    const e = s + (r.clientX - i);
+  document.onmousemove = function(l) {
+    const e = s + (l.clientX - i);
     e >= 250 && e <= 600 && (a.style.width = e + "px", a.style.minWidth = e + "px", localStorage.setItem("sidebarWidth", e));
   }, document.onmouseup = function() {
     document.onmousemove = null, document.onmouseup = null;
@@ -28,17 +28,17 @@ async function L(o) {
   }
   const s = await i.json();
   y(s.last_modified);
-  const r = document.getElementById("myst"), e = document.createElement("div");
-  e.id = "myst", e.style.flexGrow = "1", e.style.border = "1px solid #ccc", e.style.marginBottom = "0.5rem", e.style.height = "80vh", r.replaceWith(e), localStorage.setItem("currentPath", o);
-  const l = new CSSStyleSheet(), p = await (await fetch("../PFXStyleOverride.css")).text();
-  await l.replace(p), document.adoptedStyleSheets = [...document.adoptedStyleSheets, l];
+  const l = document.getElementById("myst"), e = document.createElement("div");
+  e.id = "myst", e.style.flexGrow = "1", e.style.border = "1px solid #ccc", e.style.marginBottom = "0.5rem", e.style.height = "80vh", l.replaceWith(e), localStorage.setItem("currentPath", o);
+  const r = new CSSStyleSheet(), p = await (await fetch("../PFXStyleOverride.css")).text();
+  await r.replace(p), document.adoptedStyleSheets = [...document.adoptedStyleSheets, r];
   const f = o.split("\\").pop().split("/").pop();
   requestAnimationFrame(async () => {
     t = g({
       templatelist: "linkedtemplatelist.json",
       initialText: s.content,
       title: f,
-      additionalStyles: l,
+      additionalStyles: r,
       includeButtons: w.concat([{
         id: "revert",
         text: "🧹 Revert",
@@ -86,7 +86,7 @@ async function L(o) {
         var d;
         ["Both", "Source", "Inline"].includes(c) ? (await new Promise((v) => setTimeout(v, 150)), n ? n.handleModeChange(c, t) : m(t)) : c === "Gitdiff" && (n ? n.clearMergeView(t) : (d = t.editorView) != null && d.v && t.editorView.v.dispatch({
           effects: mergeCompartment.reconfigure([])
-        }), T());
+        }), console.log("set git diff panel"), T());
       });
     });
   }), localStorage.setItem("lastOpened", o);

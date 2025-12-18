@@ -88,6 +88,25 @@ const Gitdiff = () => {
       return m ? parseInt(m[1], 10) : 0;
     };
 
+    const waitForCommitDropdowns = (timeout = 5000) =>
+      new Promise((resolve, reject) => {
+        const start = performance.now();
+        const check = () => {
+          const cl = getEl("commitDropdownLeft");
+          const cr = getEl("commitDropdownRight");
+          if (cl?.value && cr?.value) {
+            resolve({ cl, cr });
+            return;
+          }
+          if (performance.now() - start > timeout) {
+            reject(new Error("Commit dropdowns not ready"));
+            return;
+          }
+          requestAnimationFrame(check);
+        };
+        check();
+      });
+
     const reloadGitdiff = async (modeArg) => {
       try {
         const branchLeft = getEl("branchDropdownLeft");
@@ -96,9 +115,10 @@ const Gitdiff = () => {
         const commitRight = getEl("commitDropdownRight");
 
         const filename = getFilename();
-        // const gitCommitToggle = localStorage.getItem("gitLeftListToggle") || true;
-        const gitCommitToggle = localStorage.getItem("gitLeftListToggle") === "true";
-        const mode = modeArg || (gitCommitToggle ? "commits" : "local") || "commits";
+        const stored = localStorage.getItem("gitDiffLocalstateToggle");
+        const mode =
+          modeArg ??
+          (stored === "false" || stored == null ? "local" : "commits");
 
         if (!filename) {
           console.warn("[Gitdiff] Missing filename — skipping reload.");
@@ -143,15 +163,19 @@ const Gitdiff = () => {
           newerSide = "right";
         } else {
           // Commits mode
-          const leftCommit = commitLeft?.value || "";
-          const rightCommit = commitRight?.value || "";
-          const leftBranch = branchLeft?.value || "";
-          const rightBranch = branchRight?.value || "";
+          let leftCommit, rightCommit, leftBranch, rightBranch;
 
-          if (!leftCommit || !rightCommit) {
-            console.warn("[Gitdiff] Missing commits — skipping reload.");
+          try {
+            await waitForCommitDropdowns();
+          } catch {
+            // Silent exit — UI not ready yet
             return;
           }
+
+          leftCommit = commitLeft?.value || "";
+          rightCommit = commitRight?.value || "";
+          leftBranch = branchLeft?.value || "";
+          rightBranch = branchRight?.value || "";
 
           const res = await fetch("/get-file-from-git", {
             method: "POST",
@@ -169,11 +193,10 @@ const Gitdiff = () => {
             console.error("[Gitdiff] Fetch failed:", res.status, await res.text());
             return;
           }
+
           const result = await res.json();
-          const leftContentFromGit = result.left_content ?? "// Failed left commit";
-          const rightContentFromGit = result.right_content ?? "// Failed right commit";
-          aDoc = leftContentFromGit;
-          bDoc = rightContentFromGit;
+          aDoc = result.left_content ?? "// Failed left commit";
+          bDoc = result.right_content ?? "// Failed right commit";
         }
 
         // Init MergeView
@@ -215,7 +238,11 @@ const Gitdiff = () => {
     ];
     dropdowns.forEach((el) => el?.addEventListener("change", reloadGitdiff));
 
-    reloadGitdiff();
+    const hasCommits = () => {
+      const cl = getEl("commitDropdownLeft");
+      const cr = getEl("commitDropdownRight");
+      return cl?.options?.length > 0 && cr?.options?.length > 0;
+    };
 
     return () => {
       mergeView.current?.destroy();

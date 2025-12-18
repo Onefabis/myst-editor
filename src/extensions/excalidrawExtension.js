@@ -235,8 +235,9 @@ class ExcalidrawExporter {
     const { pngName, pngFullPath } = utils.derivePngSavePaths(this.filePath);
     const formData = new FormData();
     formData.append("file", blob, pngName);
+    formData.append("filename", pngFullPath);
 
-    const res = await fetch(`/save?filename=${encodeURIComponent(pngFullPath)}`, {
+    const res = await fetch(`/save`, {
       method: "POST",
       body: formData
     });

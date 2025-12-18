@@ -307,7 +307,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
   const { options, editorView, collab, suggestMode } = useContext(MystState);
   const titleHtml = useComputed(() => purify.sanitize(renderMdLinks(options.title.value)));
 
-  const gitCommitDiff = localStorage.getItem("gitLeftListToggle");
+  const gitCommitDiff = localStorage.getItem("gitDiffLocalstateToggle");
   const showLeftCommitList = useSignal(gitCommitDiff === null ? true : gitCommitDiff === "true");
   const firstRender = useRef(true);
   const activeBranch = useSignal("");
@@ -318,7 +318,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
       fetchGitCommitTree();
     } 
 
-    localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
+    localStorage.setItem("gitDiffLocalstateToggle", showLeftCommitList.value.toString());
 
     if (firstRender.current) {
       firstRender.current = false;
@@ -326,6 +326,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
     }
 
     if (options.mode.value === "Gitdiff") {
+      console.log("reload git diff from topbar");
       if (window.reloadGitdiff) {
         window.reloadGitdiff(showLeftCommitList.value ? "commits" : "local");
       }
@@ -339,7 +340,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
       { id: "preview", tooltip: "Preview", action: () => { options.mode.value = "Preview"; fetchLocalTree(false); }, icon: PreviewIcon },
       { id: "both", tooltip: "Dual Pane", action: () => { options.mode.value = "Both"; fetchLocalTree(false); }, icon: BothIcon },
       { id: "inline", tooltip: "Inline Preview", action: () => { options.mode.value = "Inline"; fetchLocalTree(false); }, icon: InlinePreviewIcon },
-      { id: "gitdiff", tooltip: "Git Diff", action: () => { options.mode.value = "Gitdiff"; saveCurrentEditorContent(true)}, icon: GitdiffIcon },
+      { id: "gitdiff", tooltip: "Git Diff", action: () => { options.mode.value = "Gitdiff"; saveCurrentEditorContent(true); }, icon: GitdiffIcon },
       { id: "gitcommit", tooltip: "Git Commit", action: () => { options.mode.value = "GitCommit"; saveCurrentEditorContent(true)}, icon: GitCommitIcon },
       { id: "outline", text: "Table of Contents", action: () => { options.mode.value = "Outline"; }, icon: TocIcon },
     ];

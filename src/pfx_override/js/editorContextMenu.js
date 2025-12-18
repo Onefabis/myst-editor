@@ -164,10 +164,12 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
   const nameBase = rawName.trim().replace(/\s+/g, '_');
   if (!nameBase) return;
 
-  const mdPath = (localStorage.getItem("currentPath") || "").toString();
-  const mdParts = mdPath.replace(/\\/g, "/").split("/").slice(0, -1);
+  // const mdPath = (localStorage.getItem("currentPath") || "").toString();
+  const mdPathRaw = (localStorage.getItem("currentPath") || "").toString();
+  const mdDir = mdPathRaw.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
+  // const mdParts = mdPath.replace(/\\/g, "/").split("/").slice(0, -1);
 
-  const targetFolder = `_static/${mdParts.join("/")}`;
+  // const targetFolder = `_static/${mdParts.join("/")}`;
   const filename = `${nameBase}.png`;
 
   // Request empty file creation and backend handles incrementing
@@ -175,7 +177,7 @@ document.getElementById("excalidraw_image").addEventListener("click", async () =
 
   const emptyFile = new Blob([], { type: "image/png" });
   formData.append("file", emptyFile, filename);
-  formData.append("path", mdPath);
+  formData.append("path", mdDir);
 
   try {
     const res = await fetch("/api/upload_image", {

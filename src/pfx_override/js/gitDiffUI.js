@@ -174,6 +174,12 @@ export function updateCommits(selectedBranch, commitDropdown, gitData, savedComm
     }));
 
     populateDropdown(commitDropdown, commitItems);
+    if (!commitDropdown.value && commitDropdown.options.length > 0) {
+      commitDropdown.value = commitDropdown.options[0].value;
+    }
+    if (commitDropdown._searchable) {
+      commitDropdown._searchable.updateLabel();
+    }
 
     if (savedCommit) {
       const opt = [...commitDropdown.options].find(o => o.value === savedCommit);
@@ -305,7 +311,6 @@ export async function setupGitPanel() {
   // Restore commit selections AFTER commits exist
   persistDropdown(commitLeft, "commitDropdownLeft");
   persistDropdown(commitRight, "commitDropdownRight");
-
 
   branchLeft.onchange = () => updateCommits(branchLeft.value, commitLeft, data);
   branchRight.onchange = () => updateCommits(branchRight.value, commitRight, data);

@@ -832,26 +832,43 @@ class TreeAPI {
    * This is a coordination helper to avoid races between component render and API calls.
    * Returns { left, right } when ready or null after a timeout.
    */
-  static async waitForDropdowns() {
-    const host = document.querySelector('#myst');
-    if (!host) return null;
+  static waitForDropdowns() {
+    const host = document.querySelector("#myst");
+    if (!host?.shadowRoot) return Promise.resolve(null);
 
-    let attempts = 0;
-    while (attempts < CONFIG.maxDropdownWaitAttempts) {
-      const left = host.shadowRoot?.getElementById("commitDropdownLeft");
-      const right = host.shadowRoot?.getElementById("commitDropdownRight");
-      
-      if (left && right && left.options.length > 0 && right.options.length > 0) {
-        return { left, right };
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, CONFIG.dropdownWaitInterval));
-      attempts++;
-    }
-    
-    console.warn("Commit dropdowns not ready in time");
-    return null;
+    return new Promise((resolve) => {
+      const root = host.shadowRoot;
+
+      const check = () => {
+        const left = root.getElementById("commitDropdownLeft");
+        const right = root.getElementById("commitDropdownRight");
+
+        if (
+          left &&
+          right &&
+          left.options.length > 0 &&
+          right.options.length > 0
+        ) {
+          observer.disconnect();
+          resolve({ left, right });
+        }
+      };
+
+      const observer = new MutationObserver(check);
+      observer.observe(root, { childList: true, subtree: true });
+
+      // run once immediately
+      check();
+
+      // safety timeout
+      setTimeout(() => {
+        observer.disconnect();
+        console.warn("Commit dropdowns not ready in time");
+        resolve(null);
+      }, CONFIG.maxDropdownWaitAttempts * CONFIG.dropdownWaitInterval);
+    });
   }
+
 }
 
 // ========================= MAIN FUNCTIONS =========================
@@ -912,11 +929,14 @@ export async function fetchLocalTree(loadfile = true) {
   if (currentPath) {
     restoreActiveFile(normalizePath(currentPath));
   }
+
+  // Add branch selection/creation elements
   initBranchSwitcher();
   const brangh_edit = document.getElementById("branch_edit");
   if (brangh_edit){
     brangh_edit.style.display = "flex"; 
   }
+  console.log("Init edit/preview view");
 }
 
 /**
@@ -942,15 +962,17 @@ function findFirstFile(nodes) {
  * This function coordinates with the host UI (commit dropdowns) and switches diff sources accordingly.
  */
 export async function fetchGitTree(gitCommit) {
-  const dropdowns = await TreeAPI.waitForDropdowns();
-  if (!dropdowns) return;
+  // let currentPath = localStorage.getItem('currentPath');
+  // loadFile(normalizePath(currentPath));
 
   const tree_div = document.getElementById("tree");
   tree_div.style.display = "flex"; 
   const commit_message = document.getElementById("commit-no-changes-message");
   commit_message.style.display = "none";
-
+  console.log("Init git diff view");
   if (gitCommit) {
+    const dropdowns = await TreeAPI.waitForDropdowns();
+    if (!dropdowns) return;
     // Commit vs commit comparison - show all files that exist in EITHER commit
     const leftCommit = dropdowns.left.value;
     const rightCommit = dropdowns.right.value;
@@ -963,7 +985,6 @@ export async function fetchGitTree(gitCommit) {
       const diffs = await TreeAPI.getDiff('tree', { left: leftCommit, right: rightCommit });
       diffMap = GitDiffManager.buildDiffMap(diffs);
     }
-    
     const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
     TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
   } else {
@@ -973,7 +994,6 @@ export async function fetchGitTree(gitCommit) {
     const diffs = await TreeAPI.getDiff('working-tree', { commit: commitHash });
     const diffMap = GitDiffManager.buildDiffMap(diffs);
     const changedFolders = GitDiffManager.computeChangedFolders(baseTree, diffMap);
-    
     TreeRenderer.renderTree(baseTree, tree_div, true, diffMap, changedFolders);
     removeTreeContextMenu();
   }
@@ -991,20 +1011,23 @@ export async function fetchGitTree(gitCommit) {
  *  - Restore active file and log file paths for downstream features
  */
 export async function fetchGitCommitTree() {
+  let gitCommitTreeLoaded = localStorage.getItem("gitCommitTreeLoaded");
   const resp = await fetch("/api/tree-local-diff");
   const data = await resp.json();
-
-
   const tree = Array.isArray(data?.tree) ? data.tree : [];
   const diffs = Array.isArray(data?.diffs) ? data.diffs : [];
   const tree_div = document.getElementById("tree");
   const host = document.querySelector("#myst");
+  const diffMap = GitDiffManager.buildDiffMap(diffs);
+  const changedFolders = GitDiffManager.computeChangedFolders(tree, diffMap);
+
+  TreeRenderer.renderTree(tree, tree_div, true, diffMap, changedFolders);
+
+  const currentPath = localStorage.getItem("currentPath");
+  restoreActiveFile(normalizePath(currentPath));
 
   if (!host?.shadowRoot) return;
-
-  const shadow = host.shadowRoot;
-  const select_all_for_commit = shadow.getElementById("select-all-for-commit");
-  
+  const select_all_for_commit = host.shadowRoot?.getElementById("select-all-for-commit");
   const commit_message = document.getElementById("commit-no-changes-message");
   if (tree.length === 0) {
     commit_message.style.display = "flex";
@@ -1016,20 +1039,13 @@ export async function fetchGitCommitTree() {
     select_all_for_commit.style.display = "flex";
   }
 
-  const diffMap = GitDiffManager.buildDiffMap(diffs);
-  const changedFolders = GitDiffManager.computeChangedFolders(tree, diffMap);
-
-  TreeRenderer.renderTree(tree, tree_div, true, diffMap, changedFolders);
-
-  const currentPath = localStorage.getItem("currentPath");
-  restoreActiveFile(normalizePath(currentPath));
-
   logFilePaths();
+  console.log("Init git commit view");
   removeTreeContextMenu();
   const brangh_edit = document.getElementById("branch_edit");
   if (brangh_edit){
     brangh_edit.style.display = "none"; 
-  }
+  } 
 }
 
 
@@ -1081,7 +1097,7 @@ async function createTreeMenu() {
   );
 
   if (activeButton &&
-     ["Dual Pane", "Preview", "Source", "Inline"].includes(activeButton.title)) {
+     ["Dual Pane", "Preview", "Source", "Inline Preview"].includes(activeButton.title)) {
 
     // Create menu only when allowed
     contextMenu = document.createElement("div");
@@ -1380,17 +1396,16 @@ export let activeFolderPath = treeState.getActiveFolderPath();
 
 //Initialize
 const viewModeButtonID = localStorage.getItem("mainButtonSelection") || '0';
+const currentPath = localStorage.getItem('currentPath');
 
 if (viewModeButtonID === '4'){
-  fetchLocalTree(false);
-  fetchGitTree(localStorage.getItem("gitLeftListToggle"));
-  console.log("Init git diff view");
+  loadFile(currentPath);
+  const isLocalDiff = localStorage.getItem("gitDiffLocalstateToggle") === "true";
+  fetchGitTree(isLocalDiff);
 } else if (viewModeButtonID === '5'){
-  fetchLocalTree(false);
+  loadFile(currentPath);
   fetchGitCommitTree();
-  console.log("Init git commit view");
 } else {
   fetchLocalTree(true);
-  console.log("Init edit/preview view");
 }
 

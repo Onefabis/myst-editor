@@ -1,4 +1,4 @@
-import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates, treeState, fetchGitCommitTree } from "./leftPanelFileTree";
+import { fetchLocalTree, activeFolderPath, normalizePath, ignoredFolders, clearActiveStates, treeState } from "./leftPanelFileTree";
 import { loadFile, mystEditorInstance } from "./MainOverride";
 import { runGitAction } from "./commitCurentStateUI";
 import { showModal, showInputModal } from "./modalWindows"

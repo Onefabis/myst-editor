@@ -172,7 +172,7 @@ const MystEditor = () => {
 
   // Git panel elements style START
   // Initialize the signal with saved state
-  const savedLeft = localStorage.getItem("gitLeftListToggle");
+  const savedLeft = localStorage.getItem("gitDiffLocalstateToggle");
 
   const [headBranch, setHeadBranch] = useState(null);
 
@@ -193,7 +193,7 @@ const MystEditor = () => {
 
 
   useSignalEffect(() => {
-    localStorage.setItem("gitLeftListToggle", showLeftCommitList.value.toString());
+    localStorage.setItem("gitDiffLocalstateToggle", showLeftCommitList.value.toString());
 
     if (firstRender.current) {
       // skip first change triggered on page load
@@ -203,6 +203,7 @@ const MystEditor = () => {
 
     // user actually changed the toggle
     if (window.reloadGitdiff) {
+      console.log("reload git diff from myst edtior");
       window.reloadGitdiff(showLeftCommitList.value ? "commits" : "local");
     }
     fetchGitTree(showLeftCommitList.value);

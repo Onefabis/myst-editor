@@ -8,7 +8,6 @@ import { showLatestCommitDiff, revertFileChanges, pluginReady, pluginInstance } 
 
 export let mystEditorInstance = null;
 const editorPanel = document.getElementById('editor-panel');
-
 const sidebar = document.getElementById('sidebar');
 const resizer = document.getElementById('resizer');
 
@@ -99,7 +98,7 @@ export async function loadFile(filename) {
       showLatestCommitDiff(mystEditorInstance);
     }
     window._mystEditor = mystEditorInstance;
-    // Set up mode change subscription with more robust handling
+
     mystEditorInstance.options.mode.subscribe((newMode) => {
       requestAnimationFrame(async () => {
         if (["Both", "Source", "Inline"].includes(newMode)) {
@@ -123,6 +122,7 @@ export async function loadFile(filename) {
               });
             }
           }
+          console.log("set git diff panel");
           setupGitPanel();
         }
       });
