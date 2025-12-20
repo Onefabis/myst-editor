@@ -2,7 +2,7 @@
 REM --- Go to root of the project ---
 cd /d "%~dp0"
 
-REM --- Ensure we are in the Myst-Editor directory ---
+REM --- Ensure we are in the Doc-Editor directory ---
 cd /d "%~dp0"
 
 REM --- Go into server directory ---

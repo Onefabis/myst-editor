@@ -29,7 +29,7 @@ Multiple comment authors
 :::
 
 Comments can span multiple lines, and multiple users can participate in writing a single comment.
-MyST Editor enables comment discussions through a concept of line authorship.
+Doc Editor enables comment discussions through a concept of line authorship.
 Every line of a comment is highlighted in the color of the line's author.
 When you hover over a line, you can also see its author's avatar to the left of the comment.
 If you want to participate in a discussion, it is recommended to add a new line (for example, at the end of a comment you want to reply to).
@@ -64,7 +64,7 @@ In order to delete a comment, you can:
 
 ## Resolving Comments
 
-MyST Editor offers a comment resolution functionality.
+Doc Editor offers a comment resolution functionality.
 
 To resolve a comment, hover over its icon and click the resolve button.
 This will move it to the `Resolved Comments` view in the [topbar](topbar.md) where it will be accessible.

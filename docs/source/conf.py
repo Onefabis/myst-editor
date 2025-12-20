@@ -30,8 +30,8 @@ from os import environ
 # -- General configuration -----------------------------------------------------
 
 # General information about the project.
-project = u'MyST Editor - User Manual'
-basic_filename = u'myst-editor--user-manual'
+project = u'Doc Editor - User Manual'
+basic_filename = u'doc-editor--user-manual'
 authors = u'Antmicro'
 copyright = f'{authors}, {datetime.now().year}'
 

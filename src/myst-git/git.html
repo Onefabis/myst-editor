@@ -56,7 +56,7 @@
           target: /(^|(?<=\s))#\d+/g,
           transform: (match) => {
             const issueId = match.slice(1);
-            return `<a href="https://github.com/antmicro/myst-editor/issues/${issueId}">${match}</a>`;
+            return `<a href="https://github.com/pfxtv/doc-editor/issues/${issueId}">${match}</a>`;
           },
         },
         {
@@ -64,7 +64,7 @@
           target: /(^|(?<=\s))!\d+/g,
           transform: (match) => {
             const prid = match.slice(1);
-            return `<a href="https://github.com/antmicro/myst-editor/pull/${prid}">${match}</a>`;
+            return `<a href="https://github.com/pfxtv/doc-editor/pull/${prid}">${match}</a>`;
           },
         },
         {
@@ -117,7 +117,7 @@ file1
           storeHistory: () => {},
           commitChanges: (msg) => ({ hash: "ccc", webUrl: "#" }),
           id: "demo",
-          title: "[MyST Editor](https://github.com/antmicro/myst-editor/) demo",
+          title: "[Doc Editor](https://github.com/pfxtv/doc-editor/) demo",
           transforms: exampleTransforms,
           collaboration: {
             enabled: collabEnabled,
