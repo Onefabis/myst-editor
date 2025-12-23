@@ -839,7 +839,12 @@ async def git_diff_working_tree(request: Request):
     result = []
 
     # git.diff may return empty line here, so we will process empty as well avoiding errors
-    diff_output = repo.git.diff("--name-status", commit, str(config.DOCS_DIR)) or ""
+    diff_output = repo.git.diff(
+        "--name-status",
+        commit,
+        "--",
+        str(config.DOCS_DIR),
+    ) or ""
 
     for line in diff_output.splitlines():
         parts = line.split("\t")
@@ -907,26 +912,53 @@ async def get_tree_union(request: Request):
 
 
 async def get_tree_local_diff(request: Request):
-    """Get local changes compared to HEAD"""
-    _require_git_runtime()
+    """Get local markdown changes in docs compared to HEAD (safe, optional git)."""
 
-    changed_files = set()
-    diffs = []
+    # --- Git must be available, otherwise return empty result ---
+    try:
+        _require_git_runtime()
+    except HTTPException:
+        return JSONResponse({"tree": [], "diffs": []})
 
+    # --- docs directory must exist ---
+    if not config.BASE_DIR.exists():
+        return JSONResponse({"tree": [], "diffs": []})
+
+    # --- docs must be tracked by git ---
+    try:
+        repo.git.ls_files("--error-unmatch", str(config.DOCS_DIR))
+    except Exception:
+        return JSONResponse({"tree": [], "diffs": []})
+
+    diffs: list[dict] = []
+    changed_files: set[str] = set()
+
+    # --- get HEAD commit safely ---
     try:
         head = repo.head.commit.hexsha
     except Exception:
         head = None
 
+    # --- staged / modified files ---
     if head:
-        diff_output = repo.git.diff("--name-status", head, str(config.DOCS_DIR)) or ""
+        try:
+            diff_output = repo.git.diff(
+                "--name-status",
+                head,
+                "--",
+                str(config.DOCS_DIR),
+            ) or ""
+        except Exception:
+            diff_output = ""
+
         for line in diff_output.splitlines():
             parts = line.split("\t")
             if len(parts) < 2:
                 continue
 
             status, path = parts[0], parts[1]
-            if not path.endswith(".md") or status not in ("A", "M"):
+
+            if status not in ("A", "M") or not path.endswith(".md"):
                 continue
 
             diffs.append({
@@ -939,45 +971,65 @@ async def get_tree_local_diff(request: Request):
             prefix = f"{config.DOCS_DIR.rstrip('/')}/"
             if p.startswith(prefix):
                 p = p[len(prefix):]
+
             changed_files.add(p)
 
+    # --- untracked markdown files ---
     try:
         untracked = repo.git.ls_files(
-            "--others", "--exclude-standard", str(config.DOCS_DIR)
+            "--others",
+            "--exclude-standard",
+            "--",
+            str(config.DOCS_DIR),
         ).splitlines()
     except Exception:
         untracked = []
 
-    for p in untracked:
-        if p.endswith(".md"):
-            diffs.append({"old_path": None, "new_path": p, "status": "A"})
-            p2 = p.replace("\\", "/")
-            prefix = f"{config.DOCS_DIR.rstrip('/')}/"
-            if p2.startswith(prefix):
-                p2 = p2[len(prefix):]
-            changed_files.add(p2)
+    for path in untracked:
+        if not path.endswith(".md"):
+            continue
 
+        diffs.append({
+            "old_path": None,
+            "new_path": path,
+            "status": "A",
+        })
+
+        p = path.replace("\\", "/")
+        prefix = f"{config.DOCS_DIR.rstrip('/')}/"
+        if p.startswith(prefix):
+            p = p[len(prefix):]
+
+        changed_files.add(p)
+
+    # --- build filtered tree ---
     tree = FileUtils.scan_directory(
-        config.BASE_DIR, config.BASE_DIR, [config.MARKDOWN_EXT]
+        config.BASE_DIR,
+        config.BASE_DIR,
+        [config.MARKDOWN_EXT],
     )
 
     def filter_tree(nodes):
-        res = []
-        for n in nodes:
-            if n["type"] == "file" and n["path"] in changed_files:
-                res.append(n)
-            elif n["type"] == "folder":
-                children = filter_tree(n.get("children", []))
+        result = []
+        for node in nodes:
+            if node["type"] == "file":
+                if node["path"] in changed_files:
+                    result.append(node)
+            elif node["type"] == "folder":
+                children = filter_tree(node.get("children", []))
                 if children:
-                    res.append({
+                    result.append({
                         "type": "folder",
-                        "name": n["name"],
-                        "path": n["path"],
+                        "name": node["name"],
+                        "path": node["path"],
                         "children": children,
                     })
-        return res
+        return result
 
-    return JSONResponse({"tree": filter_tree(tree), "diffs": diffs})
+    return JSONResponse({
+        "tree": filter_tree(tree),
+        "diffs": diffs,
+    })
 
 
 async def git_commit_all(request: Request):
