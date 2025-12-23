@@ -1,0 +1,5 @@
+colorama==0.4.6
+gitdb==4.0.12
+GitPython==3.1.45
+starlette==0.47.2
+uvicorn==0.35.0

@@ -3,20 +3,25 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+
+  "_comment_build": "We have to increase RAM here to avoid OOM during Vite build",
+
   "scripts": {
+    "server": "cd bin && npm install && node doc-editor-server.js",
     "dev": "vite",
-    "build": "vite build",
+    "build": "node --max-old-space-size=8192 node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "host": "vite --host",
-    "server": "cd bin && npm install && node server.js",
     "check-format": "prettier --check src tests bin package.json vite.config.js .eslintrc.cjs",
     "lint": "eslint --ext js,jsx .",
     "format": "prettier --write src tests bin package.json vite.config.js .eslintrc.cjs",
     "test": "PW_TEST_HTML_REPORT_OPEN=never playwright test -c tests/playwright.config.js --reporter html"
   },
+
   "prettier": {
     "printWidth": 150
   },
+
   "dependencies": {
     "@codemirror/commands": "^6.2.4",
     "@codemirror/lang-markdown": "^6.2.3",
@@ -57,6 +62,7 @@
     "yaml-language-server": "github:antmicro/yaml-language-server",
     "yjs": "^13.5.44"
   },
+
   "devDependencies": {
     "@playwright/test": "^1.45.1",
     "@preact/preset-vite": "^2.4.0",
@@ -71,13 +77,16 @@
     "vite": "^6.3.5",
     "vite-plugin-babel-macros": "^1.0.6"
   },
+
   "alias": {
     "react": "@preact/compat",
     "react-dom": "@preact/compat"
-  }, 
+  },
+
   "overrides": {
     "rollup": "4.44.1"
   },
+
   "resolutions": {
     "rollup": "4.44.1"
   }

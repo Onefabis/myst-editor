@@ -10,6 +10,8 @@ import json
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import argparse
+import sys
 
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
@@ -25,14 +27,46 @@ from git import Repo, GitCommandError
 
 # ==================== CONFIGURATION START ==================== #
 
+REPO_ENV_VAR = "REPO_DIR"
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo_dir", type=str, help="Path to repository")
+
+    # if it runs through npm ignore unused arguments
+    if os.environ.get("RUN_FROM_NPM"):
+        return parser.parse_known_args()[0]
+    else:
+        return parser.parse_args()
+
+
 class Config:
-    """Application configuration"""
-    DOCS_DIR = "docs"
-    BASE_DIR = Path("../../" + DOCS_DIR).resolve()
-    STATIC_FOLDER = Path("../dist")
-    REPO_DIR = Path("../../")
-    ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg"}
-    MARKDOWN_EXT = ".md"
+    def __init__(self):
+        # 1️⃣ Сначала читаем аргументы
+        args = parse_args()
+        repo_arg = args.repo_dir
+
+        # 2️⃣ Потом читаем из окружения
+        env_repo = os.environ.get("REPO_DIR")
+
+        if repo_arg:
+            self.REPO_DIR = Path(repo_arg).resolve()
+        elif env_repo:
+            self.REPO_DIR = Path(env_repo).resolve()
+        else:
+            # fallback: папка на уровень выше server (т.е. doc-editor)
+            self.REPO_DIR = Path(__file__).parent.parent.resolve()
+
+        # директория с docs всегда внутри repo
+        self.DOCS_DIR = "docs"
+        self.BASE_DIR = (self.REPO_DIR / self.DOCS_DIR).resolve()
+
+        # статические файлы
+        self.STATIC_FOLDER = (Path(__file__).parent / "../dist").resolve()
+
+        self.ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg"}
+        self.MARKDOWN_EXT = ".md"
 
 
 config = Config()
@@ -279,16 +313,22 @@ class GitUtils:
 
 
 # Initialize Git repository
-if not (config.REPO_DIR / ".git").exists():
-    raise FileNotFoundError(f"Git repository not found in {config.REPO_DIR}")
 
-# Always resolve as absolute path to .git directory
-git_root = Path(config.REPO_DIR).resolve()
+repo = None
+git_utils = None
+GIT_ENABLED = False
 
-# This ensures repo is ALWAYS the project/.git dir
-repo = Repo(git_root)
+repo = None
+git_utils = None
+GIT_ENABLED = False
 
-git_utils = GitUtils(repo)
+try:
+    repo = Repo(config.REPO_DIR, search_parent_directories=True)
+    git_utils = GitUtils(repo)
+    GIT_ENABLED = True
+    print(f"[Git] Enabled: {repo.git_dir}")
+except Exception as e:
+    print(f"[Git] Disabled: {e}")
 
 # ==================== GIT UTILITIES END ==================== #
 
@@ -613,64 +653,88 @@ async def upload_image(request: Request):
 
 # ==================== GIT SECTION START ==================== #
 
+def _require_git_runtime():
+    """Centralized runtime git availability check."""
+    if not GIT_ENABLED or repo is None or git_utils is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Git repository not available"
+        )
+
+
 async def search_file(request: Request):
     """Get git history for file"""
+    _require_git_runtime() 
+
     data = await request.json()
-    filename = data.get("filename", "")
-    
-    target_file = f"{config.DOCS_DIR}/{filename.replace('\\', '/')}" if filename else None
-    
+    filename = (data.get("filename") or "").strip()
+
+    # safe path normalization
+    target_file = None
+    if filename:
+        target_file = f"{config.DOCS_DIR}/{filename.replace('\\', '/')}"
+
     try:
-        if not repo.branches:
+        branches = []
+        commits: dict[str, list] = {}
+
+        try:
+            repo_branches = list(repo.branches)
+        except Exception:
+            repo_branches = []
+
+        if not repo_branches:
             return JSONResponse({
                 "branches": [],
                 "commits": {},
                 "active_branch": None,
                 "head_commit": None,
             })
-        
-        branches = []
-        commits = {}
-        
-        for branch in repo.branches:
+
+        for branch in repo_branches:
             branch_name = branch.name
+            branches.append(branch_name)
+            commits[branch_name] = []
+
             try:
-                branches.append(branch_name)
-                commits[branch_name] = []
-                
                 branch_commits = list(repo.iter_commits(branch_name))
-                
-                for idx, commit in enumerate(branch_commits):
-                    file_exists = True
-                    
-                    if target_file:
-                        try:
-                            _ = commit.tree / target_file
-                        except (KeyError, Exception):
-                            file_exists = False
-                    
-                    commits[branch_name].append({
-                        "hash": commit.hexsha,
-                        "summary": commit.summary,
-                        "message": commit.message,
-                        "index": idx + 1,
-                        "file_exists": file_exists
-                    })
-            except Exception as e:
-                print(f"Error processing branch {branch_name}: {e}")
+            except Exception:
                 continue
-        
+
+            for idx, commit in enumerate(branch_commits):
+                file_exists = True
+
+                if target_file:
+                    try:
+                        _ = commit.tree / target_file
+                    except Exception:
+                        file_exists = False
+
+                commits[branch_name].append({
+                    "hash": commit.hexsha,
+                    "summary": commit.summary,
+                    "message": commit.message,
+                    "index": idx + 1,
+                    "file_exists": file_exists,
+                })
+
+        # repo.head.commit may be unavailable, don't block UI here
+        try:
+            head_commit = repo.head.commit.hexsha
+        except Exception:
+            head_commit = None
+
         is_detached, active_branch = git_utils.check_head_status()
-        head_commit = repo.head.commit.hexsha if repo.head.commit else None
-        
+
         return JSONResponse({
             "branches": sorted(set(branches)),
             "commits": commits,
             "active_branch": active_branch,
             "head_commit": head_commit,
         })
-    except Exception as e:
-        print(f"Error in search_file: {e}")
+
+    except Exception:
+        # safe fallback here
         return JSONResponse({
             "branches": [],
             "commits": {},
@@ -681,17 +745,20 @@ async def search_file(request: Request):
 
 async def get_file_from_git(request: Request):
     """Get file content from two commits for diff"""
+    _require_git_runtime()
+
     data = await request.json()
     filename = data.get("filename")
     commit_left = data.get("commit_left")
     commit_right = data.get("commit_right")
-    
-    if not all([filename, commit_left, commit_right]):
+
+    if not filename or not commit_left or not commit_right:
         raise HTTPException(status_code=400, detail="Missing required parameters")
-    
+
+    # git_utils will exist anyways
     left_content = git_utils.get_file_content(commit_left, filename)
     right_content = git_utils.get_file_content(commit_right, filename)
-    
+
     return JSONResponse({
         "left_content": left_content,
         "right_content": right_content,
@@ -700,98 +767,110 @@ async def get_file_from_git(request: Request):
 
 async def git_diff_tree(request: Request):
     """Get diff between two commits"""
+    _require_git_runtime()
+
     commit_left = request.query_params.get("commit_left")
     commit_right = request.query_params.get("commit_right")
-    
+
     if not commit_left or not commit_right:
         raise HTTPException(status_code=400, detail="Missing commit parameters")
-    
-    commit_left_obj = repo.commit(commit_left)
-    commit_right_obj = repo.commit(commit_right)
-    
-    diffs = commit_right_obj.diff(commit_left_obj, paths=config.DOCS_DIR)
-    
+
+    try:
+        left = repo.commit(commit_left)
+        right = repo.commit(commit_right)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    diffs = right.diff(left, paths=str(config.DOCS_DIR))
+
     result = []
     for d in diffs:
-        status = "M"
         if d.new_file:
             status = "A"
         elif d.deleted_file:
             status = "D"
         elif d.renamed:
             status = "R"
-        
+        else:
+            status = "M"
+
         result.append({
             "old_path": d.rename_from if d.renamed else d.a_path,
             "new_path": d.rename_to if d.renamed else d.b_path,
             "status": status,
         })
-    
+
     return JSONResponse(result)
 
 
+def require_git():
+    if not GIT_ENABLED or repo is None or git_utils is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Git repository not available"
+        )
+
+
 async def git_head(request: Request):
-    """Get current HEAD commit and active branch"""
+    _require_git_runtime()
+
+    is_detached, active_branch = git_utils.check_head_status()
+
+    # repo.head.commit may be unavailable
     try:
-        is_detached, active_branch = git_utils.check_head_status()
-        
-        return JSONResponse({
-            "head": repo.head.commit.hexsha,
-            "active_branch": active_branch
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        head = repo.head.commit.hexsha
+    except Exception:
+        head = None
+
+    return JSONResponse({
+        "head": head,
+        "active_branch": active_branch,
+    })
 
 
 async def git_diff_working_tree(request: Request):
     """Compare working tree against commit"""
+    _require_git_runtime()
+
     commit = request.query_params.get("commit")
-    
     if not commit:
         raise HTTPException(status_code=400, detail="Missing commit parameter")
-    
+
+    result = []
+
+    # git.diff may return empty line here, so we will process empty as well avoiding errors
+    diff_output = repo.git.diff("--name-status", commit, str(config.DOCS_DIR)) or ""
+
+    for line in diff_output.splitlines():
+        parts = line.split("\t")
+        if not parts:
+            continue
+
+        status = parts[0]
+
+        if status.startswith("R") and len(parts) == 3:
+            _, old, new = parts
+            result.append({"old_path": old, "new_path": new, "status": "R"})
+        elif len(parts) >= 2:
+            path = parts[1]
+            result.append({
+                "old_path": path if status != "A" else None,
+                "new_path": path if status != "D" else None,
+                "status": status,
+            })
+
     try:
-        result = []
-        
-        # Get tracked changes
-        diff_output = repo.git.diff("--name-status", commit, config.DOCS_DIR)
-        
-        for line in diff_output.splitlines():
-            parts = line.split("\t")
-            if not parts:
-                continue
-            
-            status = parts[0]
-            
-            if status.startswith("R"):
-                _, old, new = parts
-                result.append({
-                    "old_path": old,
-                    "new_path": new,
-                    "status": "R"
-                })
-            else:
-                path = parts[1]
-                result.append({
-                    "old_path": path if status != "A" else None,
-                    "new_path": path if status != "D" else None,
-                    "status": status
-                })
-        
-        # Get untracked .md files
-        untracked = repo.git.ls_files("--others", "--exclude-standard", config.DOCS_DIR).splitlines()
-        
-        for file_path in untracked:
-            if file_path.endswith('.md'):
-                result.append({
-                    "old_path": None,
-                    "new_path": file_path,
-                    "status": "A"
-                })
-        
-        return JSONResponse(result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        untracked = repo.git.ls_files(
+            "--others", "--exclude-standard", str(config.DOCS_DIR)
+        ).splitlines()
+    except Exception:
+        untracked = []
+
+    for p in untracked:
+        if p.endswith(".md"):
+            result.append({"old_path": None, "new_path": p, "status": "A"})
+
+    return JSONResponse(result)
 
 
 async def get_tree_union(request: Request):
@@ -829,92 +908,76 @@ async def get_tree_union(request: Request):
 
 async def get_tree_local_diff(request: Request):
     """Get local changes compared to HEAD"""
+    _require_git_runtime()
+
+    changed_files = set()
+    diffs = []
+
     try:
-        result = []
-        changed_files = set()
-        
-        try:
-            head_commit = repo.head.commit.hexsha
-        except Exception:
-            head_commit = None
-        
-        if head_commit:
-            diff_output = repo.git.diff("--name-status", head_commit, config.DOCS_DIR)
-            
-            for line in diff_output.splitlines():
-                parts = line.split("\t")
-                if not parts or len(parts) < 2:
-                    continue
-                
-                status = parts[0]
-                
-                if status.startswith("R") or status not in ("M", "A", "D"):
-                    continue
-                
-                path = parts[1]
-                
-                if not path.endswith(".md") or status not in ("M", "A"):
-                    continue
-                
-                old_path = path if status != "A" else None
-                new_path = path if status != "D" else None
-                
-                result.append({"old_path": old_path, "new_path": new_path, "status": status})
-                
-                p = (new_path or old_path).replace("\\", "/")
-                prefix = f"{config.DOCS_DIR.rstrip('/')}/"
-                
-                if p.startswith(prefix):
-                    p = p[len(prefix):]
-                
-                changed_files.add(p)
-        
-        # Add untracked files
-        try:
-            untracked = repo.git.ls_files("--others", "--exclude-standard", config.DOCS_DIR).splitlines()
-            
-            for file_path in untracked:
-                if not file_path.endswith(".md"):
-                    continue
-                
-                result.append({"old_path": None, "new_path": file_path, "status": "A"})
-                
-                p = file_path.replace("\\", "/")
-                prefix = f"{config.DOCS_DIR.rstrip('/')}/"
-                
-                if p.startswith(prefix):
-                    p = p[len(prefix):]
-                
-                changed_files.add(p)
-        except Exception:
-            pass
-        
-        local_tree = FileUtils.scan_directory(config.BASE_DIR, config.BASE_DIR, [config.MARKDOWN_EXT])
-        
-        def filter_tree(nodes):
-            filtered = []
-            for node in nodes:
-                if node["type"] == "file":
-                    if node["path"] in changed_files:
-                        filtered.append({
-                            "type": node["type"],
-                            "name": node["name"],
-                            "path": node["path"]
-                        })
-                elif node["type"] == "folder":
-                    children = filter_tree(node.get("children", []))
-                    if children:
-                        filtered.append({
-                            "type": "folder",
-                            "name": node["name"],
-                            "path": node["path"],
-                            "children": children
-                        })
-            return filtered
-        
-        return JSONResponse({"tree": filter_tree(local_tree), "diffs": result})
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        head = repo.head.commit.hexsha
+    except Exception:
+        head = None
+
+    if head:
+        diff_output = repo.git.diff("--name-status", head, str(config.DOCS_DIR)) or ""
+        for line in diff_output.splitlines():
+            parts = line.split("\t")
+            if len(parts) < 2:
+                continue
+
+            status, path = parts[0], parts[1]
+            if not path.endswith(".md") or status not in ("A", "M"):
+                continue
+
+            diffs.append({
+                "old_path": None if status == "A" else path,
+                "new_path": path,
+                "status": status,
+            })
+
+            p = path.replace("\\", "/")
+            prefix = f"{config.DOCS_DIR.rstrip('/')}/"
+            if p.startswith(prefix):
+                p = p[len(prefix):]
+            changed_files.add(p)
+
+    try:
+        untracked = repo.git.ls_files(
+            "--others", "--exclude-standard", str(config.DOCS_DIR)
+        ).splitlines()
+    except Exception:
+        untracked = []
+
+    for p in untracked:
+        if p.endswith(".md"):
+            diffs.append({"old_path": None, "new_path": p, "status": "A"})
+            p2 = p.replace("\\", "/")
+            prefix = f"{config.DOCS_DIR.rstrip('/')}/"
+            if p2.startswith(prefix):
+                p2 = p2[len(prefix):]
+            changed_files.add(p2)
+
+    tree = FileUtils.scan_directory(
+        config.BASE_DIR, config.BASE_DIR, [config.MARKDOWN_EXT]
+    )
+
+    def filter_tree(nodes):
+        res = []
+        for n in nodes:
+            if n["type"] == "file" and n["path"] in changed_files:
+                res.append(n)
+            elif n["type"] == "folder":
+                children = filter_tree(n.get("children", []))
+                if children:
+                    res.append({
+                        "type": "folder",
+                        "name": n["name"],
+                        "path": n["path"],
+                        "children": children,
+                    })
+        return res
+
+    return JSONResponse({"tree": filter_tree(tree), "diffs": diffs})
 
 
 async def git_commit_all(request: Request):
@@ -1259,6 +1322,18 @@ app = Starlette(
 
 # ==================== APPLICATION ENTRY POINT ====================
 
+# ==================== ENTRY POINT ====================
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=True)
+    args = parse_args()
+
+    if args.repo_dir:
+        os.environ["REPO_DIR"] = str(Path(args.repo_dir).resolve())
+
+    # === UNIVERSAL START ===
+    # Если переменная окружения RUN_FROM_NPM не установлена, значит запустили напрямую
+    if not os.environ.get("RUN_FROM_NPM"):
+        import uvicorn
+        uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=True)
+    else:
+        # Запуск через npm/Node, ничего не делаем, Node сам запускает uvicorn
+        print("App imported via Node/npm, uvicorn will be started by backend.js")
