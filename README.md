@@ -50,4 +50,4 @@ python app.py --repo_dir "RELATIVE_OR_ABSOLUTE_PATH_TO_YOUR_WORKING_DIRECTORY"
 
 --repo_dir specifies your working directory. The editor can operate without Git in this location, but it is primarily designed to work with a Git repository. When Git is available, you gain full Git and GitHub integration features.
 
-Copyright (c) 2022-2025 [Antmicro](https://antmicro.com)
+Copyright (c) 2022-2025 [Antmicro] https://github.com/antmicro/myst-editor/
