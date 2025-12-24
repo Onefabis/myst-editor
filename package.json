@@ -7,8 +7,9 @@
   "_comment_build": "We have to increase RAM here to avoid OOM during Vite build",
 
   "scripts": {
-    "server": "cd bin && npm install && node doc-editor-server.js",
+    "server": "cd bin && node doc-editor-server.js",
     "dev": "vite",
+    "devdoc": "node bin/doc-editor-dev.js",
     "build": "node --max-old-space-size=8192 node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "host": "vite --host",

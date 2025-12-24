@@ -926,6 +926,13 @@ export async function fetchLocalTree(loadfile = true) {
     loadFile(normalizePath(currentPath));
   }
 
+  // Extract just the file name, remove .md, and capitalize first letter
+  const fileName = currentPath.split('/').pop().replace(/\.md$/, '');
+  const capitalizedName = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+
+  // Update the page title
+  document.title = `Doc Editor - "${capitalizedName}"`;
+
   if (currentPath) {
     restoreActiveFile(normalizePath(currentPath));
   }

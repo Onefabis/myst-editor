@@ -1,6 +1,5 @@
 """
 Starlette Documentation Manager with Git Integration
-A comprehensive documentation management system with version control
 """
 import os
 import re
@@ -27,15 +26,13 @@ from git import Repo, GitCommandError
 
 # ==================== CONFIGURATION START ==================== #
 
-REPO_ENV_VAR = "REPO_DIR"
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo_dir", type=str, help="Path to repository")
-
-    # if it runs through npm ignore unused arguments
-    if os.environ.get("RUN_FROM_NPM"):
+    parser.add_argument("--work_dir", type=str, help="Path to work directory with git and 'docs' folder")
+    
+    # Если запускается через npm или uvicorn, игнорировать неизвестные аргументы
+    if os.environ.get("RUN_FROM_NPM") or "uvicorn" in sys.argv[0]:
         return parser.parse_known_args()[0]
     else:
         return parser.parse_args()
@@ -43,48 +40,44 @@ def parse_args():
 
 class Config:
     def __init__(self):
-        # 1️⃣ Сначала читаем аргументы
+        # Then read from env variables
+        env_repo = os.environ.get("WORK_DIR")
+
+        # --- Второй приоритет: аргумент --work_dir при прямом запуске ---
         args = parse_args()
-        repo_arg = args.repo_dir
+        arg_repo = getattr(args, "work_dir", None)
 
-        # 2️⃣ Потом читаем из окружения
-        env_repo = os.environ.get("REPO_DIR")
+        # env_repo = os.environ.get("work_dir")
 
-        if repo_arg:
-            self.REPO_DIR = Path(repo_arg).resolve()
-        elif env_repo:
-            self.REPO_DIR = Path(env_repo).resolve()
+        if env_repo:
+            self.work_dir = Path(env_repo).resolve()
+        elif arg_repo:
+            self.work_dir = Path(arg_repo).resolve()
         else:
-            # fallback: папка на уровень выше server (т.е. doc-editor)
-            self.REPO_DIR = Path(__file__).parent.parent.resolve()
+            # fallback: go up in a file tree from a current server file (i.e. into doc-editor root)
+            # this is a workdir in case if default launch, from NPM, for example
+            self.work_dir = Path(__file__).parent.parent.resolve()
 
-        # директория с docs всегда внутри repo
+        # by default 'docs' dir is inside workdir
         self.DOCS_DIR = "docs"
-        self.BASE_DIR = (self.REPO_DIR / self.DOCS_DIR).resolve()
+        self.BASE_DIR = (self.work_dir / self.DOCS_DIR).resolve()
 
-        # статические файлы
+        # construct static files path with vite build of the frontend
         self.STATIC_FOLDER = (Path(__file__).parent / "../dist").resolve()
 
         self.ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg"}
         self.MARKDOWN_EXT = ".md"
+        self.MAX_WORKERS = 12
+
+        # regex patterns
+        self.RE_MD = re.compile(r'(!?\[[^\]]*\]\()\s*([^\)\s]+)\s*(\))')
+        self.RE_REF = re.compile(r'^(\s*\[[^\]]+\]:\s*)(\S+)\s*$', re.MULTILINE)
+        self.RE_IMG = re.compile(r'(<img[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
 
 
 config = Config()
 
 # ==================== CONFIGURATION END ==================== #
-
-
-# ==================== RENAME IMAGE CONFIGS START =============== #
-
-MD_EXT = ".md"
-MAX_WORKERS = 12
-
-# --- Regex patterns ---
-RE_MD = re.compile(r'(!?\[[^\]]*\]\()\s*([^\)\s]+)\s*(\))')
-RE_REF = re.compile(r'^(\s*\[[^\]]+\]:\s*)(\S+)\s*$', re.MULTILINE)
-RE_IMG = re.compile(r'(<img[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
-
-# ==================== RENAME IMAGE CONFIGS END =============== #
 
 
 # ==================== PATH UTILITIES START ==================== #
@@ -314,16 +307,13 @@ class GitUtils:
 
 # Initialize Git repository
 
-repo = None
-git_utils = None
-GIT_ENABLED = False
 
 repo = None
 git_utils = None
 GIT_ENABLED = False
 
 try:
-    repo = Repo(config.REPO_DIR, search_parent_directories=True)
+    repo = Repo(config.work_dir, search_parent_directories=True)
     git_utils = GitUtils(repo)
     GIT_ENABLED = True
     print(f"[Git] Enabled: {repo.git_dir}")
@@ -345,7 +335,7 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
     # --- 1) Collect all markdown files fast ---
     md_files = []
     for dp, _, files in os.walk(repo_root):
-        md_files += [Path(dp) / f for f in files if f.lower().endswith(MD_EXT)]
+        md_files += [Path(dp) / f for f in files if f.lower().endswith(config.MARKDOWN_EXT)]
 
     def fix_path(path: str) -> str:
         path = path.strip().strip('"').strip("'").replace("\\", "/")
@@ -376,9 +366,9 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
             if np != m.group(2): count += 1
             return f"{m.group(1)}{np}{m.group(3)}"
 
-        txt = RE_MD.sub(md_cb, txt)
-        txt = RE_REF.sub(ref_cb, txt)
-        txt = RE_IMG.sub(img_cb, txt)
+        txt = config.RE_MD.sub(md_cb, txt)
+        txt = config.RE_REF.sub(ref_cb, txt)
+        txt = config.RE_IMG.sub(img_cb, txt)
         return txt, count
 
     def process_file(path: Path):
@@ -400,7 +390,7 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
 
     # --- 2) Parallel processing ---
     changed = 0
-    with ThreadPoolExecutor(MAX_WORKERS) as ex:
+    with ThreadPoolExecutor(config.MAX_WORKERS) as ex:
         futs = [ex.submit(process_file, p) for p in md_files]
         for f in as_completed(futs):
             changed += f.result()
@@ -572,7 +562,7 @@ async def rename_path(request: Request):
         old_full.rename(new_full)
 
         update_md_refs(
-            repo_root=Path(config.REPO_DIR),
+            repo_root=Path(config.work_dir),
             old_rel=old_full.relative_to(config.BASE_DIR).as_posix(),
             new_rel=new_full.relative_to(config.BASE_DIR).as_posix()
         )
@@ -1371,21 +1361,20 @@ app = Starlette(
     middleware=middleware,
 )
 
-
 # ==================== APPLICATION ENTRY POINT ====================
 
 # ==================== ENTRY POINT ====================
 if __name__ == "__main__":
     args = parse_args()
 
-    if args.repo_dir:
-        os.environ["REPO_DIR"] = str(Path(args.repo_dir).resolve())
+    if args.work_dir:
+        os.environ["work_dir"] = str(Path(args.work_dir).resolve())
 
     # === UNIVERSAL START ===
-    # Если переменная окружения RUN_FROM_NPM не установлена, значит запустили напрямую
+    # If env variable RUN_FROM_NPM is not set, then run it directly
     if not os.environ.get("RUN_FROM_NPM"):
         import uvicorn
         uvicorn.run("app:app", host="0.0.0.0", port=5000, reload=True)
     else:
-        # Запуск через npm/Node, ничего не делаем, Node сам запускает uvicorn
-        print("App imported via Node/npm, uvicorn will be started by backend.js")
+        # Otherwise use it from npm/Node, don't do anything here, Node will launch uvicorn
+        print("App imported via Node/npm, uvicorn will be started by /bin/doc-editor-server.js")

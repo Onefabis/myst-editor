@@ -4,6 +4,7 @@ import { openImagePicker } from "./projectImagePicker";
 import { waitForEditorReady, saveCurrentEditorContent, bindFocusBlurHandlers, setLastSavedTimestamp } from "./saveEditorText"
 import MystEditor, { defaultButtons } from '../../MystEditor.jsx';
 import { showLatestCommitDiff, revertFileChanges, pluginReady, pluginInstance } from "../../extensions/markChangedLines";
+import "../css/PFXStyleOverride.css";
 
 
 export let mystEditorInstance = null;

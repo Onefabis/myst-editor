@@ -48,6 +48,15 @@ Ensure that all dependencies listed in ./server/requirements.txt are installed i
 python app.py --work_dir "RELATIVE_OR_ABSOLUTE_PATH_TO_YOUR_WORKING_DIRECTORY"
 ```
 
---work_dir specifies your working directory. The editor can operate without Git in this location, but it is primarily designed to work with a Git repository inside the work directory. When Git is available, you gain full Git and GitHub integration features.
+--work_dir argument specifies your working directory. The editor can operate without Git in this location, but it is primarily designed to work with a Git repository inside the work directory. When Git is available, you gain full Git and GitHub integration features.
+
+## TODO
+
+1. Make full usage of vite dev mode. Now it may work as 
+```
+npm run devdoc
+```
+But it doesn't work well with backend <-> frontent connection. More stable and simple approach need here.
+
 
 Copyright (c) 2022-2025 [Antmicro] https://github.com/antmicro/myst-editor/

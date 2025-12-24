@@ -15,10 +15,26 @@ export default defineConfig({
       include: ["path"],
     }),
   ],
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
+      "/get-file-from-git": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
+      "/search-file": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false, 
     cssCodeSplit: true, 
     lib: {
       entry: [

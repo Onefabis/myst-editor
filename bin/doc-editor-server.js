@@ -76,8 +76,7 @@ const result = spawnSync(
     env: {
       ...process.env,
       PYTHONUNBUFFERED: "1",
-      RUN_FROM_NPM: "1",
-      REPO_DIR: resolve(__dirname, "..")
+      RUN_FROM_NPM: "1"
     }
   }
 );
