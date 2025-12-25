@@ -28,7 +28,48 @@ function getPathPrefix(path) {
   return parts.join("-");                // join with dashes
 }
 
+function removeOrphanAnchors(editorView) {
+  const doc = editorView.v.state.doc;
+  const changes = [];
+
+  for (let lineNo = 1; lineNo <= doc.lines; lineNo++) {
+    const line = doc.line(lineNo);
+
+    // Match "(something)="
+    if (!/^\(.+\)=\s*$/.test(line.text.trim())) continue;
+
+    // If no next line → delete
+    if (lineNo === doc.lines) {
+      changes.push({
+        from: line.from,
+        to: line.to + 1
+      });
+      continue;
+    }
+
+    const nextLine = doc.line(lineNo + 1);
+
+    // ONLY allowed case: next line starts with '#'
+    if (!nextLine.text.startsWith("#")) {
+      changes.push({
+        from: line.from,
+        to: line.to + 1
+      });
+    }
+  }
+
+  if (changes.length) {
+    editorView.v.dispatch({
+      changes,
+      annotations: [{ type: 'cleanup-orphan-anchors', value: 'removed' }]
+    });
+  }
+}
+
+
+
 export function renumberHeadings(editorView) {
+  removeOrphanAnchors(editorView);
   const doc = editorView.v.state.doc;
   const headings = [];
   const tree = ensureSyntaxTree(editorView.v.state, doc.length, 5000);
