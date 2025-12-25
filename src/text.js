@@ -17,6 +17,8 @@ import yamlHighlight from "highlight.js/lib/languages/yaml";
 import { markdownCheckboxes } from "./markdown/markdownCheckboxes";
 import { criticMarkup } from "./markdown/markdownCriticMarkup";
 import { markdownFrontmatter } from "./markdown/markdownFrontmatter";
+import { markdownTargetBlock } from "./markdown/markdownTargetBlock";
+
 
 export const markdownUpdatedEffect = StateEffect.define();
 
@@ -59,7 +61,8 @@ export class TextManager {
         .use(markdownItMapUrls, options.mapUrl.value)
         .use(markdownCheckboxes)
         .use(criticMarkup)
-        .use(markdownFrontmatter);
+        .use(markdownFrontmatter)
+        .use(markdownTargetBlock);
       if (options.backslashLineBreak.value) md.use(backslashLineBreakPlugin);
       userSettings.value.filter((s) => s.enabled && s.markdown).forEach((s) => md.use(s.markdown));
 
