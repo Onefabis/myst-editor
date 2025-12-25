@@ -9,4 +9,4 @@ docs/venv/
 docs/.venv/
 dist
 server/__pycache__
-server/__pycache__
+server/.env
