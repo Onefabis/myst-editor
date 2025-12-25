@@ -14,7 +14,7 @@ async function api(method, url, body = null) {
 
 // Fetch branch list
 async function fetchBranches() {
-  return api("POST", "/search-file", { filename: "" });
+  return api("POST", "/api/search-file", { filename: "" });
 }
 
 // Get current working directory status

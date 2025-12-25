@@ -131,7 +131,7 @@ export async function logFilePaths() {
       let localContent = "";
       try {
         if (headCommit) {
-          const gitRes = await fetchJson("/get-file-from-git", {
+          const gitRes = await fetchJson("/api/get-file-from-git", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

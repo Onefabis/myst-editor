@@ -31,7 +31,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--work_dir", type=str, help="Path to work directory with git and 'docs' folder")
     
-    # Если запускается через npm или uvicorn, игнорировать неизвестные аргументы
+    # If launched from npm or uvicorn, ignore unrecognized arguments
     if os.environ.get("RUN_FROM_NPM") or "uvicorn" in sys.argv[0]:
         return parser.parse_known_args()[0]
     else:
@@ -40,29 +40,27 @@ def parse_args():
 
 class Config:
     def __init__(self):
-        # Then read from env variables
+        # Read from env variables first
         env_repo = os.environ.get("WORK_DIR")
 
-        # --- Второй приоритет: аргумент --work_dir при прямом запуске ---
+        # Second priority --work_dir argumend with direct python launch
         args = parse_args()
         arg_repo = getattr(args, "work_dir", None)
-
-        # env_repo = os.environ.get("work_dir")
 
         if env_repo:
             self.work_dir = Path(env_repo).resolve()
         elif arg_repo:
             self.work_dir = Path(arg_repo).resolve()
         else:
-            # fallback: go up in a file tree from a current server file (i.e. into doc-editor root)
+            # Go up in a file tree from a current server file (i.e. into doc-editor root)
             # this is a workdir in case if default launch, from NPM, for example
             self.work_dir = Path(__file__).parent.parent.resolve()
 
-        # by default 'docs' dir is inside workdir
+        # By default 'docs' dir is inside workdir
         self.DOCS_DIR = "docs"
         self.BASE_DIR = (self.work_dir / self.DOCS_DIR).resolve()
 
-        # construct static files path with vite build of the frontend
+        # Construct static files path with vite build of the frontend
         self.STATIC_FOLDER = (Path(__file__).parent / "../dist").resolve()
 
         self.ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".svg"}
@@ -1320,8 +1318,8 @@ routes = [
     Route("/api/upload_image", upload_image, methods=["POST"]),
     
     # Git operation routes
-    Route("/search-file", search_file, methods=["POST"]),
-    Route("/get-file-from-git", get_file_from_git, methods=["POST"]),
+    Route("/api/search-file", search_file, methods=["POST"]),
+    Route("/api/get-file-from-git", get_file_from_git, methods=["POST"]),
     Route("/api/git-diff-tree", git_diff_tree, methods=["GET"]),
     Route("/api/git-head", git_head, methods=["GET"]),
     Route("/api/git-diff-working-tree", git_diff_working_tree, methods=["GET"]),

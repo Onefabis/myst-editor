@@ -133,7 +133,7 @@ const Gitdiff = () => {
           const headJson = await headRes.json();
           const headCommit = headJson.head;
 
-          const gitRes = await fetch("/get-file-from-git", {
+          const gitRes = await fetch("/api/get-file-from-git", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -177,7 +177,7 @@ const Gitdiff = () => {
           leftBranch = branchLeft?.value || "";
           rightBranch = branchRight?.value || "";
 
-          const res = await fetch("/get-file-from-git", {
+          const res = await fetch("/api/get-file-from-git", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

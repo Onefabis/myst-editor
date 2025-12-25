@@ -62,7 +62,7 @@ class MystPluginClass {
     const headData = await headResp.json();
     if (!headData.head) return;
 
-    const diffResp = await fetch("/get-file-from-git", {
+    const diffResp = await fetch("/api/get-file-from-git", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -136,7 +136,7 @@ class MystPluginClass {
       const headData = await headResp.json();
       if (!headData.head) return;
 
-      const diffResp = await fetch("/get-file-from-git", {
+      const diffResp = await fetch("/api/get-file-from-git", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

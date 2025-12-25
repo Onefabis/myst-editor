@@ -387,7 +387,7 @@ export const EditorTopbar = ({ alert, buttons }) => {
         commitButtonRow.style.display = "flex";
         commitButtonRow.style.pointerEvents = "auto";
 
-        fetch("/search-file", {
+        fetch("/api/search-file", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: "" }),

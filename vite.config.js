@@ -21,14 +21,6 @@ export default defineConfig({
         target: "http://localhost:5000",
         changeOrigin: true,
       },
-      "/get-file-from-git": {
-        target: "http://localhost:5000",
-        changeOrigin: true,
-      },
-      "/search-file": {
-        target: "http://localhost:5000",
-        changeOrigin: true,
-      },
     },
   },
   build: {

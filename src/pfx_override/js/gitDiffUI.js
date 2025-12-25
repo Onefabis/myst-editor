@@ -280,7 +280,7 @@ export async function setupGitPanel() {
 
   if (!branchLeft || !branchRight) return;
 
-  const dataRes = await fetch("/search-file", {
+  const dataRes = await fetch("/api/search-file", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ filename: localStorage.getItem('currentPath') || "" })
