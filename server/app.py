@@ -6,7 +6,6 @@ import re
 import tempfile
 import shutil
 import json
-from typing import Optional, List, Dict, Any
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
@@ -84,7 +83,7 @@ class PathUtils:
     """Utilities for safe path handling"""
     
     @staticmethod
-    def normalize_relative_path(path: str) -> str:
+    def normalize_relative_path(path):
         """
         Normalize and sanitize a relative path to prevent directory traversal
         
@@ -112,7 +111,7 @@ class PathUtils:
         return path
     
     @staticmethod
-    def safe_join(base: Path, *paths: str) -> Path:
+    def safe_join(base, *paths):
         """
         Safely join paths ensuring result stays within base directory
         
@@ -143,14 +142,14 @@ class FileUtils:
     """Utilities for file operations"""
     
     @staticmethod
-    def sanitize_filename(filename: str) -> str:
+    def sanitize_filename(filename):
         """Replace unsafe characters in filename with underscores"""
         name, ext = os.path.splitext(filename)
         name = re.sub(r"[^a-zA-Z0-9_\-]", "_", name)
         return f"{name}{ext}"
     
     @staticmethod
-    def increment_filename(directory: Path, filename: str) -> str:
+    def increment_filename(directory, filename):
         """
         Generate unique filename by incrementing numeric suffix
         
@@ -178,7 +177,7 @@ class FileUtils:
             counter += 1
     
     @staticmethod
-    def scan_directory(path: Path, base: Path, ext_filter: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def scan_directory(path, base, ext_filter=None):
         """
         Recursively scan directory and return tree structure
         
@@ -222,11 +221,11 @@ class FileUtils:
 class GitUtils:
     """Utilities for git operations"""
     
-    def __init__(self, repo: Repo):
+    def __init__(self, repo):
         self.repo = repo
         self.docs_dir = config.DOCS_DIR
     
-    def get_file_content(self, commit_hash: str, filepath: str) -> str:
+    def get_file_content(self, commit_hash, filepath):
         """
         Read file content from specific commit
         
@@ -247,7 +246,7 @@ class GitUtils:
         except Exception as e:
             return f"// Error reading file: {e}"
     
-    def get_md_files_from_commit(self, commit_obj) -> set:
+    def get_md_files_from_commit(self, commit_obj):
         """Get all .md files from a commit"""
         files = set()
         
@@ -262,7 +261,7 @@ class GitUtils:
         
         return files
     
-    def check_head_status(self) -> tuple[bool, Optional[str]]:
+    def check_head_status(self):
         """
         Check if HEAD is detached and get active branch
         
@@ -276,7 +275,7 @@ class GitUtils:
         except Exception:
             return True, None
     
-    def check_remote_status(self, branch_name: str) -> Dict[str, Any]:
+    def check_remote_status(self, branch_name):
         """
         Check relationship between local and remote branch
         
@@ -323,7 +322,7 @@ except Exception as e:
 
 # ==================== MARKDOWN REFERENCE UPDATER START ==================== #
 
-def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
+def update_md_refs(repo_root, old_rel, new_rel):
     """Scan repo_root and replace old_rel → new_rel in all .md files."""
     old_rel = old_rel.lstrip("/")
     new_rel = new_rel.lstrip("/")
@@ -335,7 +334,7 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
     for dp, _, files in os.walk(repo_root):
         md_files += [Path(dp) / f for f in files if f.lower().endswith(config.MARKDOWN_EXT)]
 
-    def fix_path(path: str) -> str:
+    def fix_path(path):
         path = path.strip().strip('"').strip("'").replace("\\", "/")
         if path == old_rel:
             return new_rel
@@ -343,7 +342,7 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
             return path[: len(path) - len(old_base)] + new_base
         return path
 
-    def replace_in_text(txt: str):
+    def replace_in_text(txt):
         count = 0
 
         def md_cb(m):
@@ -369,7 +368,7 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
         txt = config.RE_IMG.sub(img_cb, txt)
         return txt, count
 
-    def process_file(path: Path):
+    def process_file(path):
         try:
             text = path.read_text(encoding="utf-8")
         except Exception:
@@ -403,14 +402,14 @@ def update_md_refs(repo_root: Path, old_rel: str, new_rel: str) -> dict:
 
 # ==================== ROUTE HANDLERS START ==================== #
 
-async def get_file_tree(request: Request):
+async def get_file_tree(request):
     """Get recursive tree of all markdown files"""
     return JSONResponse(
         FileUtils.scan_directory(config.BASE_DIR, config.BASE_DIR, [config.MARKDOWN_EXT])
     )
 
 
-async def get_file(request: Request):
+async def get_file(request):
     """Get file content and metadata"""
     path = request.query_params.get("path")
     if not path:
@@ -435,7 +434,7 @@ async def get_file(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-async def get_file_meta(request: Request):
+async def get_file_meta(request):
     """Get file modification timestamp"""
     path = request.query_params.get("path")
     if not path:
@@ -453,7 +452,7 @@ async def get_file_meta(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-async def save_file(request: Request):
+async def save_file(request):
     """Save content to file"""
     path = request.query_params.get("path")
     if not path:
@@ -480,7 +479,7 @@ async def save_file(request: Request):
     })
 
 
-async def create_file_or_folder(request: Request):
+async def create_file_or_folder(request):
     """Create new file or folder"""
     data = await request.json()
     path = data.get("path")
@@ -503,7 +502,7 @@ async def create_file_or_folder(request: Request):
     return JSONResponse({"status": "created", "path": path})
 
 
-async def delete_path(request: Request):
+async def delete_path(request):
     """Delete file or folder"""
     data = await request.json()
     path = data.get("path")
@@ -527,7 +526,7 @@ async def delete_path(request: Request):
     return JSONResponse({"status": "deleted", "path": path})
 
 
-async def rename_path(request: Request):
+async def rename_path(request):
     """Rename file or folder with collision handling"""
     data = await request.json()
     old_path = data.get("oldPath")
@@ -572,7 +571,7 @@ async def rename_path(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def images_in_folder(request: Request):
+async def images_in_folder(request):
     """List images in specific folder for the project image picker"""
     folder = request.query_params.get("folder", "")
     
@@ -592,13 +591,13 @@ async def images_in_folder(request: Request):
     )
 
 
-async def get_image_tree(request: Request):
+async def get_image_tree(request):
     """Get tree of all images in _static folder for the project image picker"""
     static_root = config.BASE_DIR / "_static"
     return JSONResponse(FileUtils.scan_directory(static_root, static_root))
 
 
-async def upload_image(request: Request):
+async def upload_image(request):
     """Upload image from outside of the project with collision handling"""
     form = await request.form()
     file = form.get("file")
@@ -650,7 +649,7 @@ def _require_git_runtime():
         )
 
 
-async def search_file(request: Request):
+async def search_file(request):
     """Get git history for file"""
     _require_git_runtime() 
 
@@ -664,7 +663,7 @@ async def search_file(request: Request):
 
     try:
         branches = []
-        commits: dict[str, list] = {}
+        commits = {}
 
         try:
             repo_branches = list(repo.branches)
@@ -731,7 +730,7 @@ async def search_file(request: Request):
         })
 
 
-async def get_file_from_git(request: Request):
+async def get_file_from_git(request):
     """Get file content from two commits for diff"""
     _require_git_runtime()
 
@@ -753,7 +752,7 @@ async def get_file_from_git(request: Request):
     })
 
 
-async def git_diff_tree(request: Request):
+async def git_diff_tree(request):
     """Get diff between two commits"""
     _require_git_runtime()
 
@@ -799,7 +798,7 @@ def require_git():
         )
 
 
-async def git_head(request: Request):
+async def git_head(request):
     _require_git_runtime()
 
     is_detached, active_branch = git_utils.check_head_status()
@@ -816,7 +815,7 @@ async def git_head(request: Request):
     })
 
 
-async def git_diff_working_tree(request: Request):
+async def git_diff_working_tree(request):
     """Compare working tree against commit"""
     _require_git_runtime()
 
@@ -866,7 +865,7 @@ async def git_diff_working_tree(request: Request):
     return JSONResponse(result)
 
 
-async def get_tree_union(request: Request):
+async def get_tree_union(request):
     """Get union of files from two commits"""
     commit_left = request.query_params.get("commit_left")
     commit_right = request.query_params.get("commit_right")
@@ -899,7 +898,7 @@ async def get_tree_union(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def get_tree_local_diff(request: Request):
+async def get_tree_local_diff(request):
     """Get local markdown changes in docs compared to HEAD (safe, optional git)."""
 
     # --- Git must be available, otherwise return empty result ---
@@ -918,8 +917,8 @@ async def get_tree_local_diff(request: Request):
     except Exception:
         return JSONResponse({"tree": [], "diffs": []})
 
-    diffs: list[dict] = []
-    changed_files: set[str] = set()
+    diffs = []
+    changed_files = set()
 
     # --- get HEAD commit safely ---
     try:
@@ -1020,7 +1019,7 @@ async def get_tree_local_diff(request: Request):
     })
 
 
-async def git_commit_all(request: Request):
+async def git_commit_all(request):
     """Commit changes to git"""
     try:
         data = await request.json()
@@ -1063,7 +1062,7 @@ async def git_commit_all(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def git_push(request: Request):
+async def git_push(request):
     """Push to remote repository"""
     try:
         is_detached, active_branch = git_utils.check_head_status()
@@ -1096,7 +1095,7 @@ async def git_push(request: Request):
         raise HTTPException(status_code=409, detail=error_msg)
 
 
-async def git_pull(request: Request):
+async def git_pull(request):
     """Pull from remote with rebase (only if remote branch exists)"""
     try:
         is_detached, active_branch = git_utils.check_head_status()
@@ -1159,7 +1158,7 @@ async def git_pull(request: Request):
 
 
 # ---- GET /api/git-status ----
-async def git_status(request: Request):
+async def git_status(request):
     try:
         DOCS = config.DOCS_DIR
 
@@ -1185,7 +1184,7 @@ async def git_status(request: Request):
 
 
 # ---- POST /api/git-checkout ----
-async def git_checkout(request: Request):
+async def git_checkout(request):
     """
     Body:
         { "branch": "feature/x" }
@@ -1204,7 +1203,7 @@ async def git_checkout(request: Request):
         try:
             repo.git.pull("--rebase")
         except Exception:
-            # Some repos don’t need pull, or branch not tracked
+            # Some repos don't need pull, or branch not tracked
             pass
 
         return JSONResponse({"ok": True})
@@ -1213,7 +1212,7 @@ async def git_checkout(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-async def git_create_branch(request: Request):
+async def git_create_branch(request):
     data = await request.json()
     branch = data.get("branch", "").strip()
 
@@ -1238,7 +1237,7 @@ async def git_create_branch(request: Request):
 
 # ==================== STATIC SECTION START ==================== #
 
-async def serve_static_files(request: Request):
+async def serve_static_files(request):
     """Serve static files from _static directory"""
     subpath = request.path_params["subpath"]
     
@@ -1253,24 +1252,24 @@ async def serve_static_files(request: Request):
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
-async def send_dictionaries(request: Request):
+async def send_dictionaries(request):
     """Serve dictionary files from frontend build"""
     path = request.path_params["path"]
     return FileResponse(config.STATIC_FOLDER / "dictionaries" / path)
 
 
-async def get_templates(request: Request):
+async def get_templates(request):
     """Serve template files from frontend build"""
     path = request.path_params["path"]
     return FileResponse(config.STATIC_FOLDER / "templates" / path)
 
 
-async def serve_linked_template_list(request: Request):
+async def serve_linked_template_list(request):
     """Serve linked template list JSON"""
     return FileResponse(config.STATIC_FOLDER / "linkedtemplatelist.json")
 
 
-async def save_uploaded_file(request: Request):
+async def save_uploaded_file(request):
     """Save uploaded file to disk"""
     form = await request.form()
     file = form.get("file")
