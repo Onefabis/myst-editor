@@ -10,3 +10,4 @@ docs/.venv/
 dist
 server/__pycache__
 server/.env
+sphinx

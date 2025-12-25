@@ -1,4 +1,5 @@
-# Doc Editor
+(source-readme_1._Doc_Editor)=
+# 1. Doc Editor
 
 **Doc Editor** is a web-based Markdown editor built on top of **[MyST Markdown]**.
 
@@ -11,7 +12,8 @@ Doc Editor is a **non-destructive editor**. By default, it works with the `./doc
 
 While you can do all your editing here, keep in mind that you won’t see the full power of MyST unless your local editor supports a MyST extension. You can always switch back to Doc Editor to take advantage of its full feature set.
 
-## Key features
+(source-readme_1.1._Key_features)=
+## 1.1. Key features
 
 - **Git integration**  
   Compare branches and commits, create your own branches and commits, and pull or push changes directly from the editor.
@@ -22,7 +24,8 @@ While you can do all your editing here, keep in mind that you won’t see the fu
 - **Ollama integration**  
   With a configured model, you can ask questions about selected text in context or request automatic rephrasing of selected content.
 
-## Quick start
+(source-readme_1.2._Quick_start)=
+## 1.2. Quick start
 
 Navigate to the root directory of the **Doc Editor** project and install dependencies:
 
@@ -41,7 +44,8 @@ http://localhost:5000
 ```
 The editor will open the introductory documentation located in the ./docs directory. From there, you can begin experimenting with MyST and editing your documentation.
 
-## Advanced usage
+(source-readme_1.3._Advanced_usage)=
+## 1.3. Advanced usage
 Ensure that all dependencies listed in ./server/requirements.txt are installed in your Python virtual environment. Then run:
 
 ```
@@ -50,13 +54,14 @@ python app.py --work_dir "RELATIVE_OR_ABSOLUTE_PATH_TO_YOUR_WORKING_DIRECTORY"
 
 --work_dir argument specifies your working directory. The editor can operate without Git in this location, but it is primarily designed to work with a Git repository inside the work directory. When Git is available, you gain full Git and GitHub integration features.
 
-## TODO
+(source-readme_1.4._TODO)=
+## 1.4. TODO
 
 1. Make full usage of vite dev mode. Now it may work as 
 ```
 npm run devdoc
 ```
-But it doesn't work well with backend <-> frontent connection. More stable and simple approach need here.
+But it doesn't work well with backend <-> frontend connection. More stable and simple approach need here.
 
 
 Copyright (c) 2022-2025 [Antmicro] https://github.com/antmicro/myst-editor/

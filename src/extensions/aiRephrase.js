@@ -130,11 +130,11 @@ class ResponsePopupWidget extends WidgetType {
     const btnBase = "popup-btn";
 
     // ------------- Common attributes for SVG button icons ----------------- //
-    const createSVG = (pathD, strokeColor = null) => {
+    const createSVG = (pathD, strokeColor = null, width = 24, height = 24) => {
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("width", "16");
       svg.setAttribute("height", "16");
-      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
       svg.setAttribute("fill", "none");
       svg.setAttribute("stroke", strokeColor || "currentColor");
       svg.setAttribute("stroke-width", "2");
@@ -175,7 +175,7 @@ class ResponsePopupWidget extends WidgetType {
     const retryBtn = el("button", {
       className: `${btnBase} popup-btn--orange`,
       onclick: () => this.fetchResponse(textarea, counter)
-    }, [createSVG("M14 7 L9 5 l2.127 -1.276 A5.178 5.178 0 0 0 7.512 2.248 5.264 5.264 0 1 0 12.536 9 h1.289 a6.518 6.518 0 1 1 -1.6 -5.934 L14 2 V7 Z", "orange")]);
+    }, [createSVG("M14 7 L9 5 l2.127 -1.276 A5.178 5.178 0 0 0 7.512 2.248 5.264 5.264 0 1 0 12.536 9 h1.289 a6.518 6.518 0 1 1 -1.6 -5.934 L14 2 V7 Z", "orange", 16, 16)]);
 
     const insertBtn = el("button", {
       className: `${btnBase} popup-btn--green`,
