@@ -14,15 +14,20 @@ While you can do all your editing here, keep in mind that you won’t see the fu
 
 (source-readme_1.1._Key_features)=
 ## 1.1. Key features
-
+```{note}
 - **Git integration**  
   Compare branches and commits, create your own branches and commits, and pull or push changes directly from the editor.
+```
 
+```{important}
 - **Excalidraw integration**  
   Use Excalidraw whiteboards directly inside the text editor. The editor generates PNG images with the embedded Excalidraw scene, allowing you to reopen, modify, and re-save diagrams at any time.
+```
 
+```{hint}
 - **Ollama integration**  
   With a configured model, you can ask questions about selected text in context or request automatic rephrasing of selected content.
+````
 
 (source-readme_1.2._Quick_start)=
 ## 1.2. Quick start
