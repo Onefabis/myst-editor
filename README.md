@@ -45,9 +45,9 @@ The editor will open the introductory documentation located in the ./docs direct
 Ensure that all dependencies listed in ./server/requirements.txt are installed in your Python virtual environment. Then run:
 
 ```
-python app.py --repo_dir "RELATIVE_OR_ABSOLUTE_PATH_TO_YOUR_WORKING_DIRECTORY"
+python app.py --work_dir "RELATIVE_OR_ABSOLUTE_PATH_TO_YOUR_WORKING_DIRECTORY"
 ```
 
---repo_dir specifies your working directory. The editor can operate without Git in this location, but it is primarily designed to work with a Git repository. When Git is available, you gain full Git and GitHub integration features.
+--work_dir specifies your working directory. The editor can operate without Git in this location, but it is primarily designed to work with a Git repository. When Git is available, you gain full Git and GitHub (in case if you created the branch on remote) integration features.
 
 Copyright (c) 2022-2025 [Antmicro] https://github.com/antmicro/myst-editor/
