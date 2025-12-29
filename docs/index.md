@@ -6,6 +6,7 @@
 
 source/readme
 source/integrations/ai_rephrase
+source/integrations/ask_ollama
 source/integrations/excalidraw
 source/integrations/harper
 ```

@@ -89,6 +89,7 @@ export async function loadFile(filename) {
       ]),
       spellcheckOpts: false,
       syncScroll: true,
+      cmDarkTheme: false,
     }, newContainer);
     const view = await waitForEditorReady();
     bindFocusBlurHandlers(view);
