@@ -34,6 +34,10 @@ Start the server. You do not need to reinstall or rebuild unless you modify the 
 ```
 npm run server
 ```
+or you can set specific docs folder (and git) location in command argument:
+```
+npm run server "RELATIVE_OR_ABSOLUTE_PATH_TO_YOUR_WORKING_DIRECTORY"
+```
 When you see the message “Application startup complete.”, open your browser and go to:
 
 ```
@@ -41,13 +45,5 @@ http://localhost:5000
 ```
 The editor will open the introductory documentation located in the ./docs directory. From there, you can begin experimenting with MyST and editing your documentation.
 
-## Advanced usage
-Ensure that all dependencies listed in ./server/requirements.txt are installed in your Python virtual environment. Then run:
-
-```
-python app.py --work_dir "RELATIVE_OR_ABSOLUTE_PATH_TO_YOUR_WORKING_DIRECTORY"
-```
-
---work_dir specifies your working directory. The editor can operate without Git in this location, but it is primarily designed to work with a Git repository. When Git is available, you gain full Git and GitHub (in case if you created the branch on remote) integration features.
 
 Copyright (c) 2022-2025 [Antmicro] https://github.com/antmicro/myst-editor/
